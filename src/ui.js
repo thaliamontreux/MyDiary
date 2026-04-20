@@ -82,31 +82,6 @@ const LETTER_KIND_OPTIONS = [
   ['future-self', 'Future self']
 ];
 
-const SCRAPBOOK_STYLE_OPTIONS = [
-  ['petals', 'Petal board'],
-  ['starlight', 'Starlight board'],
-  ['postcards', 'Postcard board'],
-  ['velvet', 'Velvet board']
-];
-
-const PAPER_STYLE_OPTIONS = [
-  ['rose-lace', 'Rose lace'],
-  ['strawberry-cream', 'Strawberry cream'],
-  ['lavender-letter', 'Lavender letter'],
-  ['swan-silk', 'Swan silk'],
-  ['daisy-daydream', 'Daisy daydream'],
-  ['moon-ribbon', 'Moon ribbon'],
-  ['pearl-parlor', 'Pearl parlor'],
-  ['sugar-cloud', 'Sugar cloud'],
-  ['cherry-blossom', 'Cherry blossom'],
-  ['cotton-candy', 'Cotton candy'],
-  ['mint-cream', 'Mint cream'],
-  ['peach-glow', 'Peach glow'],
-  ['berry-swirl', 'Berry swirl'],
-  ['vanilla-dream', 'Vanilla dream'],
-  ['blush-petal', 'Blush petal']
-];
-
 const SVG_ART_LIBRARY = [
   {
     id: 'bow',
@@ -2488,7 +2463,6 @@ export function createApp(mount) {
       el('div', { class: 'entry-list' },
         visibleEntries.length ? visibleEntries.map((e) => {
           const active = e.id === state.selectedId;
-          const maskedEntry = e.sessionLocked && !state.sessionUnlockedEntryIds.has(e.id);
           return el('button', {
             class: `entry-card accent-${e.accentColor || 'rose'} ${active ? 'active' : ''}`,
             onclick: () => {
@@ -2498,18 +2472,15 @@ export function createApp(mount) {
           }, [
             el('div', { class: 'entry-card-top' }, [
               el('span', { class: 'entry-type-chip', text: moduleLabel(e.moduleType) }),
-              el('span', { class: 'secondary-chip', text: e.sessionLocked ? 'Session locked' : entryContextText(e) })
+              el('span', { class: 'secondary-chip', text: entryContextText(e) })
             ]),
-            el('div', { class: `entry-title ${maskedEntry ? 'masked-text' : ''}`, text: maskedEntry ? 'Locked entry' : (e.title || 'Untitled') }),
+            el('div', { class: 'entry-title', text: e.title || 'Untitled' }),
             el('div', { class: 'entry-meta' }, [
               el('span', { text: formatPrettyDate(e.date) }),
               el('span', { class: 'dot', text: '•' }),
               el('span', { text: e.time || formatEntryTime(e.createdAt) || nowTime() })
             ]),
-            e.moduleType !== 'recipe' ? el('div', { class: 'entry-mood-line' }, maskedEntry ? [
-              el('span', { class: 'insight-chip', text: 'Hidden mood' }),
-              el('span', { class: 'insight-chip', text: e.privacyLevel || 'private' })
-            ] : [
+            e.moduleType !== 'recipe' ? el('div', { class: 'entry-mood-line' }, [
               el('span', { class: 'insight-chip', text: moodLabel(e.mood) }),
               el('span', { class: 'insight-chip', text: moodIntensityLabel(e.moodIntensity) }),
               moodBlendText(e)
@@ -2519,8 +2490,8 @@ export function createApp(mount) {
               e.prepTime ? el('span', { class: 'insight-chip', text: e.prepTime }) : el('span'),
               e.servings ? el('span', { class: 'insight-chip', text: `${e.servings} servings` }) : el('span')
             ]),
-            el('div', { class: `entry-preview ${maskedEntry ? 'masked-text' : ''}`, text: maskedEntry ? (e.lockNote || 'Locked for this session') : summarizeEntry(e) }),
-            !maskedEntry && e.tags?.length
+            el('div', { class: 'entry-preview', text: summarizeEntry(e) }),
+            e.tags?.length
               ? el('div', { class: 'tag-row' }, e.tags.slice(0, 3).map((tag) => el('span', { class: 'mini-tag', text: `#${tag}` })))
               : el('div')
           ]);
@@ -2537,7 +2508,6 @@ export function createApp(mount) {
     const rightRail = el('div', { class: 'side-rail' }, [
       renderLibraryRail(selected, librarySnapshot),
       renderPrivacyRail(selected, privacySnapshot),
-      renderScrapbookRail(selected, delightSnapshot),
       renderMemoryRail(selected, onThisDayEntries, delightSnapshot),
       renderMoodRail(selected, moodSnapshot),
       renderThemeRail()
@@ -2618,18 +2588,10 @@ export function createApp(mount) {
           el('div', { class: 'mood-stat-row' }, [el('span', { class: 'detail-label', text: 'Locked entries' }), el('span', { class: 'mood-stat-value', text: String(snapshot.lockedEntries) })]),
           el('div', { class: 'mood-stat-row' }, [el('span', { class: 'detail-label', text: 'Extra secret' }), el('span', { class: 'mood-stat-value', text: String(snapshot.secretEntries) })]),
           el('div', { class: 'mood-stat-row' }, [el('span', { class: 'detail-label', text: 'Shared' }), el('span', { class: 'mood-stat-value', text: String(snapshot.sharedEntries) })]),
-          entry ? el('div', { class: 'setting-row' }, [
-            el('span', { class: 'detail-label', text: 'Selected entry lock' }),
-            el('button', { class: `toggle-chip ${entry.sessionLocked ? 'active' : ''}`, type: 'button', onclick: () => toggleSelectedSessionLock() }, [el('span', { text: entry.sessionLocked ? 'Locked' : 'Unlocked' })])
-          ]) : el('div'),
           el('div', { class: 'button-stack' }, [
             el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => lockEntriesWhere((item) => normalizeEntry(item).privacyLevel === 'secret', 'secret entries') }, [
               el('span', { class: 'btn-ic', text: '✦' }),
               el('span', { text: 'Lock all secret' })
-            ]),
-            el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => lockEntriesWhere((item) => normalizeEntry(item).privacyLevel === 'secret' || normalizeEntry(item).sessionLocked, 'private entries') }, [
-              el('span', { class: 'btn-ic', text: '⟡' }),
-              el('span', { text: 'Re-lock protected' })
             ])
           ])
         ]),
@@ -2674,153 +2636,6 @@ export function createApp(mount) {
             importInput
           ]),
           el('div', { class: 'mood-line soft', text: 'Backups stay encrypted; importing replaces the current selected vault slot.' })
-        ])
-      ])
-    ]);
-  }
-
-  function renderScrapbookRail(selected, snapshot) {
-    const entry = selected ? normalizeEntry(selected) : null;
-
-    return el('div', { class: 'scrapbook-rail' }, [
-      el('div', { class: 'sidebar-head' }, [
-        el('div', { class: 'sidebar-title', text: 'Scrapbook' }),
-        el('div', { class: 'sidebar-sub', text: 'Keepsakes, stickers, and little treasures' })
-      ]),
-      el('div', { class: 'mood-rail-body' }, [
-        el('div', { class: 'mood-card' }, [
-          el('div', { class: 'mood-card-title', text: 'Collection' }),
-          el('div', { class: 'mood-stat-row' }, [el('span', { class: 'detail-label', text: 'Keepsakes' }), el('span', { class: 'mood-stat-value', text: String(snapshot.keepsakeCount) })]),
-          el('div', { class: 'mood-stat-row' }, [el('span', { class: 'detail-label', text: 'Sticker charms' }), el('span', { class: 'mood-stat-value', text: String(snapshot.stickerCount) })]),
-          el('div', { class: 'mood-stat-row' }, [el('span', { class: 'detail-label', text: 'Scrapbook pages' }), el('span', { class: 'mood-stat-value', text: String(snapshot.scrapbookCount) })])
-        ]),
-        entry ? el('div', { class: 'mood-card' }, [
-          el('div', { class: 'mood-card-title', text: 'Selected page keepsakes' }),
-          el('div', { class: `board-preview board-${entry.scrapbookStyle}` }),
-          el('div', { class: 'mood-line soft', text: `Board style: ${SCRAPBOOK_STYLE_OPTIONS.find(([value]) => value === entry.scrapbookStyle)?.[1] || 'Petal board'}` }),
-          el('div', { class: 'attachment-list' }, [
-            el('div', { class: 'attachment-chip', text: `${entry.keepsakes.length} keepsakes` }),
-            el('div', { class: 'attachment-chip', text: `${entry.photoCaptions.length} photo captions` }),
-            el('div', { class: 'attachment-chip', text: `${entry.voiceNotes.length} voice notes` })
-          ]),
-          el('div', { class: 'sticker-row' }, (entry.stickers.length ? entry.stickers : ['empty']).slice(0, 6).map((sticker) => el('span', { class: 'sticker-badge', text: sticker === 'empty' ? 'no stickers yet' : sticker })))
-        ]) : el('div', { class: 'mood-card' }, [
-          el('div', { class: 'mood-card-title', text: 'A keepsake board will appear here' }),
-          el('div', { class: 'mood-card-sub', text: 'Open any page to collect stickers, memory notes, and placeholders for photos or voice notes.' })
-        ])
-      ])
-    ]);
-  }
-
-  function renderMemoryRail(selected, onThisDayEntries, delightSnapshot) {
-    const entry = selected ? normalizeEntry(selected) : null;
-    const prompt = suggestedPromptForEntry(entry);
-
-    return el('div', { class: 'memory-rail' }, [
-      el('div', { class: 'sidebar-head' }, [
-        el('div', { class: 'sidebar-title', text: 'Magic little things' }),
-        el('div', { class: 'sidebar-sub', text: 'Prompts, resurfacing, and cozy controls' })
-      ]),
-      el('div', { class: 'mood-rail-body' }, [
-        el('div', { class: 'mood-card' }, [
-          el('div', { class: 'mood-card-title', text: 'Prompt whisper' }),
-          el('div', { class: 'prompt-text', text: prompt }),
-          entry ? el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => applyPromptToSelected(prompt) }, [
-            el('span', { class: 'btn-ic', text: '✎' }),
-            el('span', { text: 'Use prompt' })
-          ]) : el('div')
-        ]),
-        el('div', { class: 'mood-card' }, [
-          el('div', { class: 'mood-card-title', text: 'On this day' }),
-          onThisDayEntries.length ? el('div', { class: 'memory-list' }, onThisDayEntries.map((item) => el('button', {
-            class: 'memory-item',
-            type: 'button',
-            onclick: () => {
-              state.selectedId = item.id;
-              render();
-            }
-          }, [
-            el('div', { class: 'memory-item-title', text: item.title || 'Untitled memory' }),
-            el('div', { class: 'memory-item-sub', text: `${formatPrettyDate(item.date)} • ${moduleLabel(item.moduleType)}` })
-          ]))) : [
-            el('div', { class: 'mood-card-sub', text: 'When future memories share this date, they will softly resurface here.' })
-          ]
-        ]),
-        el('div', { class: 'mood-card' }, [
-          el('div', { class: 'mood-card-title', text: 'Delight settings' }),
-          el('div', { class: 'mood-stat-row' }, [el('span', { class: 'detail-label', text: 'Reward tier' }), el('span', { class: 'mood-stat-value', text: delightSnapshot.rewardTier })]),
-          el('div', { class: 'mood-stat-row' }, [el('span', { class: 'detail-label', text: 'Sparkle points' }), el('span', { class: 'mood-stat-value', text: String(delightSnapshot.sparklePoints) })]),
-          el('div', { class: 'setting-row' }, [
-            el('span', { class: 'detail-label', text: 'Ambience' }),
-            el('div', { class: 'setting-pill-row' }, AMBIENCE_OPTIONS.map((option) => el('button', {
-              class: `pill ${state.ui.ambience === option ? 'active' : ''}`,
-              type: 'button',
-              onclick: () => updateUiPrefs({ ambience: option })
-            }, [el('span', { text: option })])))
-          ]),
-          el('div', { class: 'setting-row' }, [
-            el('span', { class: 'detail-label', text: 'Page motion' }),
-            el('button', { class: `toggle-chip ${state.ui.pageMotion ? 'active' : ''}`, type: 'button', onclick: () => updateUiPrefs({ pageMotion: !state.ui.pageMotion }) }, [el('span', { text: state.ui.pageMotion ? 'On' : 'Off' })])
-          ]),
-          el('div', { class: 'setting-row' }, [
-            el('span', { class: 'detail-label', text: 'Comfort mode' }),
-            el('button', { class: `toggle-chip ${state.ui.comfortMode ? 'active' : ''}`, type: 'button', onclick: () => updateUiPrefs({ comfortMode: !state.ui.comfortMode }) }, [el('span', { text: state.ui.comfortMode ? 'Gentle' : 'Standard' })])
-          ]),
-          el('div', { class: 'setting-row' }, [
-            el('span', { class: 'detail-label', text: 'Kid mode' }),
-            el('button', { class: `toggle-chip ${state.ui.kidMode ? 'active' : ''}`, type: 'button', onclick: () => updateUiPrefs({ kidMode: !state.ui.kidMode }) }, [el('span', { text: state.ui.kidMode ? 'Soft labels' : 'Standard labels' })])
-          ]),
-          el('div', { class: 'mood-stat-row' }, [el('span', { class: 'detail-label', text: 'Habit wins' }), el('span', { class: 'mood-stat-value', text: String(delightSnapshot.habitCount) })]),
-          el('div', { class: 'mood-stat-row' }, [el('span', { class: 'detail-label', text: 'Self-care checks' }), el('span', { class: 'mood-stat-value', text: String(delightSnapshot.selfCareCount) })]),
-          el('div', { class: 'mood-line soft', text: `Writing streak: ${delightSnapshot.streak} day${delightSnapshot.streak === 1 ? '' : 's'}` })
-        ])
-      ])
-    ]);
-  }
-
-  function renderMoodRail(selected, snapshot) {
-    const moodEntry = selected ? normalizeEntry(selected) : null;
-
-    return el('div', { class: 'mood-rail' }, [
-      el('div', { class: 'sidebar-head' }, [
-        el('div', { class: 'sidebar-title', text: 'Mood World' }),
-        el('div', { class: 'sidebar-sub', text: 'Track feelings, needs, and gentle care' })
-      ]),
-      el('div', { class: 'mood-rail-body' }, [
-        el('div', { class: 'mood-card' }, moodEntry ? [
-          el('div', { class: 'mood-card-title', text: `${moodLabel(moodEntry.mood)} • ${moodIntensityLabel(moodEntry.moodIntensity)}` }),
-          el('div', { class: 'mood-card-sub', text: moodSupport(moodEntry.mood) }),
-          moodBlendText(moodEntry)
-            ? el('div', { class: 'mood-line', text: `Blended with ${moodBlendText(moodEntry)}` })
-            : el('div', { class: 'mood-line', text: 'No blended moods picked yet' }),
-          el('div', { class: 'mood-tag-group' }, (moodEntry.moodNeeds || []).length
-            ? moodEntry.moodNeeds.map((item) => el('span', { class: 'mood-tag', text: item }))
-            : [el('span', { class: 'mood-tag', text: 'need a little comfort' })]
-          ),
-          el('div', { class: 'mood-line soft', text: `Triggers: ${(moodEntry.moodTriggers || []).join(', ') || 'none noted'}` }),
-          el('div', { class: 'mood-line soft', text: `Coping: ${(moodEntry.copingActions || []).join(', ') || 'not chosen yet'}` })
-        ] : [
-          el('div', { class: 'mood-card-title', text: 'Your moods will bloom here' }),
-          el('div', { class: 'mood-card-sub', text: 'Open an entry to track what you feel and what might help.' })
-        ]),
-        el('div', { class: 'mood-card' }, [
-          el('div', { class: 'mood-card-title', text: 'Recent pattern' }),
-          el('div', { class: 'mood-stat-row' }, [
-            el('span', { class: 'detail-label', text: 'Top mood' }),
-            el('span', { class: 'mood-stat-value', text: snapshot.topMood })
-          ]),
-          el('div', { class: 'mood-stat-row' }, [
-            el('span', { class: 'detail-label', text: 'Average intensity' }),
-            el('span', { class: 'mood-stat-value', text: snapshot.averageIntensity })
-          ]),
-          el('div', { class: 'mood-stat-row' }, [
-            el('span', { class: 'detail-label', text: 'Most common need' }),
-            el('span', { class: 'mood-stat-value', text: snapshot.frequentNeed })
-          ]),
-          el('div', { class: 'mood-stat-row' }, [
-            el('span', { class: 'detail-label', text: 'Most common trigger' }),
-            el('span', { class: 'mood-stat-value', text: snapshot.frequentTrigger })
-          ])
         ])
       ])
     ]);
@@ -3232,10 +3047,6 @@ export function createApp(mount) {
     ];
     const detailCards = [];
 
-    if (selected.sessionLocked) {
-      insightChips.unshift(el('div', { class: 'insight-chip', text: isSessionHidden ? 'Session locked' : 'Revealed for this session' }));
-    }
-
     if (selected.moduleType === 'diary') {
       metaControls.splice(2, 0, typeSelect, moodSelect);
       insightChips.unshift(el('div', { class: 'insight-chip', text: `${moodLabel(selected.mood)} • ${moodIntensityLabel(selected.moodIntensity)}` }));
@@ -3354,16 +3165,7 @@ export function createApp(mount) {
         el('div', { class: 'editor-head-right' }, [delBtn])
       ]),
       el('div', { class: 'detail-grid' }, detailCards),
-      isSessionHidden
-        ? el('div', { class: 'locked-editor-state' }, [
-          el('div', { class: 'empty-title', text: 'This page is session-locked.' }),
-          el('div', { class: 'empty-sub', text: selected.lockNote || 'Reveal it only when you want to see it in this session.' }),
-          el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => revealSelectedForSession() }, [
-            el('span', { class: 'btn-ic', text: '♡' }),
-            el('span', { text: 'Reveal now' })
-          ])
-        ])
-        : unifiedCanvas,
+      unifiedCanvas,
       el('div', { class: 'editor-foot' }, [
         el('button', { class: 'btn', type: 'button', onclick: () => saveAllFormChanges() }, [
           el('span', { class: 'btn-ic', text: '♡' }),
