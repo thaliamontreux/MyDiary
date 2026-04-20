@@ -2736,7 +2736,6 @@ export function createApp(mount) {
     }
 
     selected = normalizeEntry(selected);
-    const isSessionHidden = selected.sessionLocked && !state.sessionUnlockedEntryIds.has(selected.id);
 
     const titleInput = el('input', {
       class: 'title-input',
@@ -2889,225 +2888,54 @@ export function createApp(mount) {
       el('span', { text: 'Trash' })
     ]);
 
-    // Art Studio Popup
-    let artStudioOpen = false;
-    let artStudioModal = null;
-    let artStudioKeyHandler = null;
-    
-    function openArtStudio() {
-      if (artStudioModal) return;
-      artStudioOpen = true;
+    const wrapSelection = (prefix, suffix = prefix) => {
+      const start = textarea.selectionStart ?? 0;
+      const end = textarea.selectionEnd ?? 0;
+      const value = textarea.value || '';
+      const selectedText = value.slice(start, end);
+      textarea.value = `${value.slice(0, start)}${prefix}${selectedText}${suffix}${value.slice(end)}`;
+      textarea.focus();
+      textarea.selectionStart = start + prefix.length;
+      textarea.selectionEnd = end + prefix.length;
+    };
 
-      const artChips = SVG_ART_LIBRARY.map((asset) => el('div', {
-        class: 'art-chip',
-        draggable: 'true',
-        title: asset.label,
-        ondragstart: (ev) => {
-          ev.dataTransfer?.setData('text/plain', asset.id);
-          ev.dataTransfer.effectAllowed = 'copy';
-          if (artStudioModal) artStudioModal.classList.add('art-studio-modal-dragging');
-        },
-        ondragend: () => closeArtStudio(),
-        onclick: () => {
-          addPlacedArtToSelected(asset.id, 50, 48);
-          closeArtStudio();
-        }
-      }, [
-        el('img', { src: asset.svg, alt: asset.label })
-      ]));
+    const prefixCurrentLine = (prefix) => {
+      const start = textarea.selectionStart ?? 0;
+      const end = textarea.selectionEnd ?? 0;
+      const value = textarea.value || '';
+      const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+      const block = value.slice(lineStart, end);
+      const nextBlock = block
+        .split('\n')
+        .map((line) => `${prefix}${line}`)
+        .join('\n');
+      textarea.value = `${value.slice(0, lineStart)}${nextBlock}${value.slice(end)}`;
+      textarea.focus();
+      textarea.selectionStart = lineStart;
+      textarea.selectionEnd = lineStart + nextBlock.length;
+    };
 
-      const uploadImageInput = el('input', {
-        type: 'file',
-        accept: 'image/*',
-        style: 'display:none;',
-        onchange: async (ev) => {
-          const file = ev.target.files?.[0];
-          if (!file) return;
-          await handleImageDrop(file, 50, 48);
-          closeArtStudio();
-        }
-      });
-      
-      artStudioModal = el('div', { 
-        class: 'art-studio-modal',
-        onclick: (ev) => {
-          if (ev.target === artStudioModal) closeArtStudio();
-        }
-      }, [
-        el('div', { class: 'art-studio-popup' }, [
-          el('div', { class: 'art-studio-header' }, [
-            el('div', { class: 'art-studio-title', text: 'Art Studio' }),
-            el('button', { 
-              class: 'art-studio-close',
-              onclick: closeArtStudio
-            }, [el('span', { text: '✕' })])
-          ]),
-          el('div', { class: 'art-studio-hint', text: 'Drag items to your page or click to place' }),
-          el('div', { class: 'art-studio-upload' }, [
-            el('button', {
-              class: 'btn ghost small-btn',
-              type: 'button',
-              onclick: () => uploadImageInput.click()
-            }, [
-              el('span', { class: 'btn-ic', text: '⤴' }),
-              el('span', { text: 'Upload image' })
-            ]),
-            uploadImageInput
-          ]),
-          el('div', { class: 'art-chip-grid' }, artChips)
-        ])
-      ]);
-
-      artStudioKeyHandler = (ev) => {
-        if (ev.key === 'Escape') closeArtStudio();
-      };
-      document.addEventListener('keydown', artStudioKeyHandler);
-
-      document.body.appendChild(artStudioModal);
-    }
-
-    function closeArtStudio() {
-      if (artStudioModal) {
-        artStudioModal.remove();
-        artStudioModal = null;
-      }
-      if (artStudioKeyHandler) {
-        document.removeEventListener('keydown', artStudioKeyHandler);
-        artStudioKeyHandler = null;
-      }
-      artStudioOpen = false;
-    }
-    
-    const addArtButton = el('button', { 
-      class: 'add-art-btn',
-      type: 'button',
-      onclick: openArtStudio
-    }, [
-      el('span', { text: '♡' }),
-      el('span', { text: 'Add Art' })
-    ]);
-
-    const unifiedCanvas = el('div', {
-      class: `unified-canvas paper-${selected.paperStyle}`,
-      ondragover: (ev) => ev.preventDefault(),
-      ondrop: async (ev) => {
-        ev.preventDefault();
-        const assetId = ev.dataTransfer?.getData('text/plain');
-        const rect = ev.currentTarget.getBoundingClientRect();
-        const x = clampPercent(((ev.clientX - rect.left) / rect.width) * 100);
-        const y = clampPercent(((ev.clientY - rect.top) / rect.height) * 100);
-        
-        if (assetId) {
-          addPlacedArtToSelected(assetId, x, y);
-        } else if (ev.dataTransfer?.files?.length > 0) {
-          const file = ev.dataTransfer.files[0];
-          await handleImageDrop(file, x, y);
-        }
-      }
-    }, [
-      el('div', { class: 'canvas-label' }, [
-        el('span', { text: 'Drag SVG charms, images, or add text blocks here.' }),
-        el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => addTextBlockToSelected(10, 10) }, [
-          el('span', { class: 'btn-ic', text: '+' }),
-          el('span', { text: 'Add text block' })
+    const editorToolbar = el('div', { class: 'detail-grid' }, [
+      el('div', { class: 'detail-card detail-card-wide' }, [
+        el('span', { class: 'detail-label', text: 'Editor tools' }),
+        el('div', { class: 'setting-pill-row' }, [
+          el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => wrapSelection('**') }, [el('span', { text: 'Bold' })]),
+          el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => wrapSelection('*') }, [el('span', { text: 'Italic' })]),
+          el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => prefixCurrentLine('# ') }, [el('span', { text: 'H1' })]),
+          el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => prefixCurrentLine('## ') }, [el('span', { text: 'H2' })]),
+          el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => prefixCurrentLine('- ') }, [el('span', { text: 'Bullet' })]),
+          el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => prefixCurrentLine('1. ') }, [el('span', { text: 'Numbered' })]),
+          el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => prefixCurrentLine('> ') }, [el('span', { text: 'Quote' })])
         ])
       ])
     ]);
 
-    // Combine all elements (text blocks and graphics) and sort by z-index
-    const allElements = [];
-    
-    (selected.textBlocks || []).forEach((block) => {
-      allElements.push({ type: 'text', data: block, z: block.z || 0 });
-    });
-    
-    (selected.placedArt || []).forEach((art) => {
-      allElements.push({ type: 'art', data: art, z: art.z || 0 });
-    });
-    
-    allElements.sort((a, b) => a.z - b.z);
-
-    allElements.forEach((element) => {
-      if (element.type === 'text') {
-        const block = element.data;
-        const bgStyle = block.backgroundColor === 'transparent' ? 'background:transparent;' : `background:${block.backgroundColor};`;
-        const textBlockEl = el('div', {
-          class: 'text-block-item',
-          'data-block-id': block.id,
-          style: `left:${block.x}%; top:${block.y}%; width:${block.width}px; height:${block.height}px; z-index:${block.z}; ${bgStyle}`,
-          onpointerdown: (ev) => startTextBlockDrag(ev, unifiedCanvas, block)
-        }, [
-          el('div', { class: 'text-block-toolbar' }, [
-            el('button', { class: 'mini-tool-btn', type: 'button', onclick: () => shiftTextBlockLayer(block.id, -1) }, [el('span', { text: '←' })]),
-            el('button', { class: 'mini-tool-btn', type: 'button', onclick: () => patchTextBlock(block.id, { width: block.width + 20 }) }, [el('span', { text: '↔' })]),
-            el('button', { class: 'mini-tool-btn', type: 'button', onclick: () => patchTextBlock(block.id, { height: block.height + 20 }) }, [el('span', { text: '↕' })]),
-            el('button', { class: 'mini-tool-btn', type: 'button', onclick: () => patchTextBlock(block.id, { width: block.width - 20 }) }, [el('span', { text: '↔' })]),
-            el('button', { class: 'mini-tool-btn', type: 'button', onclick: () => patchTextBlock(block.id, { height: block.height - 20 }) }, [el('span', { text: '↕' })]),
-            el('button', { class: 'mini-tool-btn', type: 'button', onclick: () => shiftTextBlockLayer(block.id, 1) }, [el('span', { text: '→' })]),
-            el('button', { class: 'mini-tool-btn', type: 'button', onclick: () => patchTextBlock(block.id, { fontSize: Math.max(10, block.fontSize - 2) }) }, [el('span', { text: 'A−' })]),
-            el('button', { class: 'mini-tool-btn', type: 'button', onclick: () => patchTextBlock(block.id, { fontSize: Math.min(24, block.fontSize + 2) }) }, [el('span', { text: 'A+' })]),
-            el('select', {
-              class: 'mini-color-select',
-              onchange: (ev) => patchTextBlock(block.id, { backgroundColor: ev.target.value })
-            }, TEXT_BLOCK_BACKGROUNDS.map(([value, label]) => el('option', { value, text: label }))),
-            el('button', {
-              class: 'mini-tool-btn',
-              type: 'button',
-              title: 'Transparent background',
-              onclick: () => patchTextBlock(block.id, { backgroundColor: 'transparent' })
-            }, [el('span', { text: '◌' })]),
-            el('input', {
-              class: 'mini-color-input',
-              type: 'color',
-              title: 'Background color',
-              value: block.backgroundColor === 'transparent' ? '#ffffff' : block.backgroundColor,
-              onchange: (ev) => patchTextBlock(block.id, { backgroundColor: ev.target.value })
-            }),
-            el('input', {
-              class: 'mini-color-input',
-              type: 'color',
-              title: 'Text color',
-              value: block.textColor,
-              onchange: (ev) => patchTextBlock(block.id, { textColor: ev.target.value })
-            }),
-            el('button', { class: 'mini-tool-btn danger-mini', type: 'button', onclick: () => removeTextBlock(block.id) }, [el('span', { text: '✕' })])
-          ]),
-          el('textarea', {
-            class: 'text-block-content',
-            style: `font-size:${block.fontSize}px; color:${block.textColor}; background:transparent;`,
-            placeholder: 'Type your text here...',
-            oninput: (ev) => debouncedPatchTextBlock(block.id, { content: ev.target.value })
-          }, [block.content])
-        ]);
-        // Set select value after creation
-        const bgSelect = textBlockEl.querySelector('.mini-color-select');
-        if (bgSelect) bgSelect.value = block.backgroundColor;
-        unifiedCanvas.append(textBlockEl);
-      } else if (element.type === 'art') {
-        const item = element.data;
-        const asset = item.assetId === 'custom-image' ? { svg: item.customImage, label: 'Custom image' } : artAssetById(item.assetId);
-        const placed = el('div', {
-          class: 'placed-art-item',
-          'data-art-id': item.id,
-          style: `left:${item.x}%; top:${item.y}%; width:${item.size}px; height:${item.size}px; transform:translate(-50%, -50%) rotate(${item.rotate}deg) scaleX(${item.flipX ? -1 : 1}); z-index:${item.z};`,
-          onpointerdown: (ev) => startPlacedArtDrag(ev, unifiedCanvas, item)
-        }, [
-          el('img', { class: 'placed-art-image', src: asset.svg, alt: asset.label }),
-          el('div', { class: 'placed-art-toolbar' }, [
-            el('button', { class: 'mini-tool-btn', type: 'button', onclick: () => shiftPlacedArtLayer(item.id, -1) }, [el('span', { text: '←' })]),
-            el('button', { class: 'mini-tool-btn', type: 'button', onclick: () => patchPlacedArtItem(item.id, { rotate: item.rotate - 15 }) }, [el('span', { text: '⟲' })]),
-            el('button', { class: 'mini-tool-btn', type: 'button', onclick: () => patchPlacedArtItem(item.id, { size: item.size + 12 }) }, [el('span', { text: '+' })]),
-            el('button', { class: 'mini-tool-btn', type: 'button', onclick: () => patchPlacedArtItem(item.id, { size: item.size - 12 }) }, [el('span', { text: '−' })]),
-            el('button', { class: 'mini-tool-btn', type: 'button', onclick: () => patchPlacedArtItem(item.id, { rotate: item.rotate + 15 }) }, [el('span', { text: '⟳' })]),
-            el('button', { class: 'mini-tool-btn', type: 'button', onclick: () => shiftPlacedArtLayer(item.id, 1) }, [el('span', { text: '→' })]),
-            el('button', { class: 'mini-tool-btn', type: 'button', onclick: () => duplicatePlacedArt(item.id) }, [el('span', { text: '⊕' })]),
-            el('button', { class: 'mini-tool-btn', type: 'button', onclick: () => flipPlacedArt(item.id) }, [el('span', { text: '↔' })]),
-            el('button', { class: 'mini-tool-btn danger-mini', type: 'button', onclick: () => removePlacedArtFromSelected(item.id) }, [el('span', { text: '✕' })])
-          ])
-        ]);
-        unifiedCanvas.append(placed);
-      }
-    });
+    const plainTextEditor = el('div', { class: 'detail-grid' }, [
+      el('div', { class: 'detail-card detail-card-wide' }, [
+        el('span', { class: 'detail-label', text: 'Main editor' }),
+        textarea
+      ])
+    ]);
 
     const metaControls = [dateInput, timeInput, privacySelect];
     const insightChips = [
@@ -3234,7 +3062,8 @@ export function createApp(mount) {
         el('div', { class: 'editor-head-right' }, [delBtn])
       ]),
       el('div', { class: 'detail-grid' }, detailCards),
-      unifiedCanvas,
+      editorToolbar,
+      plainTextEditor,
       el('div', { class: 'editor-foot' }, [
         el('button', { class: 'btn', type: 'button', onclick: () => saveAllFormChanges() }, [
           el('span', { class: 'btn-ic', text: '♡' }),
