@@ -2641,6 +2641,75 @@ export function createApp(mount) {
     ]);
   }
 
+  function renderMemoryRail(selected, onThisDayEntries, delightSnapshot) {
+    const entry = selected ? normalizeEntry(selected) : null;
+    const prompt = suggestedPromptForEntry(entry);
+
+    return el('div', { class: 'memory-rail' }, [
+      el('div', { class: 'sidebar-head' }, [
+        el('div', { class: 'sidebar-title', text: 'Memory lane' }),
+        el('div', { class: 'sidebar-sub', text: 'Helpful prompts and resurfacing notes' })
+      ]),
+      el('div', { class: 'mood-rail-body' }, [
+        el('div', { class: 'mood-card' }, [
+          el('div', { class: 'mood-card-title', text: 'Prompt' }),
+          el('div', { class: 'prompt-text', text: prompt }),
+          entry ? el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => applyPromptToSelected(prompt) }, [
+            el('span', { class: 'btn-ic', text: '✎' }),
+            el('span', { text: 'Use prompt' })
+          ]) : el('div')
+        ]),
+        el('div', { class: 'mood-card' }, [
+          el('div', { class: 'mood-card-title', text: 'On this day' }),
+          onThisDayEntries.length
+            ? el('div', { class: 'memory-list' }, onThisDayEntries.map((item) => el('button', {
+              class: 'memory-item',
+              type: 'button',
+              onclick: () => {
+                state.selectedId = item.id;
+                render();
+              }
+            }, [
+              el('div', { class: 'memory-item-title', text: item.title || 'Untitled memory' }),
+              el('div', { class: 'memory-item-sub', text: `${formatPrettyDate(item.date)} • ${moduleLabel(item.moduleType)}` })
+            ])))
+            : el('div', { class: 'mood-card-sub', text: 'Memories from this date will appear here.' })
+        ]),
+        el('div', { class: 'mood-card' }, [
+          el('div', { class: 'mood-card-title', text: 'Progress' }),
+          el('div', { class: 'mood-stat-row' }, [el('span', { class: 'detail-label', text: 'Reward tier' }), el('span', { class: 'mood-stat-value', text: delightSnapshot.rewardTier })]),
+          el('div', { class: 'mood-stat-row' }, [el('span', { class: 'detail-label', text: 'Sparkle points' }), el('span', { class: 'mood-stat-value', text: String(delightSnapshot.sparklePoints) })]),
+          el('div', { class: 'mood-line soft', text: `Writing streak: ${delightSnapshot.streak} day${delightSnapshot.streak === 1 ? '' : 's'}` })
+        ])
+      ])
+    ]);
+  }
+
+  function renderMoodRail(selected, snapshot) {
+    const moodEntry = selected ? normalizeEntry(selected) : null;
+
+    return el('div', { class: 'mood-rail' }, [
+      el('div', { class: 'sidebar-head' }, [
+        el('div', { class: 'sidebar-title', text: 'Mood' }),
+        el('div', { class: 'sidebar-sub', text: 'Simple emotional snapshot' })
+      ]),
+      el('div', { class: 'mood-rail-body' }, [
+        el('div', { class: 'mood-card' }, moodEntry ? [
+          el('div', { class: 'mood-card-title', text: `${moodLabel(moodEntry.mood)} • ${moodIntensityLabel(moodEntry.moodIntensity)}` }),
+          el('div', { class: 'mood-card-sub', text: moodSupport(moodEntry.mood) })
+        ] : [
+          el('div', { class: 'mood-card-title', text: 'No entry selected' }),
+          el('div', { class: 'mood-card-sub', text: 'Pick a page to view mood context.' })
+        ]),
+        el('div', { class: 'mood-card' }, [
+          el('div', { class: 'mood-card-title', text: 'Recent pattern' }),
+          el('div', { class: 'mood-stat-row' }, [el('span', { class: 'detail-label', text: 'Top mood' }), el('span', { class: 'mood-stat-value', text: snapshot.topMood })]),
+          el('div', { class: 'mood-stat-row' }, [el('span', { class: 'detail-label', text: 'Avg intensity' }), el('span', { class: 'mood-stat-value', text: snapshot.averageIntensity })])
+        ])
+      ])
+    ]);
+  }
+
   function renderThemeRail() {
     return el('div', { class: 'theme-rail' }, [
       el('div', { class: 'sidebar-head' }, [
