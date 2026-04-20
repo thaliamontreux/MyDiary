@@ -9,6 +9,7 @@ set -euo pipefail
 #
 # Optional:
 #   -p <app_port>        (default: 5173)
+#   -b <api_port>        (default: 4000)
 #   -s <site_name>       (default: diaryapp)
 #   -w                   Include www.<domain> in certificate and server_name
 
@@ -16,19 +17,21 @@ DOMAIN=""
 EMAIL=""
 CF_API_TOKEN=""
 APP_PORT="5173"
+API_PORT="4000"
 SITE_NAME="diaryapp"
 INCLUDE_WWW="false"
 
-while getopts ":d:e:t:p:s:wh" opt; do
+while getopts ":d:e:t:p:b:s:wh" opt; do
   case "$opt" in
     d) DOMAIN="$OPTARG" ;;
     e) EMAIL="$OPTARG" ;;
     t) CF_API_TOKEN="$OPTARG" ;;
     p) APP_PORT="$OPTARG" ;;
+    b) API_PORT="$OPTARG" ;;
     s) SITE_NAME="$OPTARG" ;;
     w) INCLUDE_WWW="true" ;;
     h)
-      echo "Usage: sudo $0 -d <domain> -e <email> -t <cloudflare_api_token> [-p app_port] [-s site_name] [-w]"
+      echo "Usage: sudo $0 -d <domain> -e <email> -t <cloudflare_api_token> [-p app_port] [-b api_port] [-s site_name] [-w]"
       exit 0
       ;;
     *)
@@ -40,7 +43,7 @@ done
 
 if [[ -z "$DOMAIN" || -z "$EMAIL" || -z "$CF_API_TOKEN" ]]; then
   echo "Error: -d, -e, and -t are required."
-  echo "Usage: sudo $0 -d <domain> -e <email> -t <cloudflare_api_token> [-p app_port] [-s site_name] [-w]"
+  echo "Usage: sudo $0 -d <domain> -e <email> -t <cloudflare_api_token> [-p app_port] [-b api_port] [-s site_name] [-w]"
   exit 1
 fi
 
@@ -98,6 +101,15 @@ server {
     listen [::]:80;
     server_name ${SERVER_NAMES};
 
+    location /api/ {
+        proxy_pass http://127.0.0.1:${API_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:${APP_PORT};
         proxy_http_version 1.1;
@@ -117,6 +129,15 @@ server {
 
     ssl_certificate ${CERT_PATH}/fullchain.pem;
     ssl_certificate_key ${CERT_PATH}/privkey.pem;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:${API_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
 
     location / {
         proxy_pass http://127.0.0.1:${APP_PORT};
@@ -145,4 +166,5 @@ CRON_CMD='certbot renew --quiet --deploy-hook "systemctl reload nginx"'
 echo
 echo "Done."
 echo "Nginx now proxies: http(s)://${DOMAIN} -> http://127.0.0.1:${APP_PORT}"
+echo "Nginx now proxies API: http(s)://${DOMAIN}/api -> http://127.0.0.1:${API_PORT}"
 echo "Cloudflare DNS challenge is configured via ${CF_CRED_FILE}"
