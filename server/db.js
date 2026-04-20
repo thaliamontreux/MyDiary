@@ -67,7 +67,8 @@ async function bootstrapDatabaseAndUserIfNeeded() {
 
   const appUser = process.env.MYSQL_APP_USER || 'diary_app_user';
   const appHost = process.env.MYSQL_APP_HOST || 'localhost';
-  const appPassword = process.env.MYSQL_APP_PASSWORD || crypto.randomBytes(18).toString('base64url');
+  const existingAppPassword = process.env.MYSQL_APP_PASSWORD || process.env.MYSQL_PASSWORD || '';
+  const appPassword = existingAppPassword || crypto.randomBytes(18).toString('base64url');
 
   const admin = await mysql.createConnection({
     ...transport,
@@ -76,23 +77,23 @@ async function bootstrapDatabaseAndUserIfNeeded() {
   });
 
   try {
-    const [rows] = await admin.query('SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?', [databaseName]);
-    const databaseExists = Array.isArray(rows) && rows.length > 0;
+    await admin.query(`CREATE DATABASE IF NOT EXISTS ${sqlIdentifier(databaseName)} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
 
-    if (!databaseExists) {
-      await admin.query(`CREATE DATABASE IF NOT EXISTS ${sqlIdentifier(databaseName)} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
-      const userSpec = `${sqlString(appUser)}@${sqlString(appHost)}`;
-      await admin.query(`CREATE USER IF NOT EXISTS ${userSpec} IDENTIFIED BY ${sqlString(appPassword)}`);
-      await admin.query(`ALTER USER ${userSpec} IDENTIFIED BY ${sqlString(appPassword)}`);
-      await admin.query(`GRANT ALL PRIVILEGES ON ${sqlIdentifier(databaseName)}.* TO ${userSpec}`);
-      await admin.query('FLUSH PRIVILEGES');
+    const userSpec = `${sqlString(appUser)}@${sqlString(appHost)}`;
+    await admin.query(`CREATE USER IF NOT EXISTS ${userSpec} IDENTIFIED BY ${sqlString(appPassword)}`);
+    await admin.query(`ALTER USER ${userSpec} IDENTIFIED BY ${sqlString(appPassword)}`);
+    await admin.query(`GRANT ALL PRIVILEGES ON ${sqlIdentifier(databaseName)}.* TO ${userSpec}`);
+    await admin.query('FLUSH PRIVILEGES');
 
+    const shouldPromoteAppUserInEnv = !process.env.MYSQL_USER || process.env.MYSQL_USER === 'root';
+    if (shouldPromoteAppUserInEnv || !process.env.MYSQL_APP_PASSWORD) {
       await updateEnvFile({
         MYSQL_USER: appUser,
         MYSQL_PASSWORD: appPassword,
         MYSQL_DATABASE: databaseName,
         MYSQL_APP_USER: appUser,
-        MYSQL_APP_PASSWORD: appPassword
+        MYSQL_APP_PASSWORD: appPassword,
+        MYSQL_APP_HOST: appHost
       });
     }
   } finally {
@@ -142,6 +143,14 @@ export async function initializeDatabase() {
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       UNIQUE KEY uniq_user_slot (user_id, slot_name),
       CONSTRAINT fk_user_vaults_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+      name VARCHAR(128) NOT NULL UNIQUE,
+      applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 }
