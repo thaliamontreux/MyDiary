@@ -115,13 +115,26 @@ function ensurePool() {
 export async function initializeDatabase() {
   const bootstrap = await bootstrapDatabaseAndUserIfNeeded();
 
+  const connectionLimit = Number(process.env.MYSQL_CONNECTION_LIMIT || 20);
+  const queueLimit = Number(process.env.MYSQL_QUEUE_LIMIT || 0);
+  const maxIdle = Number(process.env.MYSQL_MAX_IDLE || Math.max(4, Math.floor(connectionLimit / 2)));
+  const idleTimeout = Number(process.env.MYSQL_IDLE_TIMEOUT_MS || 60000);
+  const connectTimeout = Number(process.env.MYSQL_CONNECT_TIMEOUT_MS || 10000);
+  const keepAliveInitialDelay = Number(process.env.MYSQL_KEEP_ALIVE_INITIAL_DELAY_MS || 0);
+
   pool = mysql.createPool({
     ...bootstrap.transport,
     user: bootstrap.user,
     password: bootstrap.password,
     database: bootstrap.databaseName,
     waitForConnections: true,
-    connectionLimit: 10
+    connectionLimit,
+    queueLimit,
+    maxIdle,
+    idleTimeout,
+    connectTimeout,
+    enableKeepAlive: true,
+    keepAliveInitialDelay
   });
 
   await pool.query(`
@@ -190,6 +203,12 @@ export async function upsertVault(userId, slot, vaultMeta, vaultData) {
        updated_at = CURRENT_TIMESTAMP`,
     [userId, slot, JSON.stringify(vaultMeta || null), JSON.stringify(vaultData || null)]
   );
+}
+
+export async function pingDatabase() {
+  ensurePool();
+  await pool.query('SELECT 1');
+  return true;
 }
 
 export { pool };

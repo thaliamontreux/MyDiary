@@ -931,54 +931,14 @@ const PRIVACY_OPTIONS = [
 
 const THEMES = [
   {
-    id: 'pastel-princess',
-    name: 'Pastel Princess',
-    blurb: 'Soft pink ribbons, glowing blush, and dreamy sweetness.'
+    id: 'light',
+    name: 'Light mode',
+    blurb: 'Soft, minimal, and bright for daytime writing.'
   },
   {
-    id: 'celestial-moon',
-    name: 'Celestial Moon',
-    blurb: 'Midnight stars, violet skies, and moonlit thoughts.'
-  },
-  {
-    id: 'velvet-noir',
-    name: 'Velvet Diary',
-    blurb: 'Dark feminine velvet with rich plum and candlelight.'
-  },
-  {
-    id: 'cottage-garden',
-    name: 'Cottage Garden',
-    blurb: 'Mossy greens, petals, and an enchanted paper journal.'
-  },
-  {
-    id: 'cloud-dream',
-    name: 'Dreamy Clouds',
-    blurb: 'Airy blues, soft light, and floating handwritten pages.'
-  },
-  {
-    id: 'rose-parlor',
-    name: 'Rose Parlor',
-    blurb: 'Tea roses, velvet blush, and polished feminine glow.'
-  },
-  {
-    id: 'lavender-lace',
-    name: 'Lavender Lace',
-    blurb: 'Soft lilac lace, pearl shine, and powdery romance.'
-  },
-  {
-    id: 'strawberry-milk',
-    name: 'Strawberry Milk',
-    blurb: 'Sweet berry cream, candy pink, and playful charm.'
-  },
-  {
-    id: 'mermaid-glass',
-    name: 'Mermaid Glass',
-    blurb: 'Iridescent aqua, shells, and dreamy shimmer.'
-  },
-  {
-    id: 'sugar-plum',
-    name: 'Sugar Plum',
-    blurb: 'Deep plum sweetness with ballet-ribbon sparkle.'
+    id: 'dark',
+    name: 'Dark mode',
+    blurb: 'Cozy, dimmed, and gentle on your eyes at night.'
   }
 ];
 
@@ -1417,7 +1377,7 @@ export function createApp(mount) {
       email: ''
     },
     ui: {
-      themeId: storedUi.themeId || 'pastel-princess',
+      themeId: storedUi.themeId || 'light',
       ambience: storedUi.ambience || 'silent',
       pageMotion: storedUi.pageMotion ?? true,
       comfortMode: storedUi.comfortMode ?? true,
@@ -2426,6 +2386,7 @@ export function createApp(mount) {
     const delightSnapshot = buildDelightSnapshot(state.vault.entries);
     const privacySnapshot = buildPrivacySnapshot(state.vault.entries);
 
+    // Left navigation rail: search + filters
     const sidebar = el('div', { class: 'sidebar' }, [
       el('div', { class: 'sidebar-head' }, [
         el('div', { class: 'sidebar-title', text: 'My world' }),
@@ -2460,51 +2421,121 @@ export function createApp(mount) {
           }
         }, [el('span', { text: label })]))) : el('div')
       ]),
-      el('div', { class: 'entry-list' },
-        visibleEntries.length ? visibleEntries.map((e) => {
-          const active = e.id === state.selectedId;
-          return el('button', {
-            class: `entry-card accent-${e.accentColor || 'rose'} ${active ? 'active' : ''}`,
-            onclick: () => {
-              state.selectedId = e.id;
-              render();
-            }
-          }, [
-            el('div', { class: 'entry-card-top' }, [
-              el('span', { class: 'entry-type-chip', text: moduleLabel(e.moduleType) }),
-              el('span', { class: 'secondary-chip', text: entryContextText(e) })
-            ]),
-            el('div', { class: 'entry-title', text: e.title || 'Untitled' }),
-            el('div', { class: 'entry-meta' }, [
-              el('span', { text: formatPrettyDate(e.date) }),
-              el('span', { class: 'dot', text: '•' }),
-              el('span', { text: e.time || formatEntryTime(e.createdAt) || nowTime() })
-            ]),
-            e.moduleType !== 'recipe' ? el('div', { class: 'entry-mood-line' }, [
-              el('span', { class: 'insight-chip', text: moodLabel(e.mood) }),
-              el('span', { class: 'insight-chip', text: moodIntensityLabel(e.moodIntensity) }),
-              moodBlendText(e)
-                ? el('span', { class: 'insight-chip', text: moodBlendText(e) })
-                : el('span')
-            ]) : el('div', { class: 'entry-mood-line' }, [
-              e.prepTime ? el('span', { class: 'insight-chip', text: e.prepTime }) : el('span'),
-              e.servings ? el('span', { class: 'insight-chip', text: `${e.servings} servings` }) : el('span')
-            ]),
-            el('div', { class: 'entry-preview', text: summarizeEntry(e) }),
-            e.tags?.length
-              ? el('div', { class: 'tag-row' }, e.tags.slice(0, 3).map((tag) => el('span', { class: 'mini-tag', text: `#${tag}` })))
-              : el('div')
-          ]);
-        }) : [
-          el('div', { class: 'empty-list-card' }, [
-            el('div', { class: 'empty-list-title', text: 'No pages match yet' }),
-            el('div', { class: 'empty-list-sub', text: 'Try a different search, or create a new memory.' })
-          ])
-        ]
-      )
+      el('div', { class: 'nav-list' }, [
+        el('button', {
+          class: 'nav-item',
+          type: 'button',
+          onclick: () => {
+            state.activeModule = 'all';
+            state.activeType = 'all';
+            state.searchQuery = '';
+            render();
+          }
+        }, [
+          el('span', { class: 'nav-item-ic', text: '🏠' }),
+          el('span', { class: 'nav-item-label', text: 'All entries' })
+        ]),
+        el('button', {
+          class: 'nav-item',
+          type: 'button',
+          onclick: () => {
+            state.activeModule = 'diary';
+            state.activeType = 'all';
+            render();
+          }
+        }, [
+          el('span', { class: 'nav-item-ic', text: '📓' }),
+          el('span', { class: 'nav-item-label', text: 'Diary pages' })
+        ]),
+        el('button', {
+          class: 'nav-item',
+          type: 'button',
+          onclick: () => {
+            state.activeModule = 'note';
+            state.activeType = 'all';
+            render();
+          }
+        }, [
+          el('span', { class: 'nav-item-ic', text: '📝' }),
+          el('span', { class: 'nav-item-label', text: 'Notes' })
+        ]),
+        el('button', {
+          class: 'nav-item',
+          type: 'button',
+          onclick: () => {
+            state.activeModule = 'letter';
+            state.activeType = 'all';
+            render();
+          }
+        }, [
+          el('span', { class: 'nav-item-ic', text: '✉️' }),
+          el('span', { class: 'nav-item-label', text: 'Letters' })
+        ]),
+        el('button', {
+          class: 'nav-item',
+          type: 'button',
+          onclick: () => {
+            state.activeModule = 'recipe';
+            state.activeType = 'all';
+            render();
+          }
+        }, [
+          el('span', { class: 'nav-item-ic', text: '🍲' }),
+          el('span', { class: 'nav-item-label', text: 'Recipes' })
+        ])
+      ])
     ]);
 
+    // Central feed: entry cards + editor
+    const feedList = el('div', { class: 'feed-list' },
+      visibleEntries.length ? visibleEntries.map((e) => {
+        const active = e.id === state.selectedId;
+        return el('button', {
+          class: `entry-card feed-card accent-${e.accentColor || 'rose'} ${active ? 'active' : ''}`,
+          onclick: () => {
+            state.selectedId = e.id;
+            render();
+          }
+        }, [
+          el('div', { class: 'entry-card-top', }, [
+            el('span', { class: 'entry-type-chip', text: moduleLabel(e.moduleType) }),
+            el('span', { class: 'secondary-chip', text: entryContextText(e) })
+          ]),
+          el('div', { class: 'entry-title', text: e.title || 'Untitled' }),
+          el('div', { class: 'entry-meta' }, [
+            el('span', { text: formatPrettyDate(e.date) }),
+            el('span', { class: 'dot', text: '•' }),
+            el('span', { text: e.time || formatEntryTime(e.createdAt) || nowTime() })
+          ]),
+          e.moduleType !== 'recipe' ? el('div', { class: 'entry-mood-line' }, [
+            el('span', { class: 'insight-chip', text: moodLabel(e.mood) }),
+            el('span', { class: 'insight-chip', text: moodIntensityLabel(e.moodIntensity) }),
+            moodBlendText(e)
+              ? el('span', { class: 'insight-chip', text: moodBlendText(e) })
+              : el('span')
+          ]) : el('div', { class: 'entry-mood-line' }, [
+            e.prepTime ? el('span', { class: 'insight-chip', text: e.prepTime }) : el('span'),
+            e.servings ? el('span', { class: 'insight-chip', text: `${e.servings} servings` }) : el('span')
+          ]),
+          el('div', { class: 'entry-preview', text: summarizeEntry(e) }),
+          e.tags?.length
+            ? el('div', { class: 'tag-row' }, e.tags.slice(0, 3).map((tag) => el('span', { class: 'mini-tag', text: `#${tag}` })))
+            : el('div')
+        ]);
+      }) : [
+        el('div', { class: 'empty-list-card' }, [
+          el('div', { class: 'empty-list-title', text: 'No pages match yet' }),
+          el('div', { class: 'empty-list-sub', text: 'Try a different search, or create a new memory.' })
+        ])
+      ]
+    );
+
     const editor = renderEditor(selected, keepEditorFocus);
+
+    const feedColumn = el('div', { class: 'feed-column' }, [
+      editor,
+      feedList
+    ]);
     const rightRail = el('div', { class: 'side-rail' }, [
       renderLibraryRail(selected, librarySnapshot),
       renderPrivacyRail(selected, privacySnapshot),
@@ -2514,7 +2545,7 @@ export function createApp(mount) {
     ]);
 
     main.replaceChildren(
-      el('div', { class: 'layout layout-wide' }, [sidebar, editor, rightRail])
+      el('div', { class: 'layout layout-wide' }, [sidebar, feedColumn, rightRail])
     );
 
     if (focusState) restoreFocusState(focusState);

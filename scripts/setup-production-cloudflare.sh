@@ -128,7 +128,7 @@ Group=${SERVICE_USER}
 WorkingDirectory=${APP_DIR}
 Environment=NODE_ENV=production
 EnvironmentFile=${APP_DIR}/.env
-ExecStart=/usr/bin/env node server/index.js
+ExecStart=/usr/bin/env node server/cluster.js
 Restart=always
 RestartSec=3
 
@@ -190,6 +190,11 @@ server {
     ssl_certificate ${CERT_PATH}/fullchain.pem;
     ssl_certificate_key ${CERT_PATH}/privkey.pem;
 
+    gzip on;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css application/json application/javascript application/xml+rss image/svg+xml;
+
     root ${APP_DIR}/dist;
     index index.html;
 
@@ -200,6 +205,15 @@ server {
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_connect_timeout 5s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+
+    location /assets/ {
+        expires 7d;
+        add_header Cache-Control "public, max-age=604800, immutable";
+        try_files \$uri =404;
     }
 
     location / {
