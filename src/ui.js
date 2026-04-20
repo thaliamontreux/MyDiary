@@ -82,13 +82,6 @@ const LETTER_KIND_OPTIONS = [
   ['future-self', 'Future self']
 ];
 
-const STATIONERY_OPTIONS = [
-  ['blush', 'Blush ribbon'],
-  ['moon', 'Moon paper'],
-  ['garden', 'Garden petals'],
-  ['velvet', 'Velvet plum']
-];
-
 const SCRAPBOOK_STYLE_OPTIONS = [
   ['petals', 'Petal board'],
   ['starlight', 'Starlight board'],
@@ -955,17 +948,11 @@ const MOOD_DEFINITIONS = [
 
 const MOOD_OPTIONS = MOOD_DEFINITIONS.map(({ id }) => id);
 
-const NEED_OPTIONS = ['rest', 'comfort', 'space', 'clarity', 'reassurance', 'play', 'connection', 'quiet'];
-const TRIGGER_OPTIONS = ['school', 'family', 'friendship', 'loneliness', 'pressure', 'change', 'memories', 'body image'];
-const COPING_OPTIONS = ['tea', 'music', 'walk', 'journal', 'cry', 'breathe', 'stretch', 'talk to someone'];
-
 const PRIVACY_OPTIONS = [
   ['private', 'Private'],
   ['shared', 'Shared'],
   ['secret', 'Extra secret']
 ];
-
-const ACCENT_OPTIONS = ['rose', 'violet', 'sky', 'mint', 'gold'];
 
 const THEMES = [
   {
@@ -2341,105 +2328,67 @@ export function createApp(mount) {
   }
 
   function saveAllFormChanges() {
-    const entry = getSelectedEntry();
-    if (!entry) return;
-    
-    // Collect values from all form fields
+    if (!getSelectedEntry()) return;
+
     const patch = {};
-    
+
     const titleInput = document.querySelector('.title-input');
     if (titleInput) patch.title = titleInput.value;
-    
+
     const dateInput = document.querySelector('.date-input');
     if (dateInput) patch.date = dateInput.value;
-    
+
     const timeInput = document.querySelector('.time-input');
     if (timeInput) patch.time = timeInput.value;
-    
+
     const typeSelect = document.querySelector('[data-focus-key*="entryType"]');
     if (typeSelect) patch.entryType = typeSelect.value;
-    
-    const moodSelect = document.querySelector('[data-focus-key*="mood"]');
-    if (moodSelect && !moodSelect.classList.contains('mood-select')) patch.mood = moodSelect.value;
-    
+
+    const moodSelect = document.querySelector('[data-focus-key*=":mood"]');
+    if (moodSelect) patch.mood = moodSelect.value;
+
     const privacySelect = document.querySelector('[data-focus-key*="privacy"]');
     if (privacySelect) patch.privacyLevel = privacySelect.value;
-    
-    const energyInput = document.querySelector('.range-input');
-    if (energyInput) patch.energyLevel = Number(energyInput.value);
-    
+
     const aboutInput = document.querySelector('[data-focus-key*="about"]');
     if (aboutInput) patch.about = aboutInput.value;
-    
+
     const tagsInput = document.querySelector('[data-focus-key*="tags"]');
     if (tagsInput) patch.tags = normalizeTags(tagsInput.value);
-    
-    const moodBlendInput = document.querySelector('[data-focus-key*="moodBlend"]');
-    if (moodBlendInput) patch.moodBlend = normalizeListInput(moodBlendInput.value, 3).filter((item) => item !== entry.mood && MOOD_OPTIONS.includes(item));
-    
-    const moodNeedsInput = document.querySelector('[data-focus-key*="moodNeeds"]');
-    if (moodNeedsInput) patch.moodNeeds = normalizeListInput(moodNeedsInput.value, 6);
-    
-    const moodTriggersInput = document.querySelector('[data-focus-key*="moodTriggers"]');
-    if (moodTriggersInput) patch.moodTriggers = normalizeListInput(moodTriggersInput.value, 6);
-    
-    const copingActionsInput = document.querySelector('[data-focus-key*="copingActions"]');
-    if (copingActionsInput) patch.copingActions = normalizeListInput(copingActionsInput.value, 6);
-    
+
     const folderInput = document.querySelector('[data-focus-key*="folder"]');
     if (folderInput) patch.folder = folderInput.value;
-    
+
     const recipientInput = document.querySelector('[data-focus-key*="recipient"]');
     if (recipientInput) patch.recipient = recipientInput.value;
-    
+
     const letterKindSelect = document.querySelector('[data-focus-key*="letterKind"]');
     if (letterKindSelect) patch.letterKind = letterKindSelect.value;
-    
-    const stationerySelect = document.querySelector('[data-focus-key*="stationery"]');
-    if (stationerySelect) patch.stationeryTheme = stationerySelect.value;
-    
-    const sentAtInput = document.querySelectorAll('.date-input')[1];
+
+    const sentAtInput = document.querySelector('[data-focus-key*="sentAt"]');
     if (sentAtInput) patch.sentAt = sentAtInput.value;
-    
-    const futureDeliveryDateInput = document.querySelectorAll('.date-input')[2];
+
+    const futureDeliveryDateInput = document.querySelector('[data-focus-key*="futureDeliveryDate"]');
     if (futureDeliveryDateInput) patch.futureDeliveryDate = futureDeliveryDateInput.value;
-    
+
     const recipeCategoryInput = document.querySelector('[data-focus-key*="recipeCategory"]');
     if (recipeCategoryInput) patch.recipeCategory = recipeCategoryInput.value;
-    
+
     const prepTimeInput = document.querySelector('[data-focus-key*="prepTime"]');
     if (prepTimeInput) patch.prepTime = prepTimeInput.value;
-    
+
     const servingsInput = document.querySelector('[data-focus-key*="servings"]');
     if (servingsInput) patch.servings = servingsInput.value;
-    
-    const lockNoteInput = document.querySelector('[data-focus-key*="lockNote"]');
-    if (lockNoteInput) patch.lockNote = lockNoteInput.value;
-    
-    const keepsakesInput = document.querySelector('[data-focus-key*="keepsakes"]');
-    if (keepsakesInput) patch.keepsakes = normalizeLineList(keepsakesInput.value, 12);
-    
-    const photoCaptionsInput = document.querySelector('[data-focus-key*="photoCaptions"]');
-    if (photoCaptionsInput) patch.photoCaptions = normalizeLineList(photoCaptionsInput.value, 12);
-    
-    const voiceNotesInput = document.querySelector('[data-focus-key*="voiceNotes"]');
-    if (voiceNotesInput) patch.voiceNotes = normalizeLineList(voiceNotesInput.value, 8);
-    
+
     const ingredientsInput = document.querySelector('[data-focus-key*="ingredients"]');
     if (ingredientsInput) patch.ingredients = normalizeLineList(ingredientsInput.value, 16);
-    
+
     const stepsInput = document.querySelector('[data-focus-key*="steps"]');
     if (stepsInput) patch.steps = normalizeLineList(stepsInput.value, 16);
-    
-    const scrapbookStyleSelect = document.querySelector('[data-focus-key*="scrapbookStyle"]');
-    if (scrapbookStyleSelect) patch.scrapbookStyle = scrapbookStyleSelect.value;
-    
-    const paperStyleSelect = document.querySelector('[data-focus-key*="paperStyle"]');
-    if (paperStyleSelect) patch.paperStyle = paperStyleSelect.value;
-    
+
     const bodyInput = document.querySelector('.body-input');
     if (bodyInput) patch.body = bodyInput.value;
-    
+
     updateSelected(patch);
     showToast('Changes saved');
   }
@@ -2945,22 +2894,6 @@ export function createApp(mount) {
     }, PRIVACY_OPTIONS.map(([value, label]) => el('option', { value, text: label })));
     privacySelect.value = selected.privacyLevel || 'private';
 
-    const energyInput = el('input', {
-      class: 'range-input',
-      type: 'range',
-      min: '1',
-      max: '5',
-      value: String(selected.energyLevel || 3)
-    });
-
-    const moodIntensityInput = el('input', {
-      class: 'range-input',
-      type: 'range',
-      min: '1',
-      max: '5',
-      value: String(selected.moodIntensity || 3)
-    });
-
     const aboutInput = el('textarea', {
       class: 'meta-textarea',
       'data-focus-key': `entry:${selected.id}:about`,
@@ -2973,34 +2906,6 @@ export function createApp(mount) {
       'data-focus-key': `entry:${selected.id}:tags`,
       value: (selected.tags || []).join(', '),
       placeholder: 'Tags, separated by commas'
-    });
-
-    const moodBlendInput = el('textarea', {
-      class: 'meta-textarea',
-      'data-focus-key': `entry:${selected.id}:moodBlend`,
-      value: (selected.moodBlend || []).join(', '),
-      placeholder: `Blended moods, like ${MOOD_OPTIONS.slice(0, 3).join(', ')}`
-    });
-
-    const moodNeedsInput = el('textarea', {
-      class: 'meta-textarea',
-      'data-focus-key': `entry:${selected.id}:moodNeeds`,
-      value: (selected.moodNeeds || []).join(', '),
-      placeholder: `Needs, like ${NEED_OPTIONS.slice(0, 4).join(', ')}`
-    });
-
-    const moodTriggersInput = el('textarea', {
-      class: 'meta-textarea',
-      'data-focus-key': `entry:${selected.id}:moodTriggers`,
-      value: (selected.moodTriggers || []).join(', '),
-      placeholder: `Triggers, like ${TRIGGER_OPTIONS.slice(0, 4).join(', ')}`
-    });
-
-    const copingActionsInput = el('textarea', {
-      class: 'meta-textarea',
-      'data-focus-key': `entry:${selected.id}:copingActions`,
-      value: (selected.copingActions || []).join(', '),
-      placeholder: `Coping ideas, like ${COPING_OPTIONS.slice(0, 4).join(', ')}`
     });
 
     const folderInput = el('input', {
@@ -3025,20 +2930,16 @@ export function createApp(mount) {
     }, LETTER_KIND_OPTIONS.map(([value, label]) => el('option', { value, text: label })));
     letterKindSelect.value = selected.letterKind || 'unsent';
 
-    const stationerySelect = el('select', {
-      class: 'mood-select',
-      'data-focus-key': `entry:${selected.id}:stationery`
-    }, STATIONERY_OPTIONS.map(([value, label]) => el('option', { value, text: label })));
-    stationerySelect.value = selected.stationeryTheme || 'blush';
-
     const sentAtInput = el('input', {
       class: 'date-input',
+      'data-focus-key': `entry:${selected.id}:sentAt`,
       type: 'date',
       value: selected.sentAt || ''
     });
 
     const futureDeliveryDateInput = el('input', {
       class: 'date-input',
+      'data-focus-key': `entry:${selected.id}:futureDeliveryDate`,
       type: 'date',
       value: selected.futureDeliveryDate || ''
     });
@@ -3067,34 +2968,6 @@ export function createApp(mount) {
       placeholder: 'Servings'
     });
 
-    const lockNoteInput = el('input', {
-      class: 'meta-input',
-      'data-focus-key': `entry:${selected.id}:lockNote`,
-      value: selected.lockNote || '',
-      placeholder: 'Lock note, like private for later me'
-    });
-
-    const keepsakesInput = el('textarea', {
-      class: 'meta-textarea',
-      'data-focus-key': `entry:${selected.id}:keepsakes`,
-      placeholder: 'Keepsakes, one per line'
-    });
-    keepsakesInput.value = lineListText(selected.keepsakes || []);
-
-    const photoCaptionsInput = el('textarea', {
-      class: 'meta-textarea',
-      'data-focus-key': `entry:${selected.id}:photoCaptions`,
-      placeholder: 'Photo captions or image memories, one per line'
-    });
-    photoCaptionsInput.value = lineListText(selected.photoCaptions || []);
-
-    const voiceNotesInput = el('textarea', {
-      class: 'meta-textarea',
-      'data-focus-key': `entry:${selected.id}:voiceNotes`,
-      placeholder: 'Voice note placeholders, one per line'
-    });
-    voiceNotesInput.value = lineListText(selected.voiceNotes || []);
-
     const ingredientsInput = el('textarea', {
       class: 'meta-textarea',
       'data-focus-key': `entry:${selected.id}:ingredients`,
@@ -3108,18 +2981,6 @@ export function createApp(mount) {
       placeholder: 'One step per line'
     });
     stepsInput.value = lineListText(selected.steps || []);
-
-    const scrapbookStyleSelect = el('select', {
-      class: 'mood-select',
-      'data-focus-key': `entry:${selected.id}:scrapbookStyle`
-    }, SCRAPBOOK_STYLE_OPTIONS.map(([value, label]) => el('option', { value, text: label })));
-    scrapbookStyleSelect.value = selected.scrapbookStyle || 'petals';
-
-    const paperStyleSelect = el('select', {
-      class: 'mood-select',
-      'data-focus-key': `entry:${selected.id}:paperStyle`
-    }, PAPER_STYLE_OPTIONS.map(([value, label]) => el('option', { value, text: label })));
-    paperStyleSelect.value = selected.paperStyle || 'rose-lace';
 
     const textarea = el('textarea', {
       class: 'body-input',
@@ -3143,28 +3004,6 @@ export function createApp(mount) {
       el('span', { class: 'btn-ic', text: '✕' }),
       el('span', { text: 'Trash' })
     ]);
-
-    const stickerButtons = el('div', { class: 'sticker-row' }, STICKER_OPTIONS.map((sticker) => el('button', {
-      class: `sticker-badge sticker-button ${selected.stickers.includes(sticker) ? 'active' : ''}`,
-      type: 'button',
-      onclick: () => updateSelected({
-        stickers: selected.stickers.includes(sticker)
-          ? selected.stickers.filter((item) => item !== sticker)
-          : [...selected.stickers, sticker].slice(0, 8)
-      })
-    }, [el('span', { text: sticker })])));
-
-    const habitButtons = el('div', { class: 'sticker-row' }, HABIT_OPTIONS.map((habit) => el('button', {
-      class: `sticker-badge sticker-button ${selected.habitWins.includes(habit) ? 'active' : ''}`,
-      type: 'button',
-      onclick: () => toggleSelectedListValue('habitWins', habit)
-    }, [el('span', { text: habit })])));
-
-    const selfCareButtons = el('div', { class: 'sticker-row' }, SELF_CARE_OPTIONS.map((item) => el('button', {
-      class: `sticker-badge sticker-button ${selected.selfCareChecklist.includes(item) ? 'active' : ''}`,
-      type: 'button',
-      onclick: () => toggleSelectedListValue('selfCareChecklist', item)
-    }, [el('span', { text: item })])));
 
     // Art Studio Popup
     let artStudioOpen = false;
@@ -3386,13 +3225,6 @@ export function createApp(mount) {
       }
     });
 
-    const artSummary = el('div', { class: 'art-summary-list' }, (selected.placedArt || []).length
-      ? selected.placedArt.map((item) => el('div', { class: 'art-summary-item' }, [
-        el('span', { text: artAssetById(item.assetId).label }),
-        el('span', { class: 'tiny', text: `${Math.round(item.x)}%, ${Math.round(item.y)}%` })
-      ]))
-      : [el('div', { class: 'mood-card-sub', text: 'No placed art yet. Add bows, hearts, roses, moons, and more.' })]);
-
     const metaControls = [dateInput, timeInput, privacySelect];
     const insightChips = [
       el('div', { class: 'insight-chip', text: moduleLabel(selected.moduleType) }),
@@ -3407,11 +3239,7 @@ export function createApp(mount) {
     if (selected.moduleType === 'diary') {
       metaControls.splice(2, 0, typeSelect, moodSelect);
       insightChips.unshift(el('div', { class: 'insight-chip', text: `${moodLabel(selected.mood)} • ${moodIntensityLabel(selected.moodIntensity)}` }));
-      insightChips.push(el('div', { class: 'insight-chip', text: `Energy ${'♥'.repeat(selected.energyLevel || 3)}` }));
       insightChips.push(el('div', { class: 'insight-chip', text: `About ${selected.about || 'your world'}` }));
-      insightChips.push(moodBlendText(selected)
-        ? el('div', { class: 'insight-chip', text: `Blend ${moodBlendText(selected)}` })
-        : el('div', { class: 'insight-chip', text: 'Single mood' }));
 
       detailCards.push(
         el('label', { class: 'detail-card' }, [
@@ -3421,46 +3249,6 @@ export function createApp(mount) {
         el('label', { class: 'detail-card' }, [
           el('span', { class: 'detail-label', text: 'Tags' }),
           tagsInput
-        ]),
-        el('label', { class: 'detail-card detail-card-wide' }, [
-          el('span', { class: 'detail-label', text: 'Feeling intensity' }),
-          el('div', { class: 'range-row' }, [
-            el('span', { class: 'range-edge', text: 'Light' }),
-            moodIntensityInput,
-            el('span', { class: 'range-edge', text: moodIntensityLabel(selected.moodIntensity) })
-          ])
-        ]),
-        el('label', { class: 'detail-card' }, [
-          el('span', { class: 'detail-label', text: 'Blended moods' }),
-          moodBlendInput
-        ]),
-        el('label', { class: 'detail-card' }, [
-          el('span', { class: 'detail-label', text: 'What you need' }),
-          moodNeedsInput
-        ]),
-        el('label', { class: 'detail-card' }, [
-          el('span', { class: 'detail-label', text: 'What triggered it' }),
-          moodTriggersInput
-        ]),
-        el('label', { class: 'detail-card' }, [
-          el('span', { class: 'detail-label', text: 'What could help' }),
-          copingActionsInput
-        ]),
-        el('label', { class: 'detail-card detail-card-wide' }, [
-          el('span', { class: 'detail-label', text: 'Energy level' }),
-          el('div', { class: 'range-row' }, [
-            el('span', { class: 'range-edge', text: 'Soft' }),
-            energyInput,
-            el('span', { class: 'range-edge', text: 'Full' })
-          ])
-        ]),
-        el('label', { class: 'detail-card detail-card-wide' }, [
-          el('span', { class: 'detail-label', text: 'Scrapbook board' }),
-          scrapbookStyleSelect
-        ]),
-        el('label', { class: 'detail-card detail-card-wide' }, [
-          el('span', { class: 'detail-label', text: 'Paper style' }),
-          paperStyleSelect
         ])
       );
     }
@@ -3476,10 +3264,6 @@ export function createApp(mount) {
           el('span', { class: 'detail-label', text: 'Folder' }),
           folderInput
         ]),
-        el('div', { class: 'detail-card' }, [
-          el('span', { class: 'detail-label', text: 'Pin status' }),
-          pinnedToggle
-        ]),
         el('label', { class: 'detail-card' }, [
           el('span', { class: 'detail-label', text: 'What this note is about' }),
           aboutInput
@@ -3487,28 +3271,12 @@ export function createApp(mount) {
         el('label', { class: 'detail-card' }, [
           el('span', { class: 'detail-label', text: 'Tags' }),
           tagsInput
-        ]),
-        el('label', { class: 'detail-card detail-card-wide' }, [
-          el('span', { class: 'detail-label', text: 'Feeling intensity' }),
-          el('div', { class: 'range-row' }, [
-            el('span', { class: 'range-edge', text: 'Light' }),
-            moodIntensityInput,
-            el('span', { class: 'range-edge', text: moodIntensityLabel(selected.moodIntensity) })
-          ])
-        ]),
-        el('label', { class: 'detail-card detail-card-wide' }, [
-          el('span', { class: 'detail-label', text: 'Scrapbook board' }),
-          scrapbookStyleSelect
-        ]),
-        el('label', { class: 'detail-card detail-card-wide' }, [
-          el('span', { class: 'detail-label', text: 'Paper style' }),
-          paperStyleSelect
         ])
       );
     }
 
     if (selected.moduleType === 'letter') {
-      metaControls.splice(2, 0, letterKindSelect, stationerySelect, moodSelect);
+      metaControls.splice(2, 0, letterKindSelect, moodSelect);
       insightChips.unshift(el('div', { class: 'insight-chip', text: entryContextText(selected) }));
       insightChips.push(el('div', { class: 'insight-chip', text: `${moodLabel(selected.mood)} • ${moodIntensityLabel(selected.moodIntensity)}` }));
       insightChips.push(el('div', { class: 'insight-chip', text: selected.recipient ? `For ${selected.recipient}` : 'No recipient yet' }));
@@ -3534,44 +3302,12 @@ export function createApp(mount) {
           : selected.letterKind === 'future-self'
             ? el('label', { class: 'detail-card' }, [
               el('span', { class: 'detail-label', text: 'Open on' }),
-              futureDeliveryInput
+              futureDeliveryDateInput
             ])
             : el('div', { class: 'detail-card' }, [
               el('span', { class: 'detail-label', text: 'Letter path' }),
               el('div', { class: 'insight-row' }, [el('span', { class: 'insight-chip', text: 'Keep writing from the heart' })])
-            ]),
-        el('label', { class: 'detail-card detail-card-wide' }, [
-          el('span', { class: 'detail-label', text: 'Feeling intensity' }),
-          el('div', { class: 'range-row' }, [
-            el('span', { class: 'range-edge', text: 'Light' }),
-            moodIntensityInput,
-            el('span', { class: 'range-edge', text: moodIntensityLabel(selected.moodIntensity) })
-          ])
-        ]),
-        el('label', { class: 'detail-card' }, [
-          el('span', { class: 'detail-label', text: 'Blended moods' }),
-          moodBlendInput
-        ]),
-        el('label', { class: 'detail-card' }, [
-          el('span', { class: 'detail-label', text: 'What you need' }),
-          moodNeedsInput
-        ]),
-        el('label', { class: 'detail-card' }, [
-          el('span', { class: 'detail-label', text: 'What triggered it' }),
-          moodTriggersInput
-        ]),
-        el('label', { class: 'detail-card' }, [
-          el('span', { class: 'detail-label', text: 'What could help' }),
-          copingActionsInput
-        ]),
-        el('label', { class: 'detail-card detail-card-wide' }, [
-          el('span', { class: 'detail-label', text: 'Scrapbook board' }),
-          scrapbookStyleSelect
-        ]),
-        el('label', { class: 'detail-card detail-card-wide' }, [
-          el('span', { class: 'detail-label', text: 'Paper style' }),
-          paperStyleSelect
-        ])
+            ])
       );
     }
 
@@ -3585,18 +3321,6 @@ export function createApp(mount) {
           el('span', { class: 'detail-label', text: 'Recipe category' }),
           recipeCategoryInput
         ]),
-        el('label', { class: 'detail-card' }, [
-          el('span', { class: 'detail-label', text: 'Tags' }),
-          tagsInput
-        ]),
-        el('label', { class: 'detail-card' }, [
-          el('span', { class: 'detail-label', text: 'Prep time' }),
-          prepTimeInput
-        ]),
-        el('label', { class: 'detail-card' }, [
-          el('span', { class: 'detail-label', text: 'Servings' }),
-          servingsInput
-        ]),
         el('label', { class: 'detail-card detail-card-wide' }, [
           el('span', { class: 'detail-label', text: 'Ingredients' }),
           ingredientsInput
@@ -3608,71 +3332,9 @@ export function createApp(mount) {
         el('label', { class: 'detail-card detail-card-wide' }, [
           el('span', { class: 'detail-label', text: 'Recipe story or occasion' }),
           aboutInput
-        ]),
-        el('label', { class: 'detail-card detail-card-wide' }, [
-          el('span', { class: 'detail-label', text: 'Scrapbook board' }),
-          scrapbookStyleSelect
-        ]),
-        el('label', { class: 'detail-card detail-card-wide' }, [
-          el('span', { class: 'detail-label', text: 'Paper style' }),
-          paperStyleSelect
         ])
       );
     }
-
-    detailCards.push(
-      el('div', { class: 'detail-card detail-card-wide' }, [
-        el('span', { class: 'detail-label', text: 'Entry privacy lock' }),
-        el('div', { class: 'setting-stack' }, [
-          el('button', { class: `toggle-chip ${selected.sessionLocked ? 'active' : ''}`, type: 'button', onclick: () => toggleSelectedSessionLock() }, [el('span', { text: selected.sessionLocked ? 'Session-locked' : 'Not session-locked' })]),
-          lockNoteInput,
-          selected.sessionLocked && isSessionHidden
-            ? el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => revealSelectedForSession() }, [
-              el('span', { class: 'btn-ic', text: '♡' }),
-              el('span', { text: 'Reveal for this session' })
-            ])
-            : el('div')
-        ])
-      ]),
-      el('div', { class: 'detail-card detail-card-wide' }, [
-        el('span', { class: 'detail-label', text: 'Habit wins' }),
-        habitButtons
-      ]),
-      el('div', { class: 'detail-card detail-card-wide' }, [
-        el('span', { class: 'detail-label', text: 'Self-care checklist' }),
-        selfCareButtons
-      ]),
-      el('label', { class: 'detail-card detail-card-wide' }, [
-        el('span', { class: 'detail-label', text: 'Keepsakes' }),
-        keepsakesInput
-      ]),
-      el('label', { class: 'detail-card detail-card-wide' }, [
-        el('span', { class: 'detail-label', text: 'Photo memories' }),
-        photoCaptionsInput
-      ]),
-      el('label', { class: 'detail-card detail-card-wide' }, [
-        el('span', { class: 'detail-label', text: 'Voice note placeholders' }),
-        voiceNotesInput
-      ]),
-      el('div', { class: 'detail-card detail-card-wide' }, [
-        el('span', { class: 'detail-label', text: 'Stickers' }),
-        stickerButtons
-      ]),
-      el('div', { class: 'detail-card detail-card-wide' }, [
-        el('span', { class: 'detail-label', text: selected.moduleType === 'note' ? 'Color category' : 'Accent color' }),
-        el('div', { class: 'accent-row' }, ACCENT_OPTIONS.map((accent) => el('button', {
-          class: `accent-swatch accent-${accent} ${selected.accentColor === accent ? 'active' : ''}`,
-          onclick: () => updateSelected({ accentColor: accent, colorCategory: accent }),
-          title: accent,
-          type: 'button'
-        }, [])))
-      ]),
-      el('div', { class: 'detail-card detail-card-wide' }, [
-        el('span', { class: 'detail-label', text: 'SVG art studio' }),
-        addArtButton,
-        artSummary
-      ])
-    );
 
     const footerSummary = selected.moduleType === 'recipe'
       ? `${selected.recipeCategory || 'Recipe'} • ${selected.prepTime || 'Prep time soon'} • ${formatPrettyDate(selected.date)}`
