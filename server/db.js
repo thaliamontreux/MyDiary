@@ -1,14 +1,23 @@
 import mysql from 'mysql2/promise';
 
-const pool = mysql.createPool({
-  host: process.env.MYSQL_HOST || '127.0.0.1',
-  port: Number(process.env.MYSQL_PORT || 3306),
+const useSocket = (process.env.MYSQL_USE_SOCKET || 'true').toLowerCase() === 'true';
+
+const poolConfig = {
   user: process.env.MYSQL_USER || 'root',
   password: process.env.MYSQL_PASSWORD || '',
   database: process.env.MYSQL_DATABASE || 'diary_app',
   waitForConnections: true,
   connectionLimit: 10
-});
+};
+
+if (useSocket) {
+  poolConfig.socketPath = process.env.MYSQL_SOCKET_PATH || '/var/run/mysqld/mysqld.sock';
+} else {
+  poolConfig.host = process.env.MYSQL_HOST || '127.0.0.1';
+  poolConfig.port = Number(process.env.MYSQL_PORT || 3306);
+}
+
+const pool = mysql.createPool(poolConfig);
 
 export async function initializeDatabase() {
   await pool.query(`
