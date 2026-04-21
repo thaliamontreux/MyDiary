@@ -1627,8 +1627,9 @@ export function createApp(mount) {
         el('div', { class: 'brand-sub', text: 'private, pretty, and protected' })
       ])
     ]),
-    el('div', { class: 'topbar-right top-actions' }, [
+    el('div', { class: 'topbar-right' }, [
       el('div', { class: 'streak-pill', id: 'topbar-streak' }),
+      el('div', { class: 'top-actions' }),
       themeToggleBtn
     ])
   ]);
