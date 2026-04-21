@@ -1082,6 +1082,59 @@ function renderMarkdownToHtml(markdown = '') {
   return htmlParts.join('\n');
 }
 
+function htmlToMarkdown(html = '') {
+  // Create a temporary container to walk the DOM
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+
+  function nodeToMd(node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return node.textContent;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return '';
+
+    const tag = node.tagName.toLowerCase();
+    const inner = Array.from(node.childNodes).map(nodeToMd).join('');
+
+    switch (tag) {
+      case 'h1': return `# ${inner}\n`;
+      case 'h2': return `## ${inner}\n`;
+      case 'h3': return `### ${inner}\n`;
+      case 'h4': return `#### ${inner}\n`;
+      case 'strong': case 'b': return `**${inner}**`;
+      case 'em':    case 'i': return `*${inner}*`;
+      case 'u':               return `__${inner}__`;
+      case 's': case 'strike': case 'del': return `~~${inner}~~`;
+      case 'code':            return `\`${inner}\``;
+      case 'blockquote':      return inner.split('\n').map((l) => `> ${l}`).join('\n') + '\n';
+      case 'ul': {
+        return Array.from(node.children).map((li) =>
+          `- ${Array.from(li.childNodes).map(nodeToMd).join('')}`
+        ).join('\n') + '\n';
+      }
+      case 'ol': {
+        return Array.from(node.children).map((li, i) =>
+          `${i + 1}. ${Array.from(li.childNodes).map(nodeToMd).join('')}`
+        ).join('\n') + '\n';
+      }
+      case 'li': return inner;
+      case 'br': return '\n';
+      case 'p':  return inner + '\n';
+      case 'div': {
+        // Rich editors often use divs for newlines
+        const hasBlock = node.querySelector('h1,h2,h3,h4,ul,ol,blockquote');
+        return hasBlock ? inner : (inner + '\n');
+      }
+      case 'a': return inner;
+      default: return inner;
+    }
+  }
+
+  const raw = Array.from(tmp.childNodes).map(nodeToMd).join('');
+  // Collapse 3+ newlines to 2
+  return raw.replace(/\n{3,}/g, '\n\n').trim();
+}
+
 function normalizeLineList(input, max = 16) {
   return input
     .split('\n')
@@ -4111,8 +4164,8 @@ export function createApp(mount) {
     const stepsInput = document.querySelector('[data-focus-key*="steps"]');
     if (stepsInput) patch.steps = normalizeLineList(stepsInput.value, 16);
 
-    const bodyInput = document.querySelector('.body-input');
-    if (bodyInput) patch.body = bodyInput.value;
+    const richEditorEl = document.querySelector('.rich-editor[contenteditable]');
+    if (richEditorEl) patch.body = htmlToMarkdown(richEditorEl.innerHTML);
 
     updateSelected(patch);
     showToast('Changes saved');
@@ -4754,7 +4807,7 @@ export function createApp(mount) {
   }
 
   // ── Voice Dictation ────────────────────────────────────────────────────────
-  function renderDictateButton(entry, textarea) {
+  function renderDictateButton(entry) {
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRec) return el('div'); // Browser doesn't support it
 
@@ -4802,16 +4855,28 @@ export function createApp(mount) {
         interimTranscript = interim;
         liveBar.textContent = interim ? `"${interim}"` : '';
 
-        // Append finalized text to textarea + entry
+        // Insert finalized text at caret position inside the rich editor
         if (finalText) {
-          const cur = textarea.value;
-          const needsSpace = cur.length > 0 && !cur.endsWith(' ') && !cur.endsWith('\n');
-          const appended = cur + (needsSpace ? ' ' : '') + finalText;
-          textarea.value = appended;
-          // Trigger the input event so the entry updates live
-          textarea.dispatchEvent(new Event('input', { bubbles: true }));
-          // Scroll textarea to bottom
-          textarea.scrollTop = textarea.scrollHeight;
+          const editorEl = btn.closest('.dictate-wrap')?.previousElementSibling?.querySelector?.('.rich-editor[contenteditable]')
+            || document.querySelector('.rich-editor[contenteditable]');
+          if (editorEl) {
+            editorEl.focus();
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount) {
+              const range = sel.getRangeAt(0);
+              range.collapse(false);
+              const textNode = document.createTextNode((finalText.startsWith(' ') ? '' : ' ') + finalText);
+              range.insertNode(textNode);
+              range.setStartAfter(textNode);
+              range.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(range);
+            } else {
+              document.execCommand('insertText', false, finalText);
+            }
+            editorEl.dispatchEvent(new Event('input', { bubbles: true }));
+            editorEl.scrollTop = editorEl.scrollHeight;
+          }
         }
       };
 
@@ -5009,33 +5074,90 @@ export function createApp(mount) {
     });
     stepsInput.value = lineListText(selected.steps || []);
 
-    const textarea = el('textarea', {
-      class: 'body-input',
+    // ── Rich WYSIWYG editor ────────────────────────────────────────────────────
+    const richEditorPlaceholder = selected.moduleType === 'note'
+      ? 'Jot down anything you want to keep close.'
+      : selected.moduleType === 'letter'
+        ? 'Write the words you want this person, future self, or memory to hold.'
+        : selected.moduleType === 'recipe'
+          ? 'Add little serving notes, family memories, or substitutions.'
+          : 'Write anything… it stays with you.';
+
+    const richEditor = el('div', {
+      class: 'rich-editor',
+      contenteditable: 'true',
+      'data-placeholder': richEditorPlaceholder,
       'data-focus-key': `entry:${selected.id}:body`,
-      placeholder: selected.moduleType === 'note'
-        ? 'Jot down anything you want to keep close.'
-        : selected.moduleType === 'letter'
-          ? 'Write the words you want this person, future self, or memory to hold.'
-          : selected.moduleType === 'recipe'
-            ? 'Add little serving notes, family memories, or substitutions.'
-            : 'Write anything… it stays with you.'
+      spellcheck: 'true'
     });
-    textarea.value = selected.body || '';
 
-    const markdownPreview = el('div', { class: 'body-preview' });
+    // Load existing content as formatted HTML
+    richEditor.innerHTML = selected.body ? renderMarkdownToHtml(selected.body) : '';
 
-    const updatePreview = () => {
-      const bodyText = textarea.value || '';
-      // Avoid rendering when empty to keep the UI calm
-      if (!bodyText.trim()) {
-        markdownPreview.innerHTML = '<p class="tiny">Live preview appears here as you type.</p>';
-        return;
-      }
-      markdownPreview.innerHTML = renderMarkdownToHtml(bodyText);
+    // Fake textarea for backward compatibility with dictation + saveAllFormChanges
+    const textarea = {
+      get value() { return htmlToMarkdown(richEditor.innerHTML); },
+      set value(v) { richEditor.innerHTML = v ? renderMarkdownToHtml(v) : ''; },
+      scrollTop: 0,
+      get scrollHeight() { return richEditor.scrollHeight; },
+      dispatchEvent: (e) => richEditor.dispatchEvent(e)
     };
 
-    textarea.addEventListener('input', updatePreview);
-    updatePreview();
+    // Persist on every change
+    richEditor.addEventListener('input', () => {
+      const entry = getSelectedEntry();
+      if (!entry) return;
+      const md = htmlToMarkdown(richEditor.innerHTML);
+      Object.assign(entry, normalizeEntry({ ...entry, body: md, updatedAt: new Date().toISOString() }));
+      maybeCelebrateProgress(entry);
+      persistVault();
+    });
+
+    // Keyboard shortcuts inside the editor
+    richEditor.addEventListener('keydown', (e) => {
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      if (e.key === 'b') { e.preventDefault(); document.execCommand('bold'); }
+      else if (e.key === 'i') { e.preventDefault(); document.execCommand('italic'); }
+      else if (e.key === 'u') { e.preventDefault(); document.execCommand('underline'); }
+      else if (e.key === 's') { e.preventDefault(); saveAllFormChanges(); showToast('Saved'); }
+    });
+
+    // Format bar button helper
+    const fmt = (icon, title, action) => {
+      const btn = el('button', {
+        class: 'fmt-btn',
+        type: 'button',
+        title
+      }, [el('span', { text: icon })]);
+      btn.onmousedown = (e) => {
+        e.preventDefault(); // keep focus in editor
+        action();
+      };
+      return btn;
+    };
+
+    const fmtBar = el('div', { class: 'rich-fmt-bar' }, [
+      fmt('B',  'Bold (Ctrl+B)',      () => document.execCommand('bold')),
+      fmt('I',  'Italic (Ctrl+I)',    () => document.execCommand('italic')),
+      fmt('U',  'Underline (Ctrl+U)', () => document.execCommand('underline')),
+      fmt('S̶',  'Strikethrough',      () => document.execCommand('strikethrough')),
+      el('div', { class: 'fmt-divider' }),
+      fmt('H1', 'Heading 1',   () => document.execCommand('formatBlock', false, 'h1')),
+      fmt('H2', 'Heading 2',   () => document.execCommand('formatBlock', false, 'h2')),
+      fmt('H3', 'Heading 3',   () => document.execCommand('formatBlock', false, 'h3')),
+      el('div', { class: 'fmt-divider' }),
+      fmt('≡',  'Bullet list',    () => document.execCommand('insertUnorderedList')),
+      fmt('1.', 'Numbered list',  () => document.execCommand('insertOrderedList')),
+      fmt('"',  'Blockquote',     () => document.execCommand('formatBlock', false, 'blockquote')),
+      fmt('⌥',  'Code block',     () => document.execCommand('formatBlock', false, 'pre')),
+      el('div', { class: 'fmt-divider' }),
+      fmt('←',  'Outdent',   () => document.execCommand('outdent')),
+      fmt('→',  'Indent',    () => document.execCommand('indent')),
+      fmt('—',  'Paragraph', () => document.execCommand('formatBlock', false, 'p')),
+      el('div', { class: 'fmt-divider' }),
+      fmt('🗑', 'Clear formatting', () => document.execCommand('removeFormat'))
+    ]);
 
     const delBtn = el('button', {
       class: 'btn danger ghost',
@@ -5047,54 +5169,11 @@ export function createApp(mount) {
       el('span', { text: 'Trash' })
     ]);
 
-    const wrapSelection = (prefix, suffix = prefix) => {
-      const start = textarea.selectionStart ?? 0;
-      const end = textarea.selectionEnd ?? 0;
-      const value = textarea.value || '';
-      const selectedText = value.slice(start, end);
-      textarea.value = `${value.slice(0, start)}${prefix}${selectedText}${suffix}${value.slice(end)}`;
-      textarea.focus();
-      textarea.selectionStart = start + prefix.length;
-      textarea.selectionEnd = end + prefix.length;
-    };
+    const editorToolbar = el('div'); // kept for structural compat, now empty
 
-    const prefixCurrentLine = (prefix) => {
-      const start = textarea.selectionStart ?? 0;
-      const end = textarea.selectionEnd ?? 0;
-      const value = textarea.value || '';
-      const lineStart = value.lastIndexOf('\n', start - 1) + 1;
-      const block = value.slice(lineStart, end);
-      const nextBlock = block
-        .split('\n')
-        .map((line) => `${prefix}${line}`)
-        .join('\n');
-      textarea.value = `${value.slice(0, lineStart)}${nextBlock}${value.slice(end)}`;
-      textarea.focus();
-      textarea.selectionStart = lineStart;
-      textarea.selectionEnd = lineStart + nextBlock.length;
-    };
-
-    const editorToolbar = el('div', { class: 'detail-grid' }, [
-      el('div', { class: 'detail-card detail-card-wide' }, [
-        el('span', { class: 'detail-label', text: 'Editor tools' }),
-        el('div', { class: 'setting-pill-row' }, [
-          el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => wrapSelection('**') }, [el('span', { text: 'Bold' })]),
-          el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => wrapSelection('*') }, [el('span', { text: 'Italic' })]),
-          el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => prefixCurrentLine('# ') }, [el('span', { text: 'H1' })]),
-          el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => prefixCurrentLine('## ') }, [el('span', { text: 'H2' })]),
-          el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => prefixCurrentLine('- ') }, [el('span', { text: 'Bullet' })]),
-          el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => prefixCurrentLine('1. ') }, [el('span', { text: 'Numbered' })]),
-          el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => prefixCurrentLine('> ') }, [el('span', { text: 'Quote' })])
-        ])
-      ])
-    ]);
-
-    const plainTextEditor = el('div', { class: 'detail-grid' }, [
-      el('div', { class: 'detail-card detail-card-wide' }, [
-        el('span', { class: 'detail-label', text: 'Main editor' }),
-        textarea,
-        markdownPreview
-      ])
+    const plainTextEditor = el('div', { class: 'rich-editor-wrap' }, [
+      fmtBar,
+      richEditor
     ]);
 
     // Attachments UI (images + other files)
@@ -5353,7 +5432,6 @@ export function createApp(mount) {
         el('div', { class: 'editor-head-right' }, [delBtn])
       ]),
       el('div', { class: 'detail-grid' }, detailCards),
-      editorToolbar,
       plainTextEditor,
       renderVoiceMemoUI(selected),
       renderVideoUI(selected),
@@ -5363,7 +5441,7 @@ export function createApp(mount) {
           el('span', { class: 'btn-ic', text: '♡' }),
           el('span', { text: 'Save all changes' })
         ]),
-        renderDictateButton(selected, plainTextEditor),
+        renderDictateButton(selected),
         el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderShareOverlay(selected) }, [
           el('span', { class: 'btn-ic', text: '🔗' }),
           el('span', { text: 'Share' })
