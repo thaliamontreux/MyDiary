@@ -184,21 +184,48 @@ export async function initializeDatabase() {
     ['add_user_profile_fields_v1']
   );
   if (existingMigrations.length === 0) {
-    // Add profile columns and username uniqueness if they do not already exist
-    await pool.query(`
-      ALTER TABLE users
-        ADD COLUMN IF NOT EXISTS first_name VARCHAR(100) DEFAULT NULL,
-        ADD COLUMN IF NOT EXISTS middle_name VARCHAR(100) DEFAULT NULL,
-        ADD COLUMN IF NOT EXISTS last_name VARCHAR(100) DEFAULT NULL,
-        ADD COLUMN IF NOT EXISTS username VARCHAR(64) DEFAULT NULL,
-        ADD COLUMN IF NOT EXISTS address_line VARCHAR(255) DEFAULT NULL,
-        ADD COLUMN IF NOT EXISTS city VARCHAR(128) DEFAULT NULL,
-        ADD COLUMN IF NOT EXISTS state_region VARCHAR(128) DEFAULT NULL,
-        ADD COLUMN IF NOT EXISTS postal_code VARCHAR(32) DEFAULT NULL,
-        ADD COLUMN IF NOT EXISTS country_code VARCHAR(2) DEFAULT NULL,
-        ADD COLUMN IF NOT EXISTS tos_accepted_at TIMESTAMP NULL DEFAULT NULL,
-        ADD UNIQUE KEY IF NOT EXISTS uniq_users_username (username)
-    `);
+    // Add profile columns and username uniqueness if they do not already exist.
+    // We cannot rely on "IF NOT EXISTS" in ALTER TABLE across all MySQL versions,
+    // so we inspect INFORMATION_SCHEMA first and then add missing pieces.
+
+    const databaseName = bootstrap.databaseName;
+
+    async function ensureColumn(tableName, columnName, definitionSql) {
+      const [rows] = await pool.query(
+        `SELECT COUNT(*) AS count
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+        [databaseName, tableName, columnName]
+      );
+      if (!rows[0].count) {
+        await pool.query(`ALTER TABLE ${tableName} ADD COLUMN ${definitionSql}`);
+      }
+    }
+
+    async function ensureUniqueIndex(tableName, indexName, indexSql) {
+      const [rows] = await pool.query(
+        `SELECT COUNT(*) AS count
+         FROM INFORMATION_SCHEMA.STATISTICS
+         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = ?`,
+        [databaseName, tableName, indexName]
+      );
+      if (!rows[0].count) {
+        await pool.query(`ALTER TABLE ${tableName} ADD UNIQUE KEY ${indexSql}`);
+      }
+    }
+
+    await ensureColumn('users', 'first_name', 'first_name VARCHAR(100) DEFAULT NULL');
+    await ensureColumn('users', 'middle_name', 'middle_name VARCHAR(100) DEFAULT NULL');
+    await ensureColumn('users', 'last_name', 'last_name VARCHAR(100) DEFAULT NULL');
+    await ensureColumn('users', 'username', 'username VARCHAR(64) DEFAULT NULL');
+    await ensureColumn('users', 'address_line', 'address_line VARCHAR(255) DEFAULT NULL');
+    await ensureColumn('users', 'city', 'city VARCHAR(128) DEFAULT NULL');
+    await ensureColumn('users', 'state_region', 'state_region VARCHAR(128) DEFAULT NULL');
+    await ensureColumn('users', 'postal_code', 'postal_code VARCHAR(32) DEFAULT NULL');
+    await ensureColumn('users', 'country_code', 'country_code VARCHAR(2) DEFAULT NULL');
+    await ensureColumn('users', 'tos_accepted_at', 'tos_accepted_at TIMESTAMP NULL DEFAULT NULL');
+
+    await ensureUniqueIndex('users', 'uniq_users_username', 'uniq_users_username (username)');
 
     await pool.query(
       'INSERT INTO schema_migrations (name) VALUES (?)',
