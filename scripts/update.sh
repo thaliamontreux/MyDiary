@@ -36,17 +36,10 @@ fi
 git checkout "$BRANCH"
 git reset --hard "origin/$BRANCH"
 
-# Install deps (use ci if lockfile is clean, else install)
-if [ -f package-lock.json ]; then
-  log "running npm ci"
-  npm ci --omit=dev --no-audit --no-fund || npm install --no-audit --no-fund
-else
-  log "running npm install"
-  npm install --no-audit --no-fund
-fi
-
-# Ensure dev deps (e.g. vite) are available for build
-log "installing build deps"
+# Install deps. We use `npm install` (not `npm ci`) so that drift between
+# package.json and package-lock.json does not abort the update. This also
+# ensures dev deps (e.g. vite) are present for the build step below.
+log "running npm install"
 npm install --no-audit --no-fund
 
 log "building frontend"
