@@ -2896,6 +2896,55 @@ body::before {
 .export-option-title { font-size: 13px; font-weight: 700; color: var(--text); }
 .export-option-desc { font-size: 11px; color: var(--muted); }
 
+/* ── Editor footer compact layout ────────────────────────────────────────── */
+.editor-foot-primary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+.foot-save-btn {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  font-size: 13px;
+}
+.foot-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+.foot-icon-btn {
+  flex-shrink: 0;
+  padding: 6px 8px !important;
+  font-size: 16px;
+  min-width: 0;
+  border-radius: 8px;
+  line-height: 1;
+}
+.foot-icon-btn span { display: block; }
+
+/* ── Format bar spacer + dictate ─────────────────────────────────────────── */
+.fmt-spacer {
+  flex: 1;
+}
+.fmt-dictate-btn {
+  font-size: 14px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.fmt-dictate-active {
+  background: rgba(239,68,68,0.15) !important;
+  color: #ef4444 !important;
+  animation: mic-pulse 1.2s infinite;
+}
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.35); }
+  50%       { box-shadow: 0 0 0 5px rgba(239,68,68,0); }
+}
+
 /* ── Streak pill ─────────────────────────────────────────────────────────── */
 .streak-pill {
   display: none;

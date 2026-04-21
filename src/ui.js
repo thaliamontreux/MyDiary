@@ -5169,6 +5169,56 @@ export function createApp(mount) {
       return btn;
     };
 
+    // Dictate button wired to the rich editor (inline in toolbar)
+    const fmtDictateBtn = (() => {
+      if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) return el('div');
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const rec = new SR();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = 'en-US';
+      let active = false;
+      let interimEl = null;
+      const btn = el('button', { class: 'fmt-btn fmt-dictate-btn', type: 'button', title: 'Voice dictation' }, [
+        el('span', { class: 'fmt-dictate-icon', text: '🎤' })
+      ]);
+      const toggle = () => {
+        if (!active) {
+          active = true;
+          btn.classList.add('fmt-dictate-active');
+          rec.start();
+        } else {
+          active = false;
+          btn.classList.remove('fmt-dictate-active');
+          rec.stop();
+          if (interimEl) { interimEl.remove(); interimEl = null; }
+        }
+      };
+      btn.onmousedown = (e) => { e.preventDefault(); toggle(); };
+      rec.onresult = (ev) => {
+        let interim = '';
+        let final = '';
+        for (let i = ev.resultIndex; i < ev.results.length; i++) {
+          if (ev.results[i].isFinal) final += ev.results[i][0].transcript;
+          else interim += ev.results[i][0].transcript;
+        }
+        if (final) {
+          if (interimEl) { interimEl.remove(); interimEl = null; }
+          richEditor.focus();
+          document.execCommand('insertText', false, final + ' ');
+        } else if (interim) {
+          if (!interimEl) {
+            interimEl = el('span', { class: 'dictate-interim' });
+            richEditor.append(interimEl);
+          }
+          interimEl.textContent = interim;
+        }
+      };
+      rec.onerror = () => { active = false; btn.classList.remove('fmt-dictate-active'); };
+      rec.onend = () => { if (active) rec.start(); };
+      return btn;
+    })();
+
     const fmtBar = el('div', { class: 'rich-fmt-bar' }, [
       fmt('B',  'Bold (Ctrl+B)',      () => document.execCommand('bold')),
       fmt('I',  'Italic (Ctrl+I)',    () => document.execCommand('italic')),
@@ -5188,7 +5238,9 @@ export function createApp(mount) {
       fmt('→',  'Indent',    () => document.execCommand('indent')),
       fmt('—',  'Paragraph', () => document.execCommand('formatBlock', false, 'p')),
       el('div', { class: 'fmt-divider' }),
-      fmt('🗑', 'Clear formatting', () => document.execCommand('removeFormat'))
+      fmt('🗑', 'Clear formatting', () => document.execCommand('removeFormat')),
+      el('div', { class: 'fmt-spacer' }),
+      fmtDictateBtn
     ]);
 
     const delBtn = el('button', {
@@ -5517,29 +5569,25 @@ export function createApp(mount) {
       attachmentsEditor,
       el('div', { class: 'editor-foot' }, [
         el('div', { class: 'editor-foot-primary' }, [
-          el('button', { class: 'btn', type: 'button', onclick: () => saveAllFormChanges() }, [
+          el('button', { class: 'btn foot-save-btn', type: 'button', onclick: () => saveAllFormChanges() }, [
             el('span', { class: 'btn-ic', text: '♡' }),
             el('span', { text: 'Save' })
           ]),
-          renderDictateButton(selected),
-          el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderTemplateOverlay() }, [
-            el('span', { class: 'btn-ic', text: '📋' }),
-            el('span', { text: 'Template' })
+          el('div', { class: 'foot-divider' }),
+          el('button', { class: 'btn ghost foot-icon-btn', type: 'button', title: 'Template', onclick: () => renderTemplateOverlay() }, [
+            el('span', { text: '📋' })
           ]),
-          el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderShareOverlay(selected) }, [
-            el('span', { class: 'btn-ic', text: '🔗' }),
-            el('span', { text: 'Share' })
+          el('button', { class: 'btn ghost foot-icon-btn', type: 'button', title: 'Share', onclick: () => renderShareOverlay(selected) }, [
+            el('span', { text: '🔗' })
           ]),
-          el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderCommentsOverlay(selected) }, [
-            el('span', { class: 'btn-ic', text: '💬' }),
-            el('span', { text: 'Comments' })
+          el('button', { class: 'btn ghost foot-icon-btn', type: 'button', title: 'Comments', onclick: () => renderCommentsOverlay(selected) }, [
+            el('span', { text: '💬' })
           ]),
-          el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderFitnessOverlay(selected) }, [
-            el('span', { class: 'btn-ic', text: '🏃' }),
-            el('span', { text: 'Health' })
+          el('button', { class: 'btn ghost foot-icon-btn', type: 'button', title: 'Health data', onclick: () => renderFitnessOverlay(selected) }, [
+            el('span', { text: '🏃' })
           ]),
           el('button', {
-            class: 'btn ghost small-btn', type: 'button',
+            class: 'btn ghost foot-icon-btn', type: 'button', title: 'Add location',
             onclick: async () => {
               showToast('Getting location…');
               const loc = await captureLocationForEntry();
@@ -5550,10 +5598,7 @@ export function createApp(mount) {
                 showToast('Location unavailable.');
               }
             }
-          }, [
-            el('span', { class: 'btn-ic', text: '📍' }),
-            el('span', { text: 'Location' })
-          ]),
+          }, [el('span', { text: '📍' })]),
           (() => {
             const coverFileInput = el('input', { type: 'file', accept: 'image/*', style: 'display:none' });
             coverFileInput.addEventListener('change', async () => {
@@ -5568,16 +5613,14 @@ export function createApp(mount) {
               coverFileInput.value = '';
             });
             const btn = el('button', {
-              class: 'btn ghost small-btn', type: 'button',
+              class: 'btn ghost foot-icon-btn', type: 'button',
+              title: selected.coverImage ? 'Change cover image' : 'Add cover image',
               onclick: () => coverFileInput.click()
-            }, [
-              el('span', { class: 'btn-ic', text: '🖼' }),
-              el('span', { text: selected.coverImage ? 'Change cover' : 'Cover image' })
-            ]);
-            return el('div', {}, [coverFileInput, btn]);
+            }, [el('span', { text: '🖼' })]);
+            return el('div', { style: 'display:contents' }, [coverFileInput, btn]);
           })(),
           el('button', {
-            class: 'btn ghost small-btn', type: 'button',
+            class: 'btn ghost foot-icon-btn', type: 'button', title: 'Print entry',
             onclick: () => {
               const printWin = window.open('', '_blank');
               const body = selected.body ? renderMarkdownToHtml(selected.body) : '<p><em>No content</em></p>';
@@ -5599,10 +5642,7 @@ export function createApp(mount) {
               printWin.focus();
               printWin.print();
             }
-          }, [
-            el('span', { class: 'btn-ic', text: '🖨' }),
-            el('span', { text: 'Print' })
-          ])
+          }, [el('span', { text: '🖨' })])
         ]),
         el('div', { class: 'editor-foot-meta' }, [
           wordCountNode,
