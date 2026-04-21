@@ -98,20 +98,28 @@ fi
 NODE_VERSION="$(node -v)"
 echo "[install] using Node.js $NODE_VERSION"
 
-# 5. Install deps + build as service user
+# 5. Stop existing services if they're running (to prevent crashes during npm install)
+echo "[install] stopping existing services (if running)"
+for svc in mydiary-api mydiary-web; do
+  if systemctl list-unit-files | grep -q "^${svc}.service"; then
+    systemctl stop "${svc}.service" 2>/dev/null || true
+  fi
+done
+
+# 6. Install deps + build as service user
 # Use non-login shell (no -l) and force HOME to APP_DIR so npm cache lives there,
 # not in a stale $HOME from an earlier install.
 echo "[install] installing npm dependencies"
-sudo -H -u "$SERVICE_USER" env HOME="$APP_DIR" bash -c "cd '$APP_DIR' && npm install --no-audit --no-fund"
+sudo -H -u "$SERVICE_USER" env HOME="$APP_DIR" bash -c "cd '$APP_DIR' && npm install --include=dev --no-audit --no-fund"
 
 echo "[install] building frontend"
 sudo -H -u "$SERVICE_USER" env HOME="$APP_DIR" bash -c "cd '$APP_DIR' && npm run build"
 
-# 6. Make scripts executable
+# 7. Make scripts executable
 chmod +x "$APP_DIR/scripts/update.sh" "$APP_DIR/scripts/install-service.sh" 2>/dev/null || true
 chmod +x "$APP_DIR/start-all.sh" 2>/dev/null || true
 
-# 7. Configure sudoers so the service user can restart its services
+# 8. Configure sudoers so the service user can restart its services
 SUDOERS_FILE="/etc/sudoers.d/mydiary-updater"
 echo "[install] configuring passwordless systemctl restart for $SERVICE_USER"
 cat > "$SUDOERS_FILE" <<EOF
@@ -120,7 +128,7 @@ $SERVICE_USER ALL=(root) NOPASSWD: /bin/systemctl restart mydiary-api.service, /
 EOF
 chmod 0440 "$SUDOERS_FILE"
 
-# 8. Install systemd unit files from templates
+# 9. Install systemd unit files from templates
 render_template() {
   local src="$1"
   local dst="$2"
@@ -137,7 +145,7 @@ render_template "$APP_DIR/deploy/systemd/mydiary-web.service.template"     /etc/
 render_template "$APP_DIR/deploy/systemd/mydiary-updater.service.template" /etc/systemd/system/mydiary-updater.service
 render_template "$APP_DIR/deploy/systemd/mydiary-updater.timer.template"   /etc/systemd/system/mydiary-updater.timer
 
-# 9. Reload systemd + enable + start
+# 10. Reload systemd + enable + start
 echo "[install] reloading systemd"
 systemctl daemon-reload
 
@@ -150,7 +158,7 @@ systemctl enable --now mydiary-web.service
 echo "[install] enabling + starting mydiary-updater.timer"
 systemctl enable --now mydiary-updater.timer
 
-# 10. Summary
+# 11. Summary
 echo ""
 echo "=== Install complete ==="
 echo "API:     systemctl status mydiary-api.service"
