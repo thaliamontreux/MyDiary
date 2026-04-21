@@ -44,7 +44,7 @@ log "stopping services"
 for svc in mydiary-api mydiary-web; do
   if systemctl list-unit-files | grep -q "^${svc}.service"; then
     log "stopping ${svc}.service"
-    sudo -n systemctl stop "${svc}.service" || systemctl --user stop "${svc}.service" || true
+    systemctl stop "${svc}.service" || true
   fi
 done
 
@@ -66,7 +66,7 @@ npm run build
 for svc in mydiary-api mydiary-web; do
   if systemctl list-unit-files | grep -q "^${svc}.service"; then
     log "restarting ${svc}.service"
-    sudo -n systemctl restart "${svc}.service" || systemctl --user restart "${svc}.service" || true
+    systemctl restart "${svc}.service" || true
   fi
 done
 
