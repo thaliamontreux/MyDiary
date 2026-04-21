@@ -107,11 +107,88 @@ export async function deleteVault(token, slotName) {
   });
 }
 
-export async function verifyVaultPassword(token, slotName, password) {
-  return request(`/api/vaults/${encodeURIComponent(slotName)}/verify`, {
+export async function verifyVaultPassword(token, slot, password) {
+  return request(`/api/vaults/${slot}/verify`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
+    headers: {
+      Authorization: `Bearer ${token}`
+    },
     body: JSON.stringify({ password })
+  });
+}
+
+// Tag API functions
+export async function listTags(token) {
+  return request('/api/tags', {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+}
+
+export async function createTag(token, payload) {
+  return request('/api/tags', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function updateTag(token, tagId, payload) {
+  return request(`/api/tags/${tagId}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function deleteTag(token, tagId) {
+  return request(`/api/tags/${tagId}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+}
+
+export async function getEntryTags(token, slot) {
+  return request(`/api/entries/${slot}/tags`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+}
+
+export async function addTagToEntry(token, slot, tagId) {
+  return request(`/api/entries/${slot}/tags/${tagId}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+}
+
+export async function removeTagFromEntry(token, slot, tagId) {
+  return request(`/api/entries/${slot}/tags/${tagId}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+}
+
+export async function getEntriesByTag(token, tagId) {
+  return request(`/api/tags/${tagId}/entries`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
   });
 }
 

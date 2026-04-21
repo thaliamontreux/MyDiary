@@ -45,7 +45,15 @@ import {
   createVault,
   updateVault,
   deleteVault,
-  verifyVaultPassword
+  verifyVaultPassword,
+  listTags,
+  createTag,
+  updateTag,
+  deleteTag,
+  getEntryTags,
+  addTagToEntry,
+  removeTagFromEntry,
+  getEntriesByTag
 } from './api.js';
 
 function el(tag, attrs = {}, children = []) {
@@ -4942,8 +4950,114 @@ export function createApp(mount) {
     await ensureSodiumReady();
     await refreshDeviceAuthSupport();
     if (state.auth.token) {
-      await Promise.all([loadFoldersForUser(), loadVaultsForUser()]);
+      await Promise.all([loadFoldersForUser(), loadVaultsForUser(), loadTagsForUser()]);
     }
     render();
   })();
+
+  // Tag management functions
+  async function loadTagsForUser() {
+    if (!state.auth.token) return;
+    try {
+      const data = await listTags(state.auth.token);
+      state.tags = data.tags || [];
+    } catch (error) {
+      console.error('Failed to load tags:', error);
+      state.tags = [];
+    }
+  }
+
+  function renderTagManager() {
+    const container = el('div', { class: 'tag-manager' }, [
+      el('h3', { text: 'Tags' }),
+      el('div', { class: 'tag-list' }, state.tags.map(tag =>
+        el('div', { class: 'tag-item' }, [
+          el('span', {
+            class: 'tag-badge',
+            style: `background-color: ${tag.color}`,
+            text: tag.name
+          }),
+          el('button', {
+            class: 'btn mini ghost',
+            text: '×',
+            onclick: async () => {
+              try {
+                await deleteTag(state.auth.token, tag.id);
+                await loadTagsForUser();
+                render();
+              } catch (error) {
+                alert('Failed to delete tag: ' + error.message);
+              }
+            }
+          })
+        ])
+      )),
+      el('div', { class: 'tag-create' }, [
+        el('input', {
+          type: 'text',
+          placeholder: 'New tag name',
+          id: 'new-tag-name'
+        }),
+        el('input', {
+          type: 'color',
+          value: '#6366f1',
+          id: 'new-tag-color'
+        }),
+        el('button', {
+          class: 'btn mini',
+          text: 'Add',
+          onclick: async () => {
+            const nameInput = document.getElementById('new-tag-name');
+            const colorInput = document.getElementById('new-tag-color');
+            const name = nameInput.value.trim();
+            const color = colorInput.value;
+            if (!name) return;
+            try {
+              await createTag(state.auth.token, { name, color });
+              await loadTagsForUser();
+              nameInput.value = '';
+              render();
+            } catch (error) {
+              alert('Failed to create tag: ' + error.message);
+            }
+          }
+        })
+      ])
+    ]);
+    return container;
+  }
+
+  function renderTagSelector(selectedTags = []) {
+    return el('div', { class: 'tag-selector' }, [
+      el('div', { class: 'tag-selector-label', text: 'Tags:' }),
+      el('div', { class: 'tag-selector-list' }, state.tags.map(tag =>
+        el('button', {
+          class: `tag-chip ${selectedTags.includes(tag.id) ? 'selected' : ''}`,
+          style: selectedTags.includes(tag.id) ? `background-color: ${tag.color}; color: white` : `background-color: ${tag.color}33; color: ${tag.color}`,
+          text: tag.name,
+          onclick: () => {
+            // Toggle tag selection
+            const index = selectedTags.indexOf(tag.id);
+            if (index > -1) {
+              selectedTags.splice(index, 1);
+            } else {
+              selectedTags.push(tag.id);
+            }
+            render(); // Re-render to update selection
+          }
+        })
+      ))
+    ]);
+  }
+
+  function renderEntryTags(entryTags) {
+    if (!entryTags || entryTags.length === 0) return el('div');
+    return el('div', { class: 'entry-tags' }, entryTags.map(tag =>
+      el('span', {
+        class: 'tag-badge',
+        style: `background-color: ${tag.color}`,
+        text: tag.name
+      })
+    ));
+  }
 }

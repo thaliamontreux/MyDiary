@@ -30,7 +30,16 @@ import {
   getUserVaultSlot,
   createUserVaultSlot,
   updateUserVaultSlot,
-  deleteUserVaultSlot
+  deleteUserVaultSlot,
+  createTag,
+  listTags,
+  getTag,
+  updateTag,
+  deleteTag,
+  addTagToEntry,
+  removeTagFromEntry,
+  getEntryTags,
+  getEntriesByTag
 } from './db.js';
 import { requireAuth, signAuthToken } from './auth.js';
 import { log, logError, requestLogger } from './logger.js';
@@ -863,6 +872,150 @@ app.post('/api/vaults/:slot/verify', requireAuth, async (req, res) => {
   } catch (error) {
     logError('vaults_verify_failed', error, { requestId: req.requestId, userId: req.user?.id });
     res.status(500).json({ error: 'Failed to verify vault password' });
+  }
+});
+
+// Tags API endpoints
+app.get('/api/tags', requireAuth, async (req, res) => {
+  try {
+    const tags = await listTags(req.user.id);
+    res.json({ tags });
+  } catch (error) {
+    logError('tags_list_failed', error, { requestId: req.requestId, userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to load tags' });
+  }
+});
+
+app.post('/api/tags', requireAuth, async (req, res) => {
+  try {
+    const name = String(req.body?.name || '').trim();
+    const color = String(req.body?.color || '#6366f1').trim();
+    
+    if (!name) {
+      res.status(400).json({ error: 'Tag name is required' });
+      return;
+    }
+    if (name.length > 64) {
+      res.status(400).json({ error: 'Tag name must be 64 characters or less' });
+      return;
+    }
+    
+    const tag = await createTag(req.user.id, name, color);
+    res.status(201).json({ tag });
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      res.status(409).json({ error: 'A tag with this name already exists' });
+      return;
+    }
+    logError('tags_create_failed', error, { requestId: req.requestId, userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to create tag' });
+  }
+});
+
+app.patch('/api/tags/:id', requireAuth, async (req, res) => {
+  try {
+    const tagId = Number(req.params.id);
+    const name = req.body?.name ? String(req.body.name).trim() : undefined;
+    const color = req.body?.color ? String(req.body.color).trim() : undefined;
+    
+    if (name !== undefined && name.length > 64) {
+      res.status(400).json({ error: 'Tag name must be 64 characters or less' });
+      return;
+    }
+    
+    const tag = await updateTag(req.user.id, tagId, { name, color });
+    if (!tag) {
+      res.status(404).json({ error: 'Tag not found' });
+      return;
+    }
+    res.json({ tag });
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      res.status(409).json({ error: 'A tag with this name already exists' });
+      return;
+    }
+    logError('tags_update_failed', error, { requestId: req.requestId, userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to update tag' });
+  }
+});
+
+app.delete('/api/tags/:id', requireAuth, async (req, res) => {
+  try {
+    const tagId = Number(req.params.id);
+    const ok = await deleteTag(req.user.id, tagId);
+    if (!ok) {
+      res.status(404).json({ error: 'Tag not found' });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (error) {
+    logError('tags_delete_failed', error, { requestId: req.requestId, userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to delete tag' });
+  }
+});
+
+// Entry-Tag association endpoints
+app.get('/api/entries/:slot/tags', requireAuth, async (req, res) => {
+  try {
+    const slot = String(req.params.slot || '');
+    const tags = await getEntryTags(req.user.id, slot);
+    res.json({ tags });
+  } catch (error) {
+    logError('entry_tags_list_failed', error, { requestId: req.requestId, userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to load entry tags' });
+  }
+});
+
+app.post('/api/entries/:slot/tags/:tagId', requireAuth, async (req, res) => {
+  try {
+    const slot = String(req.params.slot || '');
+    const tagId = Number(req.params.tagId);
+    
+    const tag = await getTag(req.user.id, tagId);
+    if (!tag) {
+      res.status(404).json({ error: 'Tag not found' });
+      return;
+    }
+    
+    await addTagToEntry(req.user.id, slot, tagId);
+    res.status(201).json({ ok: true });
+  } catch (error) {
+    if (error.code === 'ER_DUP_ENTRY') {
+      res.status(409).json({ error: 'Tag already added to entry' });
+      return;
+    }
+    logError('entry_tag_add_failed', error, { requestId: req.requestId, userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to add tag to entry' });
+  }
+});
+
+app.delete('/api/entries/:slot/tags/:tagId', requireAuth, async (req, res) => {
+  try {
+    const slot = String(req.params.slot || '');
+    const tagId = Number(req.params.tagId);
+    
+    await removeTagFromEntry(req.user.id, slot, tagId);
+    res.json({ ok: true });
+  } catch (error) {
+    logError('entry_tag_remove_failed', error, { requestId: req.requestId, userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to remove tag from entry' });
+  }
+});
+
+app.get('/api/tags/:id/entries', requireAuth, async (req, res) => {
+  try {
+    const tagId = Number(req.params.id);
+    const tag = await getTag(req.user.id, tagId);
+    if (!tag) {
+      res.status(404).json({ error: 'Tag not found' });
+      return;
+    }
+    
+    const vaultSlots = await getEntriesByTag(req.user.id, tagId);
+    res.json({ vault_slots: vaultSlots });
+  } catch (error) {
+    logError('tag_entries_list_failed', error, { requestId: req.requestId, userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to load entries for tag' });
   }
 });
 

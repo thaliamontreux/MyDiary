@@ -187,6 +187,31 @@ export async function initializeDatabase() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS tags (
+      id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+      user_id BIGINT UNSIGNED NOT NULL,
+      name VARCHAR(64) NOT NULL,
+      color VARCHAR(7) DEFAULT '#6366f1',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_user_tag_name (user_id, name),
+      CONSTRAINT fk_tags_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS entry_tags (
+      id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+      user_id BIGINT UNSIGNED NOT NULL,
+      vault_slot VARCHAR(32) NOT NULL,
+      tag_id BIGINT UNSIGNED NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_user_vault_tag (user_id, vault_slot, tag_id),
+      CONSTRAINT fk_entry_tags_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      CONSTRAINT fk_entry_tags_tag FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
       name VARCHAR(128) NOT NULL UNIQUE,
@@ -770,6 +795,106 @@ export async function deleteUserFolder(userId, folderId) {
     [userId, folderId]
   );
   return result.affectedRows > 0;
+}
+
+// Tag CRUD operations
+export async function createTag(userId, name, color = '#6366f1') {
+  ensurePool();
+  const [result] = await pool.query(
+    'INSERT INTO tags (user_id, name, color) VALUES (?, ?, ?)',
+    [userId, name, color]
+  );
+  return { id: result.insertId, user_id: userId, name, color };
+}
+
+export async function listTags(userId) {
+  ensurePool();
+  const [rows] = await pool.query(
+    'SELECT id, name, color, created_at FROM tags WHERE user_id = ? ORDER BY name ASC',
+    [userId]
+  );
+  return rows;
+}
+
+export async function getTag(userId, tagId) {
+  ensurePool();
+  const [rows] = await pool.query(
+    'SELECT id, name, color, created_at FROM tags WHERE user_id = ? AND id = ? LIMIT 1',
+    [userId, tagId]
+  );
+  return rows[0] || null;
+}
+
+export async function updateTag(userId, tagId, { name, color }) {
+  ensurePool();
+  const fields = [];
+  const values = [];
+  if (name !== undefined) {
+    fields.push('name = ?');
+    values.push(name);
+  }
+  if (color !== undefined) {
+    fields.push('color = ?');
+    values.push(color);
+  }
+  if (!fields.length) return getTag(userId, tagId);
+  values.push(userId, tagId);
+  await pool.query(
+    `UPDATE tags SET ${fields.join(', ')} WHERE user_id = ? AND id = ?`,
+    values
+  );
+  return getTag(userId, tagId);
+}
+
+export async function deleteTag(userId, tagId) {
+  ensurePool();
+  const [result] = await pool.query(
+    'DELETE FROM tags WHERE user_id = ? AND id = ? LIMIT 1',
+    [userId, tagId]
+  );
+  return result.affectedRows > 0;
+}
+
+// Entry-Tag association operations
+export async function addTagToEntry(userId, vaultSlot, tagId) {
+  ensurePool();
+  await pool.query(
+    'INSERT INTO entry_tags (user_id, vault_slot, tag_id) VALUES (?, ?, ?)',
+    [userId, vaultSlot, tagId]
+  );
+}
+
+export async function removeTagFromEntry(userId, vaultSlot, tagId) {
+  ensurePool();
+  await pool.query(
+    'DELETE FROM entry_tags WHERE user_id = ? AND vault_slot = ? AND tag_id = ?',
+    [userId, vaultSlot, tagId]
+  );
+}
+
+export async function getEntryTags(userId, vaultSlot) {
+  ensurePool();
+  const [rows] = await pool.query(
+    `SELECT t.id, t.name, t.color
+     FROM entry_tags et
+     JOIN tags t ON et.tag_id = t.id
+     WHERE et.user_id = ? AND et.vault_slot = ?
+     ORDER BY t.name ASC`,
+    [userId, vaultSlot]
+  );
+  return rows;
+}
+
+export async function getEntriesByTag(userId, tagId) {
+  ensurePool();
+  const [rows] = await pool.query(
+    `SELECT DISTINCT et.vault_slot
+     FROM entry_tags et
+     WHERE et.user_id = ? AND et.tag_id = ?
+     ORDER BY et.vault_slot ASC`,
+    [userId, tagId]
+  );
+  return rows.map(row => row.vault_slot);
 }
 
 export { pool };
