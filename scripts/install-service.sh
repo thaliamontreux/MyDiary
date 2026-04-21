@@ -3,11 +3,10 @@
 # with an auto-updater timer that pulls from git and rebuilds on new commits.
 #
 # Usage (as root or with sudo):
-#   sudo APP_DIR=/opt/mydiary SERVICE_USER=mydiary ./scripts/install-service.sh
+#   sudo APP_DIR=/opt/MyDiary ./scripts/install-service.sh
 #
 # Variables (override with env):
-#   APP_DIR         Target install directory (default: current checkout)
-#   SERVICE_USER    System user to run services (default: mydiary)
+#   APP_DIR         Target install directory (default: /opt/MyDiary)
 #   UPDATE_INTERVAL systemd OnUnitActiveSec value (default: 5min)
 #   BRANCH          Git branch to track (default: main)
 #
@@ -19,7 +18,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 APP_DIR="${APP_DIR:-/opt/MyDiary}"
-SERVICE_USER="${SERVICE_USER:-mydiary}"
 UPDATE_INTERVAL="${UPDATE_INTERVAL:-5min}"
 BRANCH="${BRANCH:-main}"
 
@@ -35,24 +33,11 @@ fi
 
 echo "=== MyDiary installer ==="
 echo "APP_DIR         = $APP_DIR"
-echo "SERVICE_USER    = $SERVICE_USER"
 echo "UPDATE_INTERVAL = $UPDATE_INTERVAL"
 echo "BRANCH          = $BRANCH"
 echo ""
 
-# 1. Ensure service user exists with home = APP_DIR
-if ! id -u "$SERVICE_USER" >/dev/null 2>&1; then
-  echo "[install] creating system user $SERVICE_USER with home $APP_DIR"
-  useradd --system --home "$APP_DIR" --shell /usr/sbin/nologin "$SERVICE_USER"
-else
-  CURRENT_HOME="$(getent passwd "$SERVICE_USER" | cut -d: -f6)"
-  if [ "$CURRENT_HOME" != "$APP_DIR" ]; then
-    echo "[install] updating $SERVICE_USER home: $CURRENT_HOME -> $APP_DIR"
-    usermod --home "$APP_DIR" "$SERVICE_USER" || true
-  fi
-fi
-
-# 2. If APP_DIR is different from current checkout, clone/copy
+# 1. If APP_DIR is different from current checkout, clone/copy
 if [ "$APP_DIR" != "$REPO_DIR" ]; then
   if [ ! -d "$APP_DIR/.git" ]; then
     echo "[install] copying project to $APP_DIR"
@@ -63,34 +48,11 @@ fi
 
 cd "$APP_DIR"
 
-# 3. Ownership
-# Guard: refuse to chown inside /home/<someone> unless SERVICE_USER matches that user
-case "$APP_DIR" in
-  /home/*)
-    HOME_OWNER="$(echo "$APP_DIR" | awk -F/ '{print $3}')"
-    if [ -n "$HOME_OWNER" ] && [ "$HOME_OWNER" != "$SERVICE_USER" ]; then
-      echo ""
-      echo "ERROR: Refusing to chown $APP_DIR to $SERVICE_USER." >&2
-      echo "       It lives inside /home/$HOME_OWNER which would lock that user out." >&2
-      echo "" >&2
-      echo "Choose one:" >&2
-      echo "  1) Reinstall under /opt/mydiary (recommended):" >&2
-      echo "       sudo git clone https://github.com/thaliamontreux/MyDiary /opt/mydiary" >&2
-      echo "       sudo APP_DIR=/opt/mydiary SERVICE_USER=$SERVICE_USER \\" >&2
-      echo "            /opt/mydiary/scripts/install-service.sh" >&2
-      echo "" >&2
-      echo "  2) Run the service as the home's owner ($HOME_OWNER):" >&2
-      echo "       sudo APP_DIR=$APP_DIR SERVICE_USER=$HOME_OWNER \\" >&2
-      echo "            $APP_DIR/scripts/install-service.sh" >&2
-      echo "" >&2
-      exit 2
-    fi
-    ;;
-esac
+# 2. Ownership
 echo "[install] setting ownership to root"
 chown -R root:root "$APP_DIR"
 
-# 4. Ensure Node.js is available
+# 3. Ensure Node.js is available
 if ! command -v node >/dev/null 2>&1; then
   echo "[install] Node.js not found - please install Node.js 18+ before running this script" >&2
   exit 1
@@ -98,7 +60,7 @@ fi
 NODE_VERSION="$(node -v)"
 echo "[install] using Node.js $NODE_VERSION"
 
-# 5. Stop existing services if they're running (to prevent crashes during npm install)
+# 4. Stop existing services if they're running (to prevent crashes during npm install)
 echo "[install] stopping existing services (if running)"
 for svc in mydiary-api mydiary-web; do
   if systemctl list-unit-files | grep -q "^${svc}.service"; then
@@ -106,24 +68,23 @@ for svc in mydiary-api mydiary-web; do
   fi
 done
 
-# 6. Install deps + build as root
+# 5. Install deps + build as root
 echo "[install] installing npm dependencies"
 env HOME="$APP_DIR" bash -c "cd '$APP_DIR' && npm install --include=dev --no-audit --no-fund"
 
 echo "[install] building frontend"
 env HOME="$APP_DIR" bash -c "cd '$APP_DIR' && npm run build"
 
-# 7. Make scripts executable
+# 6. Make scripts executable
 chmod +x "$APP_DIR/scripts/update.sh" "$APP_DIR/scripts/install-service.sh" 2>/dev/null || true
 chmod +x "$APP_DIR/start-all.sh" 2>/dev/null || true
 
-# 8. Install systemd unit files from templates
+# 7. Install systemd unit files from templates
 render_template() {
   local src="$1"
   local dst="$2"
   sed \
     -e "s|{{APP_DIR}}|$APP_DIR|g" \
-    -e "s|{{SERVICE_USER}}|$SERVICE_USER|g" \
     -e "s|{{UPDATE_INTERVAL}}|$UPDATE_INTERVAL|g" \
     "$src" > "$dst"
 }
@@ -134,7 +95,7 @@ render_template "$APP_DIR/deploy/systemd/mydiary-web.service.template"     /etc/
 render_template "$APP_DIR/deploy/systemd/mydiary-updater.service.template" /etc/systemd/system/mydiary-updater.service
 render_template "$APP_DIR/deploy/systemd/mydiary-updater.timer.template"   /etc/systemd/system/mydiary-updater.timer
 
-# 9. Reload systemd + enable + start
+# 8. Reload systemd + enable + start
 echo "[install] reloading systemd"
 systemctl daemon-reload
 
@@ -147,7 +108,7 @@ systemctl enable --now mydiary-web.service
 echo "[install] enabling + starting mydiary-updater.timer"
 systemctl enable --now mydiary-updater.timer
 
-# 10. Summary
+# 9. Summary
 echo ""
 echo "=== Install complete ==="
 echo "API:     systemctl status mydiary-api.service"
