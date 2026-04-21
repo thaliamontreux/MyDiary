@@ -40,10 +40,16 @@ echo "UPDATE_INTERVAL = $UPDATE_INTERVAL"
 echo "BRANCH          = $BRANCH"
 echo ""
 
-# 1. Ensure service user exists
+# 1. Ensure service user exists with home = APP_DIR
 if ! id -u "$SERVICE_USER" >/dev/null 2>&1; then
-  echo "[install] creating system user $SERVICE_USER"
+  echo "[install] creating system user $SERVICE_USER with home $APP_DIR"
   useradd --system --home "$APP_DIR" --shell /usr/sbin/nologin "$SERVICE_USER"
+else
+  CURRENT_HOME="$(getent passwd "$SERVICE_USER" | cut -d: -f6)"
+  if [ "$CURRENT_HOME" != "$APP_DIR" ]; then
+    echo "[install] updating $SERVICE_USER home: $CURRENT_HOME -> $APP_DIR"
+    usermod --home "$APP_DIR" "$SERVICE_USER" || true
+  fi
 fi
 
 # 2. If APP_DIR is different from current checkout, clone/copy
@@ -93,11 +99,13 @@ NODE_VERSION="$(node -v)"
 echo "[install] using Node.js $NODE_VERSION"
 
 # 5. Install deps + build as service user
+# Use non-login shell (no -l) and force HOME to APP_DIR so npm cache lives there,
+# not in a stale $HOME from an earlier install.
 echo "[install] installing npm dependencies"
-sudo -u "$SERVICE_USER" bash -lc "cd '$APP_DIR' && npm install --no-audit --no-fund"
+sudo -H -u "$SERVICE_USER" env HOME="$APP_DIR" bash -c "cd '$APP_DIR' && npm install --no-audit --no-fund"
 
 echo "[install] building frontend"
-sudo -u "$SERVICE_USER" bash -lc "cd '$APP_DIR' && npm run build"
+sudo -H -u "$SERVICE_USER" env HOME="$APP_DIR" bash -c "cd '$APP_DIR' && npm run build"
 
 # 6. Make scripts executable
 chmod +x "$APP_DIR/scripts/update.sh" "$APP_DIR/scripts/install-service.sh" 2>/dev/null || true
