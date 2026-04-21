@@ -195,6 +195,68 @@ function el(tag, attrs = {}, children = []) {
     backDrop.append(card);
     return backDrop;
   }
+
+  function renderPasswordChangeOverlay() {
+    const backDrop = el('div', { class: 'signup-overlay' });
+    const currentInput = el('input', {
+      class: 'lock-input',
+      type: 'password',
+      placeholder: 'Current password'
+    });
+    const newInput = el('input', {
+      class: 'lock-input',
+      type: 'password',
+      placeholder: 'New password (min 10 characters)'
+    });
+    const confirmInput = el('input', {
+      class: 'lock-input',
+      type: 'password',
+      placeholder: 'Confirm new password'
+    });
+    const status = el('div', { class: 'lock-status', text: '' });
+
+    const submitBtn = el('button', {
+      class: 'btn big',
+      onclick: async () => {
+        status.textContent = 'Updating password…';
+        try {
+          if (newInput.value.length < 10) throw new Error('Use at least 10 characters');
+          if (newInput.value !== confirmInput.value) throw new Error('New passwords do not match');
+          await changePassword(state.auth.token, currentInput.value, newInput.value);
+          state.auth.user = { ...(state.auth.user || {}), mustChangePassword: false };
+          showToast('Password updated');
+          backDrop.remove();
+          render(false);
+        } catch (e) {
+          status.textContent = e?.message || 'Could not change password yet';
+        }
+      }
+    }, [
+      el('span', { class: 'btn-ic', text: '✓' }),
+      el('span', { text: 'Save new password' })
+    ]);
+
+    const cancelBtn = el('button', {
+      class: 'btn ghost',
+      onclick: () => backDrop.remove()
+    }, [
+      el('span', { class: 'btn-ic', text: '✕' }),
+      el('span', { text: 'Cancel' })
+    ]);
+
+    const card = el('div', { class: 'signup-card' }, [
+      el('div', { class: 'lock-title', text: 'Change your password' }),
+      currentInput,
+      newInput,
+      confirmInput,
+      submitBtn,
+      cancelBtn,
+      status
+    ]);
+
+    backDrop.append(card);
+    return backDrop;
+  }
   for (const c of children) node.append(c);
   return node;
 }
@@ -1942,12 +2004,30 @@ export function createApp(mount) {
 
     const keyRow = el('div', { class: 'account-key-row' }, [keyField, copyBtn, revealBtn]);
 
+    const changePasswordBtn = el('button', {
+      class: 'btn ghost small-btn',
+      type: 'button',
+      onclick: () => {
+        const overlay = renderPasswordChangeOverlay();
+        root.append(overlay);
+      }
+    }, [
+      el('span', { class: 'btn-ic', text: '✎' }),
+      el('span', { text: 'Change password' })
+    ]);
+
+    const passwordRow = el('div', { class: 'account-row' }, [
+      el('div', { class: 'account-label', text: 'Password' }),
+      changePasswordBtn
+    ]);
+
     const card = el('div', { class: 'account-card' }, [
       el('div', { class: 'lock-title', text: 'Your account & security' }),
       nameRow,
       emailRow,
       usernameRow,
       locationRow,
+      passwordRow,
       keyLabel,
       keyHelper,
       keyRow,
