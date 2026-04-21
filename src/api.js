@@ -27,6 +27,54 @@ export async function registerUser(payload) {
   });
 }
 
+export async function listFolders(token) {
+  return request('/api/folders', {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+}
+
+export async function createFolder(token, payload) {
+  return request('/api/folders', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function updateFolder(token, folderId, payload) {
+  return request(`/api/folders/${encodeURIComponent(folderId)}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function deleteFolder(token, folderId) {
+  return request(`/api/folders/${encodeURIComponent(folderId)}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+}
+
+export async function verifyFolderPassword(token, folderId, password) {
+  return request(`/api/folders/${encodeURIComponent(folderId)}/verify`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ password })
+  });
+}
+
 export async function adminGetUser(token, userId) {
   return request(`/api/admin/users/${encodeURIComponent(userId)}`, {
     method: 'GET',

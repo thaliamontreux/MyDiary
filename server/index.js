@@ -19,7 +19,13 @@ import {
   updateUsername,
   upsertVault,
   adminUpdateUserProfile,
-  initializeDatabase
+  initializeDatabase,
+  listUserFolders,
+  getUserFolderById,
+  getUserFolderByPath,
+  createUserFolder,
+  updateUserFolder,
+  deleteUserFolder
 } from './db.js';
 import { requireAuth, signAuthToken } from './auth.js';
 import { log, logError, requestLogger } from './logger.js';
@@ -99,6 +105,164 @@ app.get('/api/ready', async (_req, res) => {
     res.json({ ok: true });
   } catch {
     res.status(503).json({ ok: false, error: 'Database unavailable' });
+  }
+});
+
+app.get('/api/folders', requireAuth, async (req, res) => {
+  try {
+    const folders = await listUserFolders(req.user.id);
+    res.json({
+      folders: folders.map((f) => ({
+        id: f.id,
+        path: f.path,
+        hasPassword: Boolean(f.password_hash),
+        createdAt: f.created_at,
+        updatedAt: f.updated_at
+      }))
+    });
+  } catch (error) {
+    logError('folders_list_failed', error, { requestId: req.requestId, userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to load folders' });
+  }
+});
+
+app.post('/api/folders', requireAuth, async (req, res) => {
+  try {
+    const rawPath = String(req.body?.path || '').trim();
+    const password = String(req.body?.password || '');
+
+    if (!rawPath) {
+      res.status(400).json({ error: 'Folder name is required' });
+      return;
+    }
+
+    const existing = await getUserFolderByPath(req.user.id, rawPath);
+    if (existing) {
+      res.status(409).json({ error: 'A folder with this name already exists' });
+      return;
+    }
+
+    const passwordHash = password ? await bcrypt.hash(password, 12) : null;
+    const created = await createUserFolder(req.user.id, rawPath, passwordHash);
+
+    res.status(201).json({
+      folder: {
+        id: created.id,
+        path: created.path,
+        hasPassword: Boolean(created.password_hash),
+        createdAt: created.created_at,
+        updatedAt: created.updated_at
+      }
+    });
+  } catch (error) {
+    logError('folders_create_failed', error, { requestId: req.requestId, userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to create folder' });
+  }
+});
+
+app.patch('/api/folders/:id', requireAuth, async (req, res) => {
+  try {
+    const folderId = Number(req.params.id);
+    if (!Number.isFinite(folderId) || folderId <= 0) {
+      res.status(400).json({ error: 'Invalid folder id' });
+      return;
+    }
+
+    const current = await getUserFolderById(req.user.id, folderId);
+    if (!current) {
+      res.status(404).json({ error: 'Folder not found' });
+      return;
+    }
+
+    const rawPath = req.body?.path != null ? String(req.body.path).trim() : undefined;
+    const newPassword = req.body?.newPassword != null ? String(req.body.newPassword) : undefined;
+    const clearPassword = Boolean(req.body?.clearPassword);
+
+    if (rawPath !== undefined && !rawPath) {
+      res.status(400).json({ error: 'Folder name cannot be empty' });
+      return;
+    }
+
+    if (rawPath && rawPath !== current.path) {
+      const existing = await getUserFolderByPath(req.user.id, rawPath);
+      if (existing && existing.id !== folderId) {
+        res.status(409).json({ error: 'Another folder already uses this name' });
+        return;
+      }
+    }
+
+    const passwordHash = newPassword ? await bcrypt.hash(newPassword, 12) : undefined;
+
+    const updated = await updateUserFolder(req.user.id, folderId, {
+      path: rawPath,
+      passwordHash,
+      clearPassword
+    });
+
+    res.json({
+      folder: {
+        id: updated.id,
+        path: updated.path,
+        hasPassword: Boolean(updated.password_hash),
+        createdAt: updated.created_at,
+        updatedAt: updated.updated_at
+      }
+    });
+  } catch (error) {
+    logError('folders_update_failed', error, { requestId: req.requestId, userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to update folder' });
+  }
+});
+
+app.delete('/api/folders/:id', requireAuth, async (req, res) => {
+  try {
+    const folderId = Number(req.params.id);
+    if (!Number.isFinite(folderId) || folderId <= 0) {
+      res.status(400).json({ error: 'Invalid folder id' });
+      return;
+    }
+    const ok = await deleteUserFolder(req.user.id, folderId);
+    if (!ok) {
+      res.status(404).json({ error: 'Folder not found' });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (error) {
+    logError('folders_delete_failed', error, { requestId: req.requestId, userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to delete folder' });
+  }
+});
+
+app.post('/api/folders/:id/verify', requireAuth, async (req, res) => {
+  try {
+    const folderId = Number(req.params.id);
+    if (!Number.isFinite(folderId) || folderId <= 0) {
+      res.status(400).json({ error: 'Invalid folder id' });
+      return;
+    }
+
+    const folder = await getUserFolderById(req.user.id, folderId);
+    if (!folder) {
+      res.status(404).json({ error: 'Folder not found' });
+      return;
+    }
+
+    if (!folder.password_hash) {
+      res.json({ ok: true });
+      return;
+    }
+
+    const password = String(req.body?.password || '');
+    const ok = await bcrypt.compare(password, folder.password_hash);
+    if (!ok) {
+      res.status(401).json({ error: 'Incorrect folder password' });
+      return;
+    }
+
+    res.json({ ok: true });
+  } catch (error) {
+    logError('folders_verify_failed', error, { requestId: req.requestId, userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to verify folder password' });
   }
 });
 

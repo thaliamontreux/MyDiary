@@ -174,6 +174,19 @@ export async function initializeDatabase() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_folders (
+      id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+      user_id BIGINT UNSIGNED NOT NULL,
+      path VARCHAR(255) NOT NULL,
+      password_hash VARCHAR(255) DEFAULT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_user_folder_path (user_id, path),
+      CONSTRAINT fk_user_folders_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
       name VARCHAR(128) NOT NULL UNIQUE,
@@ -590,6 +603,76 @@ export async function getSiteSummary() {
     adminUsers,
     tosAcceptedUsers
   };
+}
+
+export async function listUserFolders(userId) {
+  ensurePool();
+  const [rows] = await pool.query(
+    'SELECT id, path, password_hash, created_at, updated_at FROM user_folders WHERE user_id = ? ORDER BY path ASC',
+    [userId]
+  );
+  return rows;
+}
+
+export async function getUserFolderById(userId, folderId) {
+  ensurePool();
+  const [rows] = await pool.query(
+    'SELECT id, path, password_hash, created_at, updated_at FROM user_folders WHERE user_id = ? AND id = ? LIMIT 1',
+    [userId, folderId]
+  );
+  return rows[0] || null;
+}
+
+export async function getUserFolderByPath(userId, pathValue) {
+  ensurePool();
+  const [rows] = await pool.query(
+    'SELECT id, path, password_hash, created_at, updated_at FROM user_folders WHERE user_id = ? AND path = ? LIMIT 1',
+    [userId, pathValue]
+  );
+  return rows[0] || null;
+}
+
+export async function createUserFolder(userId, pathValue, passwordHash = null) {
+  ensurePool();
+  const [result] = await pool.query(
+    'INSERT INTO user_folders (user_id, path, password_hash) VALUES (?, ?, ?)',
+    [userId, pathValue, passwordHash]
+  );
+  return getUserFolderById(userId, result.insertId);
+}
+
+export async function updateUserFolder(userId, folderId, { path: nextPath, passwordHash, clearPassword }) {
+  ensurePool();
+  const fields = [];
+  const values = [];
+  if (typeof nextPath === 'string') {
+    fields.push('path = ?');
+    values.push(nextPath);
+  }
+  if (clearPassword) {
+    fields.push('password_hash = NULL');
+  } else if (typeof passwordHash === 'string') {
+    fields.push('password_hash = ?');
+    values.push(passwordHash);
+  }
+  if (!fields.length) {
+    return getUserFolderById(userId, folderId);
+  }
+  values.push(userId, folderId);
+  await pool.query(
+    `UPDATE user_folders SET ${fields.join(', ')} WHERE user_id = ? AND id = ?`,
+    values
+  );
+  return getUserFolderById(userId, folderId);
+}
+
+export async function deleteUserFolder(userId, folderId) {
+  ensurePool();
+  const [result] = await pool.query(
+    'DELETE FROM user_folders WHERE user_id = ? AND id = ? LIMIT 1',
+    [userId, folderId]
+  );
+  return result.affectedRows > 0;
 }
 
 export { pool };

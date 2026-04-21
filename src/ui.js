@@ -35,7 +35,12 @@ import {
   adminDeleteUser,
   adminGetSiteSummary,
   adminGetUser,
-  adminUpdateUser
+  adminUpdateUser,
+  listFolders,
+  createFolder,
+  updateFolder,
+  deleteFolder,
+  verifyFolderPassword
 } from './api.js';
 
 function el(tag, attrs = {}, children = []) {
@@ -1416,7 +1421,11 @@ export function createApp(mount) {
     adminSelectedUserLoading: false,
     adminSelectedUserSaving: false,
     adminSiteSummary: null,
-    adminSiteSummaryLoading: false
+    adminSiteSummaryLoading: false,
+    folders: [],
+    foldersLoading: false,
+    activeFolderPath: null,
+    unlockedFolderIds: new Set()
   };
 
   // setupActivityListeners(); // Auto-lock completely disabled
@@ -1531,27 +1540,93 @@ export function createApp(mount) {
     return backDrop;
   }
 
+  function renderAccountFoldersSection() {
+    if (!state.auth.user) return el('div');
+
+    const rows = (state.folders || []).map((folder) => {
+      const hasPasswordText = folder.hasPassword ? 'Password set' : 'No password';
+      const meta = el('div', { class: 'account-helper', text: hasPasswordText });
+
+      const deleteBtn = el('button', {
+        class: 'btn danger ghost small-btn',
+        type: 'button',
+        onclick: async () => {
+          if (!confirm(`Delete folder "${folder.path}" and unassign it from entries?`)) return;
+          try {
+            if (state.auth.token && typeof folder.id === 'number') {
+              await deleteFolder(state.auth.token, folder.id);
+            }
+            let changed = false;
+            for (const entry of state.vault.entries) {
+              if (entry.folder === folder.path) {
+                entry.folder = '';
+                changed = true;
+              }
+            }
+            if (changed) {
+              persistVault();
+            }
+            state.folders = state.folders.filter((f) => f.path !== folder.path);
+            if (state.activeFolderPath === folder.path) state.activeFolderPath = null;
+            showToast('Folder deleted');
+            render(false);
+          } catch (e) {
+            showToast(e?.message || 'Failed to delete folder');
+          }
+        }
+      }, [
+        el('span', { class: 'btn-ic', text: '✕' }),
+        el('span', { text: 'Delete' })
+      ]);
+
+      return el('div', { class: 'account-row' }, [
+        el('div', { class: 'account-label', text: folder.path }),
+        el('div', { class: 'account-value', text: '' }),
+        meta,
+        deleteBtn
+      ]);
+    });
+
+    return el('div', { class: 'account-folders' }, [
+      el('div', { class: 'account-label', text: 'Folders' }),
+      ...rows
+    ]);
+  }
+
   function renderFolderOverlay() {
     const backDrop = el('div', { class: 'signup-overlay' });
-    const input = el('input', { class: 'lock-input', placeholder: 'New folder name' });
+    const nameInput = el('input', { class: 'lock-input', placeholder: 'New folder name' });
+    const passwordInput = el('input', { class: 'lock-input', type: 'password', placeholder: 'Optional folder password' });
     const status = el('div', { class: 'lock-status', text: '' });
 
     const submitBtn = el('button', {
       class: 'btn big',
-      onclick: () => {
-        const name = (input.value || '').trim();
+      onclick: async () => {
+        const name = (nameInput.value || '').trim();
+        const password = String(passwordInput.value || '');
         if (!name) {
           status.textContent = 'Please enter a folder name';
           return;
         }
-        const entry = getSelectedEntry();
-        if (!entry) {
-          status.textContent = 'No entry selected';
+        if (!state.auth.token) {
+          status.textContent = 'Sign in before creating folders';
           return;
         }
-        updateSelected({ folder: name });
-        showToast(`Folder set to "${name}"`);
-        backDrop.remove();
+        status.textContent = 'Creating folder…';
+        try {
+          const { folder } = await createFolder(state.auth.token, { path: name, password });
+          state.folders.push(folder);
+          const entry = getSelectedEntry();
+          if (entry) {
+            updateSelected({ folder: folder.path });
+            showToast(`Folder set to "${folder.path}"`);
+          } else {
+            showToast('Folder created');
+          }
+          backDrop.remove();
+        } catch (e) {
+          status.textContent = e?.message || 'Could not create folder yet';
+        }
       }
     }, [
       el('span', { class: 'btn-ic', text: '✓' }),
@@ -1568,7 +1643,8 @@ export function createApp(mount) {
 
     const card = el('div', { class: 'signup-card' }, [
       el('div', { class: 'lock-title', text: 'Add a folder' }),
-      input,
+      nameInput,
+      passwordInput,
       submitBtn,
       cancelBtn,
       status
@@ -2230,7 +2306,10 @@ export function createApp(mount) {
   function getVisibleEntries() {
     return sortEntriesDesc(state.vault.entries)
       .map(normalizeEntry)
-      .filter((entry) => matchesEntry(entry, state.searchQuery, state.activeModule, state.activeType));
+      .filter((entry) => {
+        if (state.activeFolderPath && entry.folder !== state.activeFolderPath) return false;
+        return matchesEntry(entry, state.searchQuery, state.activeModule, state.activeType);
+      });
   }
 
   function showToast(message) {
@@ -2272,6 +2351,8 @@ export function createApp(mount) {
     state.key = null;
     state.vault = createEmptyVault();
     state.meta = loadVaultMeta(state.activeVaultSlot) || null;
+    state.activeFolderPath = null;
+    state.unlockedFolderIds = new Set();
     render();
   }
 
@@ -2498,6 +2579,7 @@ export function createApp(mount) {
       keyLabel,
       keyHelper,
       keyRow,
+      renderAccountFoldersSection(),
       closeBtn
     ]);
 
@@ -2596,6 +2678,8 @@ export function createApp(mount) {
     if (!state.selectedId && state.vault.entries.length) {
       state.selectedId = sortEntriesDesc(state.vault.entries)[0].id;
     }
+
+    await loadFoldersForUser();
     render();
   }
 
@@ -3621,8 +3705,70 @@ export function createApp(mount) {
           entry.folder ? el('div', { class: 'mood-line soft', text: `Folder: ${entry.folder}` }) : el('div'),
           entry.recipient ? el('div', { class: 'mood-line soft', text: `For: ${entry.recipient}` }) : el('div'),
           entry.recipeCategory ? el('div', { class: 'mood-line soft', text: `Category: ${entry.recipeCategory}` }) : el('div')
-        ]) : el('div')
+        ]) : el('div'),
+        renderFolderListCard(snapshot)
       ])
+    ]);
+  }
+
+  function renderFolderListCard(snapshot) {
+    const counts = new Map();
+    for (const entry of state.vault.entries) {
+      const key = (entry.folder || '').trim();
+      const current = counts.get(key) || 0;
+      counts.set(key, current + 1);
+    }
+
+    const items = state.folders.length
+      ? state.folders
+      : Array.from(counts.keys()).filter(Boolean).sort().map((path, index) => ({ id: `local-${index}`, path, hasPassword: false }));
+
+    const rows = [];
+
+    rows.push(el('button', {
+      class: `folder-row ${!state.activeFolderPath ? 'active' : ''}`,
+      type: 'button',
+      onclick: () => {
+        state.activeFolderPath = null;
+        render(false);
+      }
+    }, [
+      el('span', { class: 'folder-name', text: 'All folders' }),
+      el('span', { class: 'folder-count', text: String(snapshot.diaryCount + snapshot.noteCount + snapshot.letterCount + snapshot.recipeCount) })
+    ]));
+
+    for (const folder of items) {
+      const count = counts.get(folder.path) || 0;
+      const isActive = state.activeFolderPath === folder.path;
+      rows.push(el('button', {
+        class: `folder-row ${isActive ? 'active' : ''}`,
+        type: 'button',
+        onclick: async () => {
+          if (folder.hasPassword && !state.unlockedFolderIds.has(folder.id)) {
+            const password = window.prompt(`Enter password for folder "${folder.path}"`);
+            if (password == null) return;
+            try {
+              await verifyFolderPassword(state.auth.token, folder.id, password);
+              state.unlockedFolderIds.add(folder.id);
+            } catch (e) {
+              showToast(e?.message || 'Incorrect folder password');
+              return;
+            }
+          }
+          state.activeFolderPath = folder.path;
+          render(false);
+        }
+      }, [
+        el('span', { class: 'folder-name', text: folder.path }),
+        el('span', { class: 'folder-count', text: String(count) })
+      ]));
+    }
+
+    return el('div', { class: 'mood-card' }, [
+      el('div', { class: 'mood-card-title', text: 'Folders' }),
+      state.foldersLoading
+        ? el('div', { class: 'lock-status', text: 'Loading folders…' })
+        : el('div', { class: 'folder-list' }, rows)
     ]);
   }
 
@@ -4303,6 +4449,9 @@ export function createApp(mount) {
     });
     await ensureSodiumReady();
     await refreshDeviceAuthSupport();
+    if (state.auth.token) {
+      await loadFoldersForUser();
+    }
     render();
   })();
 }
