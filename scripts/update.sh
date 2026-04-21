@@ -39,11 +39,9 @@ fi
 git checkout "$BRANCH"
 git reset --hard "origin/$BRANCH"
 
-# Fix node_modules ownership if it exists (may be owned by root from previous runs)
-if [ -d "$APP_DIR/node_modules" ]; then
-  log "fixing node_modules ownership"
-  chown -R "$(id -u):$(id -g)" "$APP_DIR/node_modules" 2>/dev/null || true
-fi
+# Clean install: remove node_modules and package-lock.json to fix broken state
+log "cleaning node_modules and package-lock.json"
+rm -rf "$APP_DIR/node_modules" "$APP_DIR/package-lock.json"
 
 # Install deps. We use `npm install` (not `npm ci`) so that drift between
 # package.json and package-lock.json does not abort the update. This also
