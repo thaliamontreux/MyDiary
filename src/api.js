@@ -77,6 +77,44 @@ export async function verifyFolderPassword(token, folderId, password) {
   });
 }
 
+export async function listVaults(token) {
+  return request('/api/vaults', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export async function createVault(token, payload) {
+  return request('/api/vaults', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function updateVault(token, slotName, payload) {
+  return request(`/api/vaults/${encodeURIComponent(slotName)}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function deleteVault(token, slotName) {
+  return request(`/api/vaults/${encodeURIComponent(slotName)}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export async function verifyVaultPassword(token, slotName, password) {
+  return request(`/api/vaults/${encodeURIComponent(slotName)}/verify`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ password })
+  });
+}
+
 export async function adminGetUser(token, userId) {
   return request(`/api/admin/users/${encodeURIComponent(userId)}`, {
     method: 'GET',

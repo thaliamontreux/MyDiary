@@ -25,7 +25,12 @@ import {
   getUserFolderByPath,
   createUserFolder,
   updateUserFolder,
-  deleteUserFolder
+  deleteUserFolder,
+  listUserVaultSlots,
+  getUserVaultSlot,
+  createUserVaultSlot,
+  updateUserVaultSlot,
+  deleteUserVaultSlot
 } from './db.js';
 import { requireAuth, signAuthToken } from './auth.js';
 import { log, logError, requestLogger } from './logger.js';
@@ -707,6 +712,147 @@ app.put('/api/vault/:slot', requireAuth, async (req, res) => {
   } catch (error) {
     logError('vault_save_failed', error, { requestId: req.requestId, userId: req.user?.id });
     res.status(500).json({ error: 'Failed to save vault' });
+  }
+});
+
+function slotToPublic(row) {
+  return {
+    slotName: row.slot_name,
+    label: row.label || (row.slot_name === 'primary' ? 'Main diary' : row.slot_name),
+    hasPassword: Boolean(row.access_password_hash),
+    hasData: Boolean(row.has_data),
+    isPrimary: row.slot_name === 'primary'
+  };
+}
+
+app.get('/api/vaults', requireAuth, async (req, res) => {
+  try {
+    let slots = await listUserVaultSlots(req.user.id);
+    // Ensure primary row exists
+    if (!slots.find((s) => s.slot_name === 'primary')) {
+      await createUserVaultSlot(req.user.id, 'primary', 'Main diary', null);
+      slots = await listUserVaultSlots(req.user.id);
+    }
+    res.json({ vaults: slots.map(slotToPublic) });
+  } catch (error) {
+    logError('vaults_list_failed', error, { requestId: req.requestId, userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to load vaults' });
+  }
+});
+
+app.post('/api/vaults', requireAuth, async (req, res) => {
+  try {
+    const rawSlotName = String(req.body?.slotName || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    const label = String(req.body?.label || '').trim();
+    const password = String(req.body?.password || '');
+
+    if (!rawSlotName || rawSlotName === 'primary') {
+      res.status(400).json({ error: 'Invalid slot name' });
+      return;
+    }
+    if (!label) {
+      res.status(400).json({ error: 'Vault label is required' });
+      return;
+    }
+    if (rawSlotName.length > 32) {
+      res.status(400).json({ error: 'Slot name too long' });
+      return;
+    }
+
+    const existing = await getUserVaultSlot(req.user.id, rawSlotName);
+    if (existing) {
+      res.status(409).json({ error: 'A vault with that slot name already exists' });
+      return;
+    }
+
+    const accessPasswordHash = password ? await bcrypt.hash(password, 12) : null;
+    const created = await createUserVaultSlot(req.user.id, rawSlotName, label, accessPasswordHash);
+    res.status(201).json({ vault: slotToPublic(created) });
+  } catch (error) {
+    logError('vaults_create_failed', error, { requestId: req.requestId, userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to create vault' });
+  }
+});
+
+app.patch('/api/vaults/:slot', requireAuth, async (req, res) => {
+  try {
+    const slotName = String(req.params.slot || '');
+    const current = await getUserVaultSlot(req.user.id, slotName);
+    if (!current) {
+      res.status(404).json({ error: 'Vault not found' });
+      return;
+    }
+
+    const label = req.body?.label != null ? String(req.body.label).trim() : undefined;
+    const newPassword = req.body?.newPassword != null ? String(req.body.newPassword) : undefined;
+    const clearPassword = Boolean(req.body?.clearPassword);
+
+    // Enforce: primary cannot have a password
+    if (slotName === 'primary' && (newPassword || clearPassword === false && req.body?.newPassword)) {
+      if (newPassword) {
+        res.status(400).json({ error: 'Main diary cannot be locked with a password' });
+        return;
+      }
+    }
+    if (label !== undefined && !label) {
+      res.status(400).json({ error: 'Label cannot be empty' });
+      return;
+    }
+
+    const accessPasswordHash = newPassword ? await bcrypt.hash(newPassword, 12) : undefined;
+    const updated = await updateUserVaultSlot(req.user.id, slotName, {
+      label,
+      accessPasswordHash,
+      clearPassword
+    });
+    res.json({ vault: slotToPublic(updated) });
+  } catch (error) {
+    logError('vaults_update_failed', error, { requestId: req.requestId, userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to update vault' });
+  }
+});
+
+app.delete('/api/vaults/:slot', requireAuth, async (req, res) => {
+  try {
+    const slotName = String(req.params.slot || '');
+    if (slotName === 'primary') {
+      res.status(400).json({ error: 'Main diary cannot be deleted' });
+      return;
+    }
+    const ok = await deleteUserVaultSlot(req.user.id, slotName);
+    if (!ok) {
+      res.status(404).json({ error: 'Vault not found' });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (error) {
+    logError('vaults_delete_failed', error, { requestId: req.requestId, userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to delete vault' });
+  }
+});
+
+app.post('/api/vaults/:slot/verify', requireAuth, async (req, res) => {
+  try {
+    const slotName = String(req.params.slot || '');
+    const slot = await getUserVaultSlot(req.user.id, slotName);
+    if (!slot) {
+      res.status(404).json({ error: 'Vault not found' });
+      return;
+    }
+    if (!slot.access_password_hash) {
+      res.json({ ok: true });
+      return;
+    }
+    const password = String(req.body?.password || '');
+    const ok = await bcrypt.compare(password, slot.access_password_hash);
+    if (!ok) {
+      res.status(401).json({ error: 'Incorrect vault password' });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (error) {
+    logError('vaults_verify_failed', error, { requestId: req.requestId, userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to verify vault password' });
   }
 });
 

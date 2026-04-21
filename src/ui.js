@@ -40,7 +40,12 @@ import {
   createFolder,
   updateFolder,
   deleteFolder,
-  verifyFolderPassword
+  verifyFolderPassword,
+  listVaults,
+  createVault,
+  updateVault,
+  deleteVault,
+  verifyVaultPassword
 } from './api.js';
 
 function el(tag, attrs = {}, children = []) {
@@ -1425,7 +1430,10 @@ export function createApp(mount) {
     folders: [],
     foldersLoading: false,
     activeFolderPath: null,
-    unlockedFolderIds: new Set()
+    unlockedFolderIds: new Set(),
+    availableVaults: [],
+    vaultsLoading: false,
+    unlockedVaultSlots: new Set()
   };
 
   // setupActivityListeners(); // Auto-lock completely disabled
@@ -1742,79 +1750,300 @@ export function createApp(mount) {
     ]);
   }
 
+  async function handleCreateVault() {
+    const label = window.prompt('Name for the new vault (e.g. "Travel journal"):');
+    if (label == null) return;
+    const trimmedLabel = String(label).trim();
+    if (!trimmedLabel) return;
+    const slotName = trimmedLabel.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32);
+    if (!slotName) {
+      showToast('Please use letters or numbers in the name');
+      return;
+    }
+    const pw = window.prompt(`Optional password to lock "${trimmedLabel}" (leave empty for no password):`);
+    if (pw == null) return;
+    try {
+      const { vault } = await createVault(state.auth.token, { slotName, label: trimmedLabel, password: String(pw) });
+      state.availableVaults = [...state.availableVaults.filter((v) => v.slotName !== vault.slotName), vault];
+      showToast(`Vault "${vault.label}" created`);
+      render(false);
+    } catch (e) {
+      showToast(e?.message || 'Failed to create vault');
+    }
+  }
+
+  async function handleRenameVault(vault) {
+    const nextLabel = window.prompt(`Rename "${vault.label}" to:`, vault.label);
+    if (nextLabel == null) return;
+    const trimmed = String(nextLabel).trim();
+    if (!trimmed || trimmed === vault.label) return;
+    try {
+      const { vault: updated } = await updateVault(state.auth.token, vault.slotName, { label: trimmed });
+      state.availableVaults = state.availableVaults.map((v) => (v.slotName === vault.slotName ? updated : v));
+      showToast(`Renamed to "${updated.label}"`);
+      render(false);
+    } catch (e) {
+      showToast(e?.message || 'Failed to rename vault');
+    }
+  }
+
+  async function handleSecureVault(vault) {
+    if (vault.isPrimary) {
+      showToast('Main diary cannot be locked with a password');
+      return;
+    }
+    const newPassword = window.prompt(
+      vault.hasPassword ? `New password for "${vault.label}":` : `Set a password for "${vault.label}":`
+    );
+    if (newPassword == null) return;
+    const pw = String(newPassword);
+    if (!pw) return;
+    try {
+      const { vault: updated } = await updateVault(state.auth.token, vault.slotName, { newPassword: pw });
+      state.availableVaults = state.availableVaults.map((v) => (v.slotName === vault.slotName ? updated : v));
+      state.unlockedVaultSlots.add(vault.slotName);
+      showToast(`Password ${vault.hasPassword ? 'changed' : 'set'} for "${updated.label}"`);
+      render(false);
+    } catch (e) {
+      showToast(e?.message || 'Failed to set vault password');
+    }
+  }
+
+  async function handleUnsecureVault(vault) {
+    if (!vault.hasPassword) return;
+    if (!confirm(`Remove password from "${vault.label}"?`)) return;
+    try {
+      const { vault: updated } = await updateVault(state.auth.token, vault.slotName, { clearPassword: true });
+      state.availableVaults = state.availableVaults.map((v) => (v.slotName === vault.slotName ? updated : v));
+      showToast('Vault password removed');
+      render(false);
+    } catch (e) {
+      showToast(e?.message || 'Failed to remove password');
+    }
+  }
+
+  async function handleDeleteVault(vault) {
+    if (vault.isPrimary) {
+      showToast('Main diary cannot be deleted');
+      return;
+    }
+    if (!confirm(`Permanently delete vault "${vault.label}" and all its data?`)) return;
+    try {
+      await deleteVault(state.auth.token, vault.slotName);
+      state.availableVaults = state.availableVaults.filter((v) => v.slotName !== vault.slotName);
+      state.unlockedVaultSlots.delete(vault.slotName);
+      if (state.activeVaultSlot === vault.slotName) {
+        switchVaultAndLock('primary', 'Vault deleted. Unlock main diary to continue.');
+      }
+      showToast(`Deleted "${vault.label}"`);
+      render(false);
+    } catch (e) {
+      showToast(e?.message || 'Failed to delete vault');
+    }
+  }
+
+  async function handleMergeVault(vault) {
+    // Merge the currently-unlocked active vault into `vault`.
+    if (vault.slotName === state.activeVaultSlot) {
+      showToast('Cannot merge a vault into itself');
+      return;
+    }
+    if (!state.unlocked || !state.key) {
+      showToast('Unlock your diary first to merge');
+      return;
+    }
+    if (!confirm(`Merge entries from the currently unlocked vault INTO "${vault.label}"?\nEntries from the current vault will be copied into "${vault.label}". The source vault will remain intact. Continue?`)) return;
+
+    const accountPassword = window.prompt('Enter your account password to merge:');
+    if (accountPassword == null) return;
+    const pw = String(accountPassword);
+    if (!pw) return;
+
+    try {
+      await ensureSodiumReady();
+
+      // If target has access password, verify it
+      if (vault.hasPassword && !state.unlockedVaultSlots.has(vault.slotName)) {
+        const vaultPw = window.prompt(`Enter access password for vault "${vault.label}":`);
+        if (vaultPw == null) return;
+        await verifyVaultPassword(state.auth.token, vault.slotName, String(vaultPw));
+        state.unlockedVaultSlots.add(vault.slotName);
+      }
+
+      // Fetch target vault meta + data
+      const remoteTarget = await loadVaultFromServer(state.auth.token, vault.slotName);
+      let targetMeta = remoteTarget?.meta || null;
+      let targetPayload = remoteTarget?.data || null;
+
+      if (!targetMeta) {
+        targetMeta = {
+          v: 1,
+          kdf: 'argon2id',
+          salt: createNewVaultSalt(),
+          createdAt: new Date().toISOString()
+        };
+      }
+
+      const targetKey = await deriveVaultKey(pw, targetMeta.salt);
+
+      let targetVault = { entries: [], trash: [] };
+      if (targetPayload) {
+        try {
+          targetVault = decryptVaultOrThrow(targetPayload, targetKey);
+        } catch {
+          safeMemzeroKey(targetKey);
+          showToast('Wrong account password for target vault');
+          return;
+        }
+      }
+
+      // Merge entries (skip duplicates by id)
+      const existingIds = new Set((targetVault.entries || []).map((e) => e.id));
+      const merged = {
+        entries: [
+          ...(targetVault.entries || []),
+          ...state.vault.entries.filter((e) => !existingIds.has(e.id))
+        ],
+        trash: [
+          ...(targetVault.trash || []),
+          ...(state.vault.trash || [])
+        ]
+      };
+
+      const newPayload = encryptVault(merged, targetKey);
+      safeMemzeroKey(targetKey);
+
+      await saveVaultToServer(state.auth.token, vault.slotName, {
+        meta: targetMeta,
+        data: newPayload
+      });
+
+      showToast(`Merged ${state.vault.entries.length} entries into "${vault.label}"`);
+      await loadVaultsForUser();
+      render(false);
+    } catch (e) {
+      showToast(e?.message || 'Failed to merge vaults');
+    }
+  }
+
   function renderAccountVaultsSection() {
     if (!state.auth.user) return el('div');
 
-    const rows = VAULT_SLOT_OPTIONS.map(([slotValue, slotName]) => {
-      const hasData = slotHasStoredVault(slotValue);
-      const isActive = state.activeVaultSlot === slotValue;
-      const isPanic = state.ui.panicVaultSlot === slotValue;
-      const visible = slotValue === 'primary' || state.ui.showDecoyVault;
-      if (!visible && !isActive) return null;
+    const vaults = state.availableVaults.length
+      ? state.availableVaults
+      : [{ slotName: 'primary', label: 'Main diary', hasPassword: false, hasData: false, isPrimary: true }];
+
+    const rows = vaults.map((vault) => {
+      const isActive = state.activeVaultSlot === vault.slotName;
+      const isPanic = state.ui.panicVaultSlot === vault.slotName;
 
       const statusText = [
         isActive ? 'Active' : null,
-        hasData ? 'Has data' : 'Empty',
+        vault.hasData ? 'Has data' : 'Empty',
+        vault.hasPassword ? '🔒 Locked' : null,
         isPanic ? 'Panic target' : null
       ].filter(Boolean).join(' • ');
 
       const switchBtn = el('button', {
         class: 'btn ghost small-btn',
         type: 'button',
-        onclick: () => {
+        disabled: isActive ? true : undefined,
+        onclick: async () => {
           if (isActive) return;
-          switchVaultAndLock(slotValue, `Unlock ${slotName} to continue.`);
+          if (vault.hasPassword && !state.unlockedVaultSlots.has(vault.slotName)) {
+            const pw = window.prompt(`Enter password for "${vault.label}":`);
+            if (pw == null) return;
+            try {
+              await verifyVaultPassword(state.auth.token, vault.slotName, String(pw));
+              state.unlockedVaultSlots.add(vault.slotName);
+            } catch (e) {
+              showToast(e?.message || 'Incorrect vault password');
+              return;
+            }
+          }
+          switchVaultAndLock(vault.slotName, `Unlock ${vault.label} to continue.`);
           state.showAccountOverlay = false;
           render();
         }
       }, [el('span', { class: 'btn-ic', text: '⇆' }), el('span', { text: isActive ? 'Current' : 'Switch' })]);
 
+      const renameBtn = el('button', {
+        class: 'btn ghost small-btn',
+        type: 'button',
+        onclick: () => handleRenameVault(vault)
+      }, [el('span', { class: 'btn-ic', text: '✎' }), el('span', { text: 'Rename' })]);
+
+      const secureAttrs = {
+        class: `btn ghost small-btn ${vault.isPrimary ? 'is-disabled' : ''}`,
+        type: 'button',
+        onclick: () => {
+          if (vault.isPrimary) {
+            showToast('Main diary cannot be locked with a password');
+            return;
+          }
+          handleSecureVault(vault);
+        }
+      };
+      if (vault.isPrimary) secureAttrs.disabled = true;
+      const secureBtn = el('button', secureAttrs, [
+        el('span', { class: 'btn-ic', text: vault.hasPassword ? '🔒' : '🔓' }),
+        el('span', { text: vault.hasPassword ? 'Change password' : 'Secure vault' })
+      ]);
+
+      const unsecureBtn = vault.hasPassword && !vault.isPrimary ? el('button', {
+        class: 'btn ghost small-btn',
+        type: 'button',
+        onclick: () => handleUnsecureVault(vault)
+      }, [el('span', { class: 'btn-ic', text: '⚿' }), el('span', { text: 'Remove password' })]) : null;
+
+      const mergeBtn = !isActive && state.unlocked ? el('button', {
+        class: 'btn ghost small-btn',
+        type: 'button',
+        onclick: () => handleMergeVault(vault)
+      }, [el('span', { class: 'btn-ic', text: '⇲' }), el('span', { text: 'Merge into' })]) : null;
+
       const panicBtn = el('button', {
         class: `btn ghost small-btn ${isPanic ? 'active' : ''}`,
         type: 'button',
         onclick: () => {
-          updateUiPrefs({ panicVaultSlot: slotValue });
+          updateUiPrefs({ panicVaultSlot: vault.slotName });
           render(false);
         }
       }, [el('span', { class: 'btn-ic', text: '⚠' }), el('span', { text: isPanic ? 'Panic target' : 'Set as panic' })]);
 
-      const showDecoyBtn = slotValue === 'decoy' ? el('button', {
-        class: 'btn ghost small-btn',
+      const deleteBtn = !vault.isPrimary ? el('button', {
+        class: 'btn danger ghost small-btn',
         type: 'button',
-        onclick: () => {
-          updateUiPrefs({ showDecoyVault: !state.ui.showDecoyVault });
-          render(false);
-        }
-      }, [el('span', { class: 'btn-ic', text: state.ui.showDecoyVault ? '🙈' : '👁' }), el('span', { text: state.ui.showDecoyVault ? 'Hide decoy' : 'Show decoy' })]) : null;
+        onclick: () => handleDeleteVault(vault)
+      }, [el('span', { class: 'btn-ic', text: '✕' }), el('span', { text: 'Delete' })]) : null;
 
       return el('div', { class: 'folder-manager-row' }, [
         el('div', { class: 'folder-manager-info' }, [
-          el('div', { class: 'account-label', text: slotName }),
+          el('div', { class: 'account-label', text: vault.label }),
           el('div', { class: 'account-helper', text: statusText })
         ]),
         el('div', { class: 'folder-manager-actions' }, [
           switchBtn,
+          renameBtn,
+          secureBtn,
+          unsecureBtn || el('span'),
+          mergeBtn || el('span'),
           panicBtn,
-          showDecoyBtn || el('span')
+          deleteBtn || el('span')
         ])
       ]);
-    }).filter(Boolean);
+    });
 
-    const toggleDecoyRow = !state.ui.showDecoyVault
-      ? el('button', {
-          class: 'btn ghost small-btn',
-          type: 'button',
-          onclick: () => {
-            updateUiPrefs({ showDecoyVault: true });
-            render(false);
-          }
-        }, [el('span', { class: 'btn-ic', text: '✧' }), el('span', { text: 'Enable decoy vault' })])
-      : null;
+    const createBtn = el('button', {
+      class: 'btn small-btn',
+      type: 'button',
+      onclick: handleCreateVault
+    }, [el('span', { class: 'btn-ic', text: '+' }), el('span', { text: 'New vault' })]);
 
     return el('div', { class: 'account-folders' }, [
       el('div', { class: 'account-section-header' }, [
         el('div', { class: 'account-label', text: 'Vault Manager' }),
-        toggleDecoyRow || el('span')
+        createBtn
       ]),
       el('div', { class: 'folder-manager-list' }, rows)
     ]);
@@ -1893,6 +2122,32 @@ export function createApp(mount) {
     } finally {
       state.adminUsersLoading = false;
       render(false);
+    }
+  }
+
+  async function loadFoldersForUser() {
+    if (!state.auth.token) return;
+    state.foldersLoading = true;
+    try {
+      const { folders } = await listFolders(state.auth.token);
+      state.folders = folders || [];
+    } catch (e) {
+      /* silent */
+    } finally {
+      state.foldersLoading = false;
+    }
+  }
+
+  async function loadVaultsForUser() {
+    if (!state.auth.token) return;
+    state.vaultsLoading = true;
+    try {
+      const { vaults } = await listVaults(state.auth.token);
+      state.availableVaults = vaults || [];
+    } catch (e) {
+      /* silent */
+    } finally {
+      state.vaultsLoading = false;
     }
   }
 
@@ -2907,7 +3162,7 @@ export function createApp(mount) {
       state.selectedId = sortEntriesDesc(state.vault.entries)[0].id;
     }
 
-    await loadFoldersForUser();
+    await Promise.all([loadFoldersForUser(), loadVaultsForUser()]);
     render();
   }
 
@@ -4573,16 +4828,25 @@ export function createApp(mount) {
           el('span', { text: 'More vault options' })
         ])
       ])
-      : el('div', { class: 'filter-pills' }, VAULT_SLOT_OPTIONS
-        .filter(([value]) => value === 'primary' || state.ui.showDecoyVault || value === state.activeVaultSlot)
-        .map(([value, label]) => el('button', {
-          class: `pill ${state.activeVaultSlot === value ? 'active' : ''}`,
-          type: 'button',
-          onclick: () => {
-            syncVaultSlot(value);
-            render(false);
-          }
-        }, [el('span', { text: label })])));
+      : el('div', { class: 'filter-pills' }, (state.availableVaults.length
+        ? state.availableVaults.map((v) => [v.slotName, v.label])
+        : VAULT_SLOT_OPTIONS)
+        .filter((entry) => {
+          const value = Array.isArray(entry) ? entry[0] : entry.slotName;
+          return value === 'primary' || state.ui.showDecoyVault || value === state.activeVaultSlot;
+        })
+        .map((entry) => {
+          const value = Array.isArray(entry) ? entry[0] : entry.slotName;
+          const label = Array.isArray(entry) ? entry[1] : entry.label;
+          return el('button', {
+            class: `pill ${state.activeVaultSlot === value ? 'active' : ''}`,
+            type: 'button',
+            onclick: () => {
+              syncVaultSlot(value);
+              render(false);
+            }
+          }, [el('span', { text: label })]);
+        }));
 
     const email = el('input', {
       class: 'lock-input',
@@ -4678,7 +4942,7 @@ export function createApp(mount) {
     await ensureSodiumReady();
     await refreshDeviceAuthSupport();
     if (state.auth.token) {
-      await loadFoldersForUser();
+      await Promise.all([loadFoldersForUser(), loadVaultsForUser()]);
     }
     render();
   })();

@@ -2324,3 +2324,10 @@ body::before {
   gap: 6px;
   flex-wrap: wrap;
 }
+
+.btn.is-disabled,
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}

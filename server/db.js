@@ -278,6 +278,32 @@ export async function initializeDatabase() {
     );
   }
 
+  // Add vault label + access password if missing
+  const [vaultColMigrations] = await pool.query(
+    'SELECT name FROM schema_migrations WHERE name = ? LIMIT 1',
+    ['add_user_vault_label_password_v1']
+  );
+  if (vaultColMigrations.length === 0) {
+    const databaseName = bootstrap.databaseName;
+    async function ensureColumnSimple(tableName, columnName, definitionSql) {
+      const [rows] = await pool.query(
+        `SELECT COUNT(*) AS count
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+        [databaseName, tableName, columnName]
+      );
+      if (!rows[0].count) {
+        await pool.query(`ALTER TABLE ${tableName} ADD COLUMN ${definitionSql}`);
+      }
+    }
+    await ensureColumnSimple('user_vaults', 'label', 'label VARCHAR(64) DEFAULT NULL');
+    await ensureColumnSimple('user_vaults', 'access_password_hash', 'access_password_hash VARCHAR(255) DEFAULT NULL');
+    await pool.query(
+      'INSERT INTO schema_migrations (name) VALUES (?)',
+      ['add_user_vault_label_password_v1']
+    );
+  }
+
   // Seed default admin if not present
   const [adminRows] = await pool.query(
     'SELECT id FROM users WHERE is_admin = 1 LIMIT 1'
@@ -431,6 +457,75 @@ export async function getVault(userId, slot) {
     [userId, slot]
   );
   return rows[0] || null;
+}
+
+export async function listUserVaultSlots(userId) {
+  ensurePool();
+  const [rows] = await pool.query(
+    `SELECT slot_name, label, access_password_hash,
+            (vault_data IS NOT NULL) AS has_data,
+            updated_at
+     FROM user_vaults
+     WHERE user_id = ?
+     ORDER BY slot_name = 'primary' DESC, updated_at ASC`,
+    [userId]
+  );
+  return rows;
+}
+
+export async function getUserVaultSlot(userId, slotName) {
+  ensurePool();
+  const [rows] = await pool.query(
+    `SELECT slot_name, label, access_password_hash,
+            (vault_data IS NOT NULL) AS has_data
+     FROM user_vaults
+     WHERE user_id = ? AND slot_name = ? LIMIT 1`,
+    [userId, slotName]
+  );
+  return rows[0] || null;
+}
+
+export async function createUserVaultSlot(userId, slotName, label, accessPasswordHash = null) {
+  ensurePool();
+  await pool.query(
+    `INSERT INTO user_vaults (user_id, slot_name, label, access_password_hash, vault_meta, vault_data)
+     VALUES (?, ?, ?, ?, NULL, NULL)`,
+    [userId, slotName, label, accessPasswordHash]
+  );
+  return getUserVaultSlot(userId, slotName);
+}
+
+export async function updateUserVaultSlot(userId, slotName, { label, accessPasswordHash, clearPassword }) {
+  ensurePool();
+  const fields = [];
+  const values = [];
+  if (typeof label === 'string') {
+    fields.push('label = ?');
+    values.push(label);
+  }
+  if (clearPassword) {
+    fields.push('access_password_hash = NULL');
+  } else if (typeof accessPasswordHash === 'string') {
+    fields.push('access_password_hash = ?');
+    values.push(accessPasswordHash);
+  }
+  if (!fields.length) return getUserVaultSlot(userId, slotName);
+  values.push(userId, slotName);
+  await pool.query(
+    `UPDATE user_vaults SET ${fields.join(', ')} WHERE user_id = ? AND slot_name = ?`,
+    values
+  );
+  return getUserVaultSlot(userId, slotName);
+}
+
+export async function deleteUserVaultSlot(userId, slotName) {
+  ensurePool();
+  if (slotName === 'primary') return false;
+  const [result] = await pool.query(
+    'DELETE FROM user_vaults WHERE user_id = ? AND slot_name = ? LIMIT 1',
+    [userId, slotName]
+  );
+  return result.affectedRows > 0;
 }
 
 export async function upsertVault(userId, slot, vaultMeta, vaultData) {
