@@ -1673,17 +1673,6 @@ export function createApp(mount) {
     const listColumn = el('div', { class: 'admin-users-column' }, listColumnChildren);
 
     const detail = state.adminSelectedUser;
-    const detailChildren = [];
-
-    if (state.adminSelectedUserLoading) {
-      detailChildren.push(el('div', { class: 'lock-status', text: 'Loading account…' }));
-    } else if (detail) {
-      const status = el('div', { class: 'lock-status', text: '' });
-
-      const emailInput = el('input', { class: 'lock-input', type: 'email', value: detail.email || '' });
-      const usernameInput = el('input', { class: 'lock-input', value: detail.username || '' });
-      const firstNameInput = el('input', { class: 'lock-input', value: detail.firstName || '' });
-      const middleNameInput = el('input', { class: 'lock-input', value: detail.middleName || '' });
       const lastNameInput = el('input', { class: 'lock-input', value: detail.lastName || '' });
       const addressInput = el('input', { class: 'lock-input', value: detail.addressLine || '' });
       const cityInput = el('input', { class: 'lock-input', value: detail.city || '' });
@@ -4100,12 +4089,22 @@ export function createApp(mount) {
   }
 
   function renderLockScreen() {
+    const hasAuthSession = Boolean(state.auth && state.auth.token && state.auth.user);
     const shouldConcealChoices = state.ui.concealVaultChoice && !state.lockVaultChoicesVisible;
 
-    const heading = el('div', { class: 'lock-title', text: 'Welcome, lovely.' });
+    const displayName = hasAuthSession
+      ? ([state.auth.user.firstName, state.auth.user.lastName].filter(Boolean).join(' ') || state.auth.user.username || state.auth.user.email)
+      : '';
+
+    const heading = el('div', {
+      class: 'lock-title',
+      text: hasAuthSession ? `Welcome back, ${displayName || 'lovely'}.` : 'Welcome, lovely.'
+    });
     const sub = el('div', {
       class: 'lock-sub',
-      text: state.lockNotice || `Sign in to your account to open ${VAULT_SLOT_OPTIONS.find(([value]) => value === state.activeVaultSlot)?.[1] || 'your diary'}.`
+      text: hasAuthSession
+        ? 'Enter your diary password to unlock your pages.'
+        : (state.lockNotice || `Sign in to your account to open ${VAULT_SLOT_OPTIONS.find(([value]) => value === state.activeVaultSlot)?.[1] || 'your diary'}.`)
     });
 
     const vaultSwitcher = shouldConcealChoices
@@ -4130,7 +4129,8 @@ export function createApp(mount) {
       class: 'lock-input',
       type: 'email',
       placeholder: 'Email address',
-      autocomplete: 'email'
+      autocomplete: 'email',
+      value: hasAuthSession ? (state.auth.email || '') : ''
     });
 
     const pwd = el('input', {
@@ -4163,13 +4163,15 @@ export function createApp(mount) {
       document.body.appendChild(overlay);
     };
 
-    const createAccountBtn = el('button', {
-      class: 'btn big ghost',
-      onclick: openSignup
-    }, [
-      el('span', { class: 'btn-ic', text: '✧' }),
-      el('span', { text: 'Sign up' })
-    ]);
+    const createAccountBtn = hasAuthSession
+      ? null
+      : el('button', {
+          class: 'btn big ghost',
+          onclick: openSignup
+        }, [
+          el('span', { class: 'btn-ic', text: '✧' }),
+          el('span', { text: 'Sign up' })
+        ]);
 
     const dangerRow = el('div', { class: 'danger-row' }, [
       el('button', {
@@ -4190,14 +4192,23 @@ export function createApp(mount) {
       heading,
       sub,
       vaultSwitcher,
-      shouldConcealChoices ? el('div', { class: 'lock-subtle', text: 'Vault choices can stay hidden until you need them.' }) : el('div'),
-      email,
-      pwd,
-      signInBtn,
-      createAccountBtn,
-      status,
-      dangerRow
+      shouldConcealChoices ? el('div', { class: 'lock-subtle', text: 'Vault choices can stay hidden until you need them.' }) : el('div')
     ];
+
+    if (!hasAuthSession) {
+      cardChildren.push(email);
+    }
+
+    cardChildren.push(
+      pwd,
+      signInBtn
+    );
+
+    if (createAccountBtn) {
+      cardChildren.push(createAccountBtn);
+    }
+
+    cardChildren.push(status, dangerRow);
 
     const card = el('div', { class: 'lock-card' }, cardChildren);
 
@@ -4209,7 +4220,10 @@ export function createApp(mount) {
       card
     ]);
 
-    setTimeout(() => email.focus(), 0);
+    setTimeout(() => {
+      if (!hasAuthSession) email.focus();
+      else pwd.focus();
+    }, 0);
     return wrap;
   }
 
