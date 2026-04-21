@@ -318,16 +318,16 @@ app.patch('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) =>
     }
     const updated = await adminUpdateUserProfile({
       id: targetId,
-      email: payload.email !== undefined ? String(payload.email) : existing.email,
-      firstName: payload.firstName !== undefined ? String(payload.firstName) : existing.first_name,
-      middleName: payload.middleName !== undefined ? String(payload.middleName) : existing.middle_name,
-      lastName: payload.lastName !== undefined ? String(payload.lastName) : existing.last_name,
-      username: payload.username !== undefined ? String(payload.username) : existing.username,
-      addressLine: payload.addressLine !== undefined ? String(payload.addressLine) : existing.address_line,
-      city: payload.city !== undefined ? String(payload.city) : existing.city,
-      stateRegion: payload.stateRegion !== undefined ? String(payload.stateRegion) : existing.state_region,
-      postalCode: payload.postalCode !== undefined ? String(payload.postalCode) : existing.postal_code,
-      countryCode: payload.countryCode !== undefined ? String(payload.countryCode) : existing.country_code,
+      email: payload.email ? String(payload.email) : existing.email,
+      firstName: payload.firstName ? String(payload.firstName) : existing.first_name,
+      middleName: payload.middleName ? String(payload.middleName) : existing.middle_name,
+      lastName: payload.lastName ? String(payload.lastName) : existing.last_name,
+      username: payload.username ? String(payload.username) : existing.username,
+      addressLine: payload.addressLine ? String(payload.addressLine) : existing.address_line,
+      city: payload.city ? String(payload.city) : existing.city,
+      stateRegion: payload.stateRegion ? String(payload.stateRegion) : existing.state_region,
+      postalCode: payload.postalCode ? String(payload.postalCode) : existing.postal_code,
+      countryCode: payload.countryCode ? String(payload.countryCode) : existing.country_code,
       isAdmin: payload.isAdmin !== undefined ? Boolean(payload.isAdmin) : Boolean(existing.is_admin),
       mustChangePassword: payload.mustChangePassword !== undefined ? Boolean(payload.mustChangePassword) : Boolean(existing.must_change_password)
     });
