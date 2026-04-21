@@ -8,7 +8,7 @@
     "dev:api": "node server/index.js",
     "start:api": "node server/index.js",
     "start:api:cluster": "node server/cluster.js",
-    "build": "vite build",
+    "build": "npx vite build",
     "preview": "vite preview",
     "loadtest:auth": "node scripts/loadtest-auth.js"
   },
