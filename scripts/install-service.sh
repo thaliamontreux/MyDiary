@@ -117,16 +117,7 @@ env HOME="$APP_DIR" bash -c "cd '$APP_DIR' && npm run build"
 chmod +x "$APP_DIR/scripts/update.sh" "$APP_DIR/scripts/install-service.sh" 2>/dev/null || true
 chmod +x "$APP_DIR/start-all.sh" 2>/dev/null || true
 
-# 8. Configure sudoers so the service user can restart its services
-SUDOERS_FILE="/etc/sudoers.d/mydiary-updater"
-echo "[install] configuring passwordless systemctl restart for $SERVICE_USER"
-cat > "$SUDOERS_FILE" <<EOF
-# Allow the MyDiary service user to restart its own services unattended
-$SERVICE_USER ALL=(root) NOPASSWD: /bin/systemctl restart mydiary-api.service, /bin/systemctl restart mydiary-web.service, /usr/bin/systemctl restart mydiary-api.service, /usr/bin/systemctl restart mydiary-web.service
-EOF
-chmod 0440 "$SUDOERS_FILE"
-
-# 9. Install systemd unit files from templates
+# 8. Install systemd unit files from templates
 render_template() {
   local src="$1"
   local dst="$2"
@@ -143,7 +134,7 @@ render_template "$APP_DIR/deploy/systemd/mydiary-web.service.template"     /etc/
 render_template "$APP_DIR/deploy/systemd/mydiary-updater.service.template" /etc/systemd/system/mydiary-updater.service
 render_template "$APP_DIR/deploy/systemd/mydiary-updater.timer.template"   /etc/systemd/system/mydiary-updater.timer
 
-# 10. Reload systemd + enable + start
+# 9. Reload systemd + enable + start
 echo "[install] reloading systemd"
 systemctl daemon-reload
 
@@ -156,7 +147,7 @@ systemctl enable --now mydiary-web.service
 echo "[install] enabling + starting mydiary-updater.timer"
 systemctl enable --now mydiary-updater.timer
 
-# 11. Summary
+# 10. Summary
 echo ""
 echo "=== Install complete ==="
 echo "API:     systemctl status mydiary-api.service"
