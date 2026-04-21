@@ -43,6 +43,16 @@ export async function loadVaultFromServer(token, slot = 'primary') {
   });
 }
 
+export async function changePassword(token, currentPassword, newPassword) {
+  return request('/api/auth/change-password', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ currentPassword, newPassword })
+  });
+}
+
 export async function setUsername(token, username) {
   return request('/api/auth/username', {
     method: 'POST',

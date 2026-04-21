@@ -25,7 +25,8 @@ import {
   saveVaultToServer,
   acceptTerms,
   deleteAccount,
-  setUsername
+  setUsername,
+  changePassword
 } from './api.js';
 
 function el(tag, attrs = {}, children = []) {
@@ -35,6 +36,69 @@ function el(tag, attrs = {}, children = []) {
     else if (k === 'text') node.textContent = v;
     else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2), v);
     else node.setAttribute(k, v);
+  }
+
+  function renderAdminPasswordOverlay() {
+    const user = state.auth.user;
+    if (!user || !user.isAdmin || !user.mustChangePassword) return null;
+
+    const wrap = el('div', { class: 'agreement-overlay' });
+    const heading = el('div', { class: 'agreement-title', text: 'Change your admin password' });
+    const body = el('div', {
+      class: 'agreement-body',
+      text: 'This admin account is using the default password. For your safety, please choose a strong new password before continuing.'
+    });
+
+    const currentInput = el('input', {
+      class: 'lock-input',
+      type: 'password',
+      placeholder: 'Current password (admin)'
+    });
+    const newInput = el('input', {
+      class: 'lock-input',
+      type: 'password',
+      placeholder: 'New password (min 10 characters)'
+    });
+    const confirmInput = el('input', {
+      class: 'lock-input',
+      type: 'password',
+      placeholder: 'Confirm new password'
+    });
+
+    const status = el('div', { class: 'lock-status', text: '' });
+
+    const submitBtn = el('button', {
+      class: 'btn',
+      onclick: async () => {
+        status.textContent = 'Updating password…';
+        try {
+          if (newInput.value.length < 10) throw new Error('Use at least 10 characters');
+          if (newInput.value !== confirmInput.value) throw new Error('New passwords do not match');
+          await changePassword(state.auth.token, currentInput.value, newInput.value);
+          state.auth.user = { ...(state.auth.user || {}), mustChangePassword: false };
+          showToast('Admin password updated');
+          render(false);
+        } catch (e) {
+          status.textContent = e?.message || 'Could not change password yet';
+        }
+      }
+    }, [
+      el('span', { class: 'btn-ic', text: '✓' }),
+      el('span', { text: 'Save new password' })
+    ]);
+
+    const card = el('div', { class: 'agreement-card' }, [
+      heading,
+      body,
+      currentInput,
+      newInput,
+      confirmInput,
+      submitBtn,
+      status
+    ]);
+
+    wrap.append(card);
+    return wrap;
   }
 
   function renderSignupOverlay(presetEmail = '', presetPassword = '') {
@@ -2932,6 +2996,11 @@ export function createApp(mount) {
     const tosOverlay = renderAgreementOverlay();
     if (tosOverlay) {
       root.append(tosOverlay);
+    }
+
+    const adminPwdOverlay = renderAdminPasswordOverlay();
+    if (!tosOverlay && adminPwdOverlay) {
+      root.append(adminPwdOverlay);
     }
 
     const accountOverlay = renderAccountOverlay();

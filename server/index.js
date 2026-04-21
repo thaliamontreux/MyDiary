@@ -78,6 +78,38 @@ app.get('/api/ready', async (_req, res) => {
   }
 });
 
+app.post('/api/auth/change-password', requireAuth, async (req, res) => {
+  try {
+    const currentPassword = String(req.body?.currentPassword || '');
+    const newPassword = String(req.body?.newPassword || '');
+
+    if (newPassword.length < 10) {
+      res.status(400).json({ error: 'New password must be at least 10 characters' });
+      return;
+    }
+
+    const user = await findUserByEmail(String(req.user.email || ''));
+    if (!user) {
+      res.status(404).json({ error: 'Account not found' });
+      return;
+    }
+
+    const ok = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!ok) {
+      res.status(401).json({ error: 'Current password is incorrect' });
+      return;
+    }
+
+    const nextHash = await bcrypt.hash(newPassword, 12);
+    await upsertUserPassword(user.id, nextHash);
+
+    res.json({ ok: true });
+  } catch (error) {
+    logError('change_password_failed', error, { requestId: req.requestId, userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to change password' });
+  }
+});
+
 app.post('/api/auth/username', requireAuth, async (req, res) => {
   try {
     const rawUsername = String(req.body?.username || '').trim();
@@ -216,7 +248,7 @@ app.post('/api/auth/register', authRateLimiter, async (req, res) => {
       countryCode
     });
 
-    const token = signAuthToken({ id: userId, email, username });
+    const token = signAuthToken({ id: userId, email, isAdmin: false });
     res.status(201).json({
       token,
       user: {
@@ -231,7 +263,9 @@ app.post('/api/auth/register', authRateLimiter, async (req, res) => {
         stateRegion,
         postalCode,
         countryCode,
-        tosAccepted: false
+        tosAccepted: false,
+        isAdmin: false,
+        mustChangePassword: false
       }
     });
   } catch (error) {
@@ -257,7 +291,7 @@ app.post('/api/auth/login', authRateLimiter, async (req, res) => {
       return;
     }
 
-    const token = signAuthToken({ id: user.id, email: user.email, username: user.username || undefined });
+    const token = signAuthToken({ id: user.id, email: user.email, isAdmin: Boolean(user.is_admin) });
     res.json({
       token,
       user: {
@@ -272,7 +306,9 @@ app.post('/api/auth/login', authRateLimiter, async (req, res) => {
         stateRegion: user.state_region || null,
         postalCode: user.postal_code || null,
         countryCode: user.country_code || null,
-        tosAccepted: Boolean(user.tos_accepted_at)
+        tosAccepted: Boolean(user.tos_accepted_at),
+        isAdmin: Boolean(user.is_admin),
+        mustChangePassword: Boolean(user.must_change_password)
       }
     });
   } catch (error) {

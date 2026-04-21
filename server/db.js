@@ -151,6 +151,8 @@ export async function initializeDatabase() {
       state_region VARCHAR(128) DEFAULT NULL,
       postal_code VARCHAR(32) DEFAULT NULL,
       country_code VARCHAR(2) DEFAULT NULL,
+      is_admin TINYINT(1) NOT NULL DEFAULT 0,
+      must_change_password TINYINT(1) NOT NULL DEFAULT 0,
       tos_accepted_at TIMESTAMP NULL DEFAULT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       UNIQUE KEY uniq_users_username (username)
@@ -232,6 +234,49 @@ export async function initializeDatabase() {
       ['add_user_profile_fields_v1']
     );
   }
+
+  // Add admin flags and must-change-password if missing
+  const [adminFlagMigrations] = await pool.query(
+    'SELECT name FROM schema_migrations WHERE name = ? LIMIT 1',
+    ['add_user_admin_flags_v1']
+  );
+  if (adminFlagMigrations.length === 0) {
+    const databaseName = bootstrap.databaseName;
+
+    async function ensureColumnSimple(tableName, columnName, definitionSql) {
+      const [rows] = await pool.query(
+        `SELECT COUNT(*) AS count
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+        [databaseName, tableName, columnName]
+      );
+      if (!rows[0].count) {
+        await pool.query(`ALTER TABLE ${tableName} ADD COLUMN ${definitionSql}`);
+      }
+    }
+
+    await ensureColumnSimple('users', 'is_admin', 'is_admin TINYINT(1) NOT NULL DEFAULT 0');
+    await ensureColumnSimple('users', 'must_change_password', 'must_change_password TINYINT(1) NOT NULL DEFAULT 0');
+
+    await pool.query(
+      'INSERT INTO schema_migrations (name) VALUES (?)',
+      ['add_user_admin_flags_v1']
+    );
+  }
+
+  // Seed default admin if not present
+  const [adminRows] = await pool.query(
+    'SELECT id FROM users WHERE is_admin = 1 LIMIT 1'
+  );
+  if (!adminRows.length) {
+    const adminEmail = 'admin@example.com';
+    const adminPassword = 'admin';
+    const adminHash = await bcrypt.hash(adminPassword, 12);
+    await pool.query(
+      'INSERT INTO users (email, password_hash, username, is_admin, must_change_password) VALUES (?, ?, ?, 1, 1)',
+      [adminEmail.toLowerCase(), adminHash, 'admin']
+    );
+  }
 }
 
 export async function createUser({
@@ -295,13 +340,20 @@ export async function findUserByEmail(email) {
        state_region,
        postal_code,
        country_code,
-       tos_accepted_at
+       tos_accepted_at,
+       is_admin,
+       must_change_password
      FROM users
      WHERE email = ?
      LIMIT 1`,
     [email]
   );
   return rows[0] || null;
+}
+
+export async function upsertUserPassword(userId, passwordHash) {
+  ensurePool();
+  await pool.query('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?', [passwordHash, userId]);
 }
 
 export async function findUserByUsername(username) {
@@ -320,7 +372,9 @@ export async function findUserByUsername(username) {
        state_region,
        postal_code,
        country_code,
-       tos_accepted_at
+       tos_accepted_at,
+       is_admin,
+       must_change_password
      FROM users
      WHERE LOWER(username) = LOWER(?)
      LIMIT 1`,
@@ -373,7 +427,9 @@ export async function markUserTosAccepted(userId) {
        state_region,
        postal_code,
        country_code,
-       tos_accepted_at
+       tos_accepted_at,
+       is_admin,
+       must_change_password
      FROM users
      WHERE id = ?
      LIMIT 1`,
