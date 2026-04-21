@@ -58,6 +58,29 @@ fi
 cd "$APP_DIR"
 
 # 3. Ownership
+# Guard: refuse to chown inside /home/<someone> unless SERVICE_USER matches that user
+case "$APP_DIR" in
+  /home/*)
+    HOME_OWNER="$(echo "$APP_DIR" | awk -F/ '{print $3}')"
+    if [ -n "$HOME_OWNER" ] && [ "$HOME_OWNER" != "$SERVICE_USER" ]; then
+      echo ""
+      echo "ERROR: Refusing to chown $APP_DIR to $SERVICE_USER." >&2
+      echo "       It lives inside /home/$HOME_OWNER which would lock that user out." >&2
+      echo "" >&2
+      echo "Choose one:" >&2
+      echo "  1) Reinstall under /opt/mydiary (recommended):" >&2
+      echo "       sudo git clone https://github.com/thaliamontreux/MyDiary /opt/mydiary" >&2
+      echo "       sudo APP_DIR=/opt/mydiary SERVICE_USER=$SERVICE_USER \\" >&2
+      echo "            /opt/mydiary/scripts/install-service.sh" >&2
+      echo "" >&2
+      echo "  2) Run the service as the home's owner ($HOME_OWNER):" >&2
+      echo "       sudo APP_DIR=$APP_DIR SERVICE_USER=$HOME_OWNER \\" >&2
+      echo "            $APP_DIR/scripts/install-service.sh" >&2
+      echo "" >&2
+      exit 2
+    fi
+    ;;
+esac
 echo "[install] setting ownership to $SERVICE_USER"
 chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR"
 
