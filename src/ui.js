@@ -999,6 +999,83 @@ function summarizeBody(text = '') {
   return compact.length > 88 ? `${compact.slice(0, 88)}…` : compact;
 }
 
+function escapeHtml(text = '') {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function renderMarkdownToHtml(markdown = '') {
+  const escaped = escapeHtml(markdown);
+  const lines = escaped.split(/\r?\n/);
+  const htmlParts = [];
+  let inList = false;
+
+  const flushList = () => {
+    if (inList) {
+      htmlParts.push('</ul>');
+      inList = false;
+    }
+  };
+
+  for (let raw of lines) {
+    const line = raw.trimEnd();
+    if (!line.trim()) {
+      flushList();
+      continue;
+    }
+
+    // Headings
+    if (line.startsWith('### ')) {
+      flushList();
+      htmlParts.push(`<h3>${line.slice(4)}</h3>`);
+      continue;
+    }
+    if (line.startsWith('## ')) {
+      flushList();
+      htmlParts.push(`<h2>${line.slice(3)}</h2>`);
+      continue;
+    }
+    if (line.startsWith('# ')) {
+      flushList();
+      htmlParts.push(`<h1>${line.slice(2)}</h1>`);
+      continue;
+    }
+
+    // Lists
+    if (/^[-*]\s+/.test(line)) {
+      if (!inList) {
+        inList = true;
+        htmlParts.push('<ul>');
+      }
+      htmlParts.push(`<li>${line.replace(/^[-*]\s+/, '')}</li>`);
+      continue;
+    }
+
+    flushList();
+
+    // Blockquotes
+    if (line.startsWith('&gt; ')) {
+      htmlParts.push(`<blockquote>${line.slice(4)}</blockquote>`);
+      continue;
+    }
+
+    let text = line;
+    // Inline code
+    text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+    // Bold
+    text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    // Italic
+    text = text.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+    htmlParts.push(`<p>${text}</p>`);
+  }
+
+  flushList();
+  return htmlParts.join('\n');
+}
+
 function normalizeLineList(input, max = 16) {
   return input
     .split('\n')
@@ -1147,7 +1224,8 @@ function normalizeEntry(entry = {}) {
     sessionLocked: Boolean(entry.sessionLocked),
     lockNote: entry.lockNote || '',
     habitWins: Array.isArray(entry.habitWins) ? entry.habitWins.slice(0, 6) : [],
-    selfCareChecklist: Array.isArray(entry.selfCareChecklist) ? entry.selfCareChecklist.slice(0, 6) : []
+    selfCareChecklist: Array.isArray(entry.selfCareChecklist) ? entry.selfCareChecklist.slice(0, 6) : [],
+    attachments: Array.isArray(entry.attachments) ? entry.attachments.slice(0, 24) : []
   };
 }
 
@@ -1245,7 +1323,8 @@ function matchesEntry(entry, query, moduleType, type) {
       ...(entry.habitWins || []),
       ...(entry.selfCareChecklist || []),
       entry.lockNote,
-      ...(entry.tags || [])
+      ...(entry.tags || []),
+      ...(entry.attachments || []).map((att) => att.name || '')
     ])
     .filter(Boolean)
     .join(' ')
@@ -4600,6 +4679,21 @@ export function createApp(mount) {
     });
     textarea.value = selected.body || '';
 
+    const markdownPreview = el('div', { class: 'body-preview' });
+
+    const updatePreview = () => {
+      const bodyText = textarea.value || '';
+      // Avoid rendering when empty to keep the UI calm
+      if (!bodyText.trim()) {
+        markdownPreview.innerHTML = '<p class="tiny">Live preview appears here as you type.</p>';
+        return;
+      }
+      markdownPreview.innerHTML = renderMarkdownToHtml(bodyText);
+    };
+
+    textarea.addEventListener('input', updatePreview);
+    updatePreview();
+
     const delBtn = el('button', {
       class: 'btn danger ghost',
       onclick: () => {
@@ -4655,7 +4749,139 @@ export function createApp(mount) {
     const plainTextEditor = el('div', { class: 'detail-grid' }, [
       el('div', { class: 'detail-card detail-card-wide' }, [
         el('span', { class: 'detail-label', text: 'Main editor' }),
-        textarea
+        textarea,
+        markdownPreview
+      ])
+    ]);
+
+    // Attachments UI (images + other files)
+    const attachments = Array.isArray(selected.attachments) ? selected.attachments : [];
+
+    const attachmentsList = el('div', { class: 'attachments-list' }, attachments.map((att) => {
+      const isImage = typeof att.mimeType === 'string' && att.mimeType.startsWith('image/');
+      const preview = isImage && att.dataUrl
+        ? el('img', { class: 'attachment-thumb', src: att.dataUrl, alt: att.name || 'Image attachment' })
+        : el('div', { class: 'attachment-icon', text: (att.name || 'File').slice(0, 2).toUpperCase() });
+
+      const nameText = el('div', { class: 'attachment-name', text: att.name || 'Attachment' });
+
+      const openBtn = att.dataUrl
+        ? el('a', {
+          class: 'btn mini ghost',
+          href: att.dataUrl,
+          target: '_blank',
+          rel: 'noopener noreferrer'
+        }, [el('span', { text: isImage ? 'View' : 'Download' })])
+        : el('div');
+
+      const removeBtn = el('button', {
+        class: 'btn mini ghost',
+        type: 'button',
+        onclick: () => {
+          const next = attachments.filter((item) => item.id !== att.id);
+          updateSelected({ attachments: next });
+        }
+      }, [el('span', { text: 'Remove' })]);
+
+      return el('div', { class: 'attachment-item' }, [preview, nameText, el('div', { class: 'attachment-actions' }, [openBtn, removeBtn])]);
+    }));
+
+    const imageInput = el('input', {
+      type: 'file',
+      accept: 'image/*',
+      multiple: 'multiple'
+    });
+
+    const MAX_ATTACHMENTS = 24;
+    const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+
+    imageInput.addEventListener('change', async () => {
+      if (!imageInput.files || !imageInput.files.length) return;
+      const entry = getSelectedEntry();
+      if (!entry) return;
+      const existing = Array.isArray(entry.attachments) ? entry.attachments : [];
+      const now = new Date().toISOString();
+      const next = [...existing];
+      for (const file of imageInput.files) {
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+          showToast(`Skipped ${file.name}: too large (max 5MB).`);
+          continue;
+        }
+        if (next.length >= MAX_ATTACHMENTS) {
+          showToast('Attachment limit reached for this entry.');
+          break;
+        }
+        try {
+          const dataUri = await fileToDataUri(file);
+          next.push({
+            id: `${entry.id}-att-${Date.now()}-${file.name}`,
+            name: file.name,
+            mimeType: file.type || 'image/*',
+            dataUrl: dataUri,
+            createdAt: now
+          });
+        } catch (err) {
+          showToast('Failed to read image attachment');
+        }
+      }
+      updateSelected({ attachments: next });
+      imageInput.value = '';
+    });
+
+    const fileInput = el('input', {
+      type: 'file',
+      multiple: 'multiple'
+    });
+
+    fileInput.addEventListener('change', async () => {
+      if (!fileInput.files || !fileInput.files.length) return;
+      const entry = getSelectedEntry();
+      if (!entry) return;
+      const existing = Array.isArray(entry.attachments) ? entry.attachments : [];
+      const now = new Date().toISOString();
+      const next = [...existing];
+      for (const file of fileInput.files) {
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+          showToast(`Skipped ${file.name}: too large (max 5MB).`);
+          continue;
+        }
+        if (next.length >= MAX_ATTACHMENTS) {
+          showToast('Attachment limit reached for this entry.');
+          break;
+        }
+        try {
+          const dataUri = await fileToDataUri(file);
+          next.push({
+            id: `${entry.id}-att-${Date.now()}-${file.name}`,
+            name: file.name,
+            mimeType: file.type || 'application/octet-stream',
+            dataUrl: dataUri,
+            createdAt: now
+          });
+        } catch (err) {
+          showToast('Failed to read file attachment');
+        }
+      }
+      updateSelected({ attachments: next });
+      fileInput.value = '';
+    });
+
+    const attachmentsEditor = el('div', { class: 'detail-grid' }, [
+      el('div', { class: 'detail-card detail-card-wide' }, [
+        el('span', { class: 'detail-label', text: 'Attachments' }),
+        el('div', { class: 'attachment-input-row' }, [
+          el('label', { class: 'btn ghost small-btn' }, [
+            el('span', { class: 'btn-ic', text: '🖼' }),
+            el('span', { text: 'Add images' }),
+            imageInput
+          ]),
+          el('label', { class: 'btn ghost small-btn' }, [
+            el('span', { class: 'btn-ic', text: '📎' }),
+            el('span', { text: 'Add files' }),
+            fileInput
+          ])
+        ]),
+        attachmentsList
       ])
     ]);
 
