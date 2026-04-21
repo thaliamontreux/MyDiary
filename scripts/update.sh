@@ -46,8 +46,9 @@ rm -rf "$APP_DIR/node_modules" "$APP_DIR/package-lock.json"
 # Install deps. We use `npm install` (not `npm ci`) so that drift between
 # package.json and package-lock.json does not abort the update. This also
 # ensures dev deps (e.g. vite) are present for the build step below.
+# We include dev deps because NODE_ENV=production in systemd would skip them.
 log "running npm install"
-npm install --no-audit --no-fund
+npm install --include=dev --no-audit --no-fund
 
 log "building frontend"
 npm run build
