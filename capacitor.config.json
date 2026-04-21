@@ -1,0 +1,22 @@
+{
+  "appId": "com.mydiary.app",
+  "appName": "My Secret Diary",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "backgroundColor": "#fdf4ff",
+      "spinnerColor": "#6366f1"
+    },
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_icon_config_sample",
+      "iconColor": "#6366f1"
+    }
+  }
+}

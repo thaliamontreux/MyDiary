@@ -1238,7 +1238,9 @@ function normalizeEntry(entry = {}) {
     temperature: entry.temperature || '',
     steps: typeof entry.steps === 'number' ? entry.steps : (entry.steps || ''),
     heartRate: entry.heartRate || '',
-    goalIds: Array.isArray(entry.goalIds) ? entry.goalIds : []
+    goalIds: Array.isArray(entry.goalIds) ? entry.goalIds : [],
+    weight: entry.weight || '',
+    sleepHours: entry.sleepHours || ''
   };
 }
 
@@ -3301,6 +3303,12 @@ export function createApp(mount) {
     }
 
     await Promise.all([loadFoldersForUser(), loadVaultsForUser(), loadTagsForUser()]);
+    if (state._pendingPrompt) {
+      const pending = state._pendingPrompt;
+      state._pendingPrompt = null;
+      const newEntry = createEntry('quick');
+      if (newEntry) updateSelected({ body: pending });
+    }
     render();
   }
 
@@ -4295,11 +4303,47 @@ export function createApp(mount) {
         el('button', {
           class: 'nav-item',
           type: 'button',
-          onclick: () => {
-            state.showAccountOverlay = true;
-            state.showEncryptionKey = false;
-            render(false);
-          }
+          onclick: () => renderHabitOverlay()
+        }, [
+          el('span', { class: 'nav-item-ic', text: '✅' }),
+          el('span', { class: 'nav-item-label', text: 'Habit tracker' })
+        ]),
+        el('button', {
+          class: 'nav-item',
+          type: 'button',
+          onclick: () => renderCollabOverlay()
+        }, [
+          el('span', { class: 'nav-item-ic', text: '🤝' }),
+          el('span', { class: 'nav-item-label', text: 'Collaborative journals' })
+        ]),
+        el('button', {
+          class: 'nav-item',
+          type: 'button',
+          onclick: () => renderSocialFeedOverlay()
+        }, [
+          el('span', { class: 'nav-item-ic', text: '🌐' }),
+          el('span', { class: 'nav-item-label', text: 'Social feed' })
+        ]),
+        el('button', {
+          class: 'nav-item',
+          type: 'button',
+          onclick: () => renderExtensionGuide()
+        }, [
+          el('span', { class: 'nav-item-ic', text: '🧩' }),
+          el('span', { class: 'nav-item-label', text: 'Browser extension' })
+        ]),
+        el('button', {
+          class: 'nav-item',
+          type: 'button',
+          onclick: () => renderCalendarSyncOverlay()
+        }, [
+          el('span', { class: 'nav-item-ic', text: '🗓️' }),
+          el('span', { class: 'nav-item-label', text: 'Calendar sync' })
+        ]),
+        el('button', {
+          class: 'nav-item',
+          type: 'button',
+          onclick: () => { state.showAccountOverlay = true; state.showEncryptionKey = false; render(false); }
         }, [
           el('span', { class: 'nav-item-ic', text: '⚙️' }),
           el('span', { class: 'nav-item-label', text: 'Account & security' })
@@ -5152,6 +5196,14 @@ export function createApp(mount) {
           el('span', { class: 'btn-ic', text: '📋' }),
           el('span', { text: 'Template' })
         ]),
+        el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderCommentsOverlay(selected) }, [
+          el('span', { class: 'btn-ic', text: '💬' }),
+          el('span', { text: 'Comments' })
+        ]),
+        el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderFitnessOverlay(selected) }, [
+          el('span', { class: 'btn-ic', text: '🏃' }),
+          el('span', { text: 'Health data' })
+        ]),
         el('button', {
           class: 'btn ghost small-btn', type: 'button',
           onclick: async () => {
@@ -5308,6 +5360,17 @@ export function createApp(mount) {
 
     cardChildren.push(status);
 
+    if (state.deviceAuth.platformAuthenticator) {
+      cardChildren.push(el('button', {
+        class: 'btn ghost small-btn biometric-btn',
+        type: 'button',
+        onclick: () => tryBiometricUnlock()
+      }, [
+        el('span', { class: 'btn-ic', text: '🔏' }),
+        el('span', { text: 'Use biometric / device PIN' })
+      ]));
+    }
+
     const card = el('div', { class: 'lock-card' }, cardChildren);
 
     const wrap = el('div', { class: 'lock' }, [
@@ -5335,6 +5398,19 @@ export function createApp(mount) {
       await Promise.all([loadFoldersForUser(), loadVaultsForUser(), loadTagsForUser()]);
     }
     initDailyReminderCheck();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const capturedPrompt = urlParams.get('prompt');
+    if (capturedPrompt) {
+      history.replaceState(null, '', window.location.pathname);
+      if (state.unlocked) {
+        const newEntry = createEntry('quick');
+        if (newEntry) updateSelected({ body: capturedPrompt });
+      } else {
+        state._pendingPrompt = capturedPrompt;
+      }
+    }
+
     render();
   })();
 
@@ -6198,6 +6274,317 @@ export function createApp(mount) {
         () => resolve(null)
       );
     });
+  }
+
+  // ── Habit Tracking ────────────────────────────────────────────────────────────
+  const HABIT_STORAGE_KEY = 'diary.habits';
+
+  function loadHabits() {
+    try { return JSON.parse(localStorage.getItem(HABIT_STORAGE_KEY) || '[]'); } catch { return []; }
+  }
+
+  function saveHabits(habits) {
+    localStorage.setItem(HABIT_STORAGE_KEY, JSON.stringify(habits));
+  }
+
+  function renderHabitOverlay() {
+    const overlay = el('div', { class: 'overlay-backdrop' });
+    let habits = loadHabits();
+    const todayIso = isoDate();
+
+    const refreshHabits = () => {
+      habitList.replaceChildren(...habits.map((h) => {
+        const completedToday = (h.completedDates || []).includes(todayIso);
+        const streak = calcHabitStreak(h.completedDates || []);
+        const checkBtn = el('button', {
+          class: `btn small-btn ${completedToday ? '' : 'ghost'}`,
+          type: 'button',
+          onclick: () => {
+            if (!completedToday) {
+              h.completedDates = [...(h.completedDates || []), todayIso];
+            } else {
+              h.completedDates = (h.completedDates || []).filter((d) => d !== todayIso);
+            }
+            saveHabits(habits);
+            refreshHabits();
+          }
+        }, [el('span', { text: completedToday ? '✓ Done today' : 'Mark done' })]);
+        const delBtn = el('button', {
+          class: 'btn mini ghost',
+          type: 'button',
+          onclick: () => { habits = habits.filter((x) => x.id !== h.id); saveHabits(habits); refreshHabits(); }
+        }, [el('span', { text: '✕' })]);
+        return el('div', { class: 'habit-item' }, [
+          el('div', { class: 'habit-name', text: h.name }),
+          el('div', { class: 'habit-meta', text: `🔥 ${streak} day streak` }),
+          el('div', { class: 'habit-actions' }, [checkBtn, delBtn])
+        ]);
+      }));
+    };
+
+    const habitList = el('div', { class: 'habits-list' });
+    refreshHabits();
+
+    const nameIn = el('input', { type: 'text', class: 'lock-input', placeholder: 'New habit name', style: 'font-size:13px' });
+    const addBtn = el('button', {
+      class: 'btn small-btn',
+      type: 'button',
+      onclick: () => {
+        const name = nameIn.value.trim();
+        if (!name) return;
+        habits.push({ id: `hab-${Date.now()}`, name, completedDates: [], createdAt: new Date().toISOString() });
+        saveHabits(habits);
+        nameIn.value = '';
+        refreshHabits();
+      }
+    }, [el('span', { text: 'Add habit' })]);
+
+    const modal = el('div', { class: 'overlay-modal' }, [
+      el('div', { class: 'overlay-title', text: 'Habit Tracker' }),
+      habitList,
+      el('div', { class: 'goal-add-row' }, [nameIn, addBtn]),
+      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Close' })])
+    ]);
+    overlay.append(modal);
+    document.body.append(overlay);
+    return overlay;
+  }
+
+  function calcHabitStreak(dates) {
+    if (!dates.length) return 0;
+    const sorted = [...dates].sort().reverse();
+    let streak = 0;
+    let cursor = new Date(isoDate());
+    for (const d of sorted) {
+      const dDate = new Date(d);
+      const diff = Math.round((cursor.getTime() - dDate.getTime()) / 86400000);
+      if (diff === 0 || diff === 1) { streak++; cursor = dDate; }
+      else break;
+    }
+    return streak;
+  }
+
+  // ── Collaborative Journals ─────────────────────────────────────────────────────
+  function renderCollabOverlay() {
+    const overlay = el('div', { class: 'overlay-backdrop' });
+    const modal = el('div', { class: 'overlay-modal' }, [
+      el('div', { class: 'overlay-title', text: 'Collaborative Journals' }),
+      el('div', { class: 'share-notice', text: 'Collaborative journals let you invite others to co-write a shared diary. This feature is coming soon — invite your collaborators by sharing your journal link below.' }),
+      el('div', { class: 'collab-invite-row' }, [
+        el('input', { type: 'text', class: 'lock-input', placeholder: 'Collaborator email', style: 'font-size:13px' }),
+        el('button', { class: 'btn small-btn', type: 'button', onclick: () => showToast('Invite sent! (Collaborative journals coming soon)') }, [el('span', { text: 'Invite' })])
+      ]),
+      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Close' })])
+    ]);
+    overlay.append(modal);
+    document.body.append(overlay);
+    return overlay;
+  }
+
+  // ── Comment System ─────────────────────────────────────────────────────────────
+  function renderCommentsOverlay(entry) {
+    if (!entry) return;
+    const overlay = el('div', { class: 'overlay-backdrop' });
+    const COMMENTS_KEY = `diary.comments.${entry.id}`;
+    let comments = [];
+    try { comments = JSON.parse(localStorage.getItem(COMMENTS_KEY) || '[]'); } catch { comments = []; }
+
+    const listEl = el('div', { class: 'comments-list' });
+    const refreshComments = () => {
+      listEl.replaceChildren(...comments.map((c) => el('div', { class: 'comment-item' }, [
+        el('span', { class: 'comment-author', text: c.author || 'You' }),
+        el('span', { class: 'comment-time', text: new Date(c.createdAt).toLocaleString() }),
+        el('div', { class: 'comment-body', text: c.text })
+      ])));
+    };
+    refreshComments();
+
+    const textIn = el('textarea', { class: 'body-input', placeholder: 'Write a comment…', rows: '3', style: 'font-size:13px; min-height:60px' });
+    const submitBtn = el('button', {
+      class: 'btn small-btn',
+      type: 'button',
+      onclick: () => {
+        const text = textIn.value.trim();
+        if (!text) return;
+        comments.push({ id: `cmt-${Date.now()}`, author: state.auth?.user?.username || 'You', text, createdAt: new Date().toISOString() });
+        localStorage.setItem(COMMENTS_KEY, JSON.stringify(comments));
+        textIn.value = '';
+        refreshComments();
+      }
+    }, [el('span', { text: 'Post comment' })]);
+
+    const modal = el('div', { class: 'overlay-modal' }, [
+      el('div', { class: 'overlay-title', text: 'Comments' }),
+      listEl,
+      textIn,
+      submitBtn,
+      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Close' })])
+    ]);
+    overlay.append(modal);
+    document.body.append(overlay);
+    return overlay;
+  }
+
+  // ── Social Feed ────────────────────────────────────────────────────────────────
+  function renderSocialFeedOverlay() {
+    const overlay = el('div', { class: 'overlay-backdrop' });
+    const publicEntries = (state.vault?.entries || [])
+      .map(normalizeEntry)
+      .filter((e) => e.privacyLevel === 'shared')
+      .slice(0, 20);
+
+    const modal = el('div', { class: 'overlay-modal' }, [
+      el('div', { class: 'overlay-title', text: 'Public / Shared Feed' }),
+      el('div', { class: 'share-notice', text: 'Entries marked as "shared" privacy appear here as your personal public feed.' }),
+      el('div', { class: 'social-feed-list' }, publicEntries.length
+        ? publicEntries.map((e) => el('div', { class: 'social-feed-item', onclick: () => { state.selectedId = e.id; overlay.remove(); render(false); } }, [
+          el('div', { class: 'feed-item-title', text: e.title || 'Untitled' }),
+          el('div', { class: 'feed-item-preview', text: summarizeBody(e.body) }),
+          el('div', { class: 'feed-item-meta', text: e.date || '' })
+        ]))
+        : [el('div', { class: 'tiny', text: 'No shared entries yet. Set an entry\'s privacy to "Shared" to see it here.' })]
+      ),
+      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Close' })])
+    ]);
+    overlay.append(modal);
+    document.body.append(overlay);
+    return overlay;
+  }
+
+  // ── Biometric Unlock ───────────────────────────────────────────────────────────
+  async function tryBiometricUnlock() {
+    if (!state.deviceAuth.supported || !state.deviceAuth.platformAuthenticator) {
+      showToast('Biometric authentication not available on this device.');
+      return;
+    }
+    try {
+      const credential = await navigator.credentials.get({
+        publicKey: {
+          challenge: crypto.getRandomValues(new Uint8Array(32)),
+          rpId: window.location.hostname,
+          userVerification: 'required',
+          timeout: 30000
+        }
+      });
+      if (credential) {
+        showToast('Biometric check passed. Enter your diary password to continue.');
+      }
+    } catch (err) {
+      if (err.name !== 'NotAllowedError') {
+        showToast('Biometric authentication failed.');
+      }
+    }
+  }
+
+  // ── Browser Extension Quick-Capture Overlay ────────────────────────────────────
+  function renderExtensionGuide() {
+    const overlay = el('div', { class: 'overlay-backdrop' });
+    const modal = el('div', { class: 'overlay-modal' }, [
+      el('div', { class: 'overlay-title', text: 'Browser Extension — Quick Capture' }),
+      el('div', { class: 'share-notice', text: 'Install the MyDiary browser extension to quickly capture thoughts from any webpage. The extension bookmarklet below can be dragged to your bookmarks bar as a quick workaround.' }),
+      el('div', { class: 'extension-step' }, [
+        el('div', { class: 'extension-step-num', text: '1' }),
+        el('div', { text: 'Drag this to your bookmarks bar:' }),
+        el('a', {
+          class: 'extension-bookmarklet',
+          href: `javascript:(function(){window.open('${window.location.origin}?prompt='+encodeURIComponent(window.getSelection().toString()||document.title),'_blank');})();`,
+          text: '📖 Save to Diary'
+        })
+      ]),
+      el('div', { class: 'extension-step' }, [
+        el('div', { class: 'extension-step-num', text: '2' }),
+        el('div', { text: 'When browsing, click the bookmarklet to open MyDiary with the selected text pre-filled as a new entry prompt.' })
+      ]),
+      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Close' })])
+    ]);
+    overlay.append(modal);
+    document.body.append(overlay);
+    return overlay;
+  }
+
+  // ── Calendar Sync Guide ────────────────────────────────────────────────────────
+  function renderCalendarSyncOverlay() {
+    const overlay = el('div', { class: 'overlay-backdrop' });
+    const exportIcal = () => {
+      const entries = (state.vault?.entries || []).map(normalizeEntry);
+      const lines = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//MyDiary//EN',
+        'CALSCALE:GREGORIAN'
+      ];
+      for (const e of entries) {
+        if (!e.date) continue;
+        const dtStart = e.date.replace(/-/g, '') + (e.time ? 'T' + e.time.replace(':', '') + '00' : '');
+        lines.push('BEGIN:VEVENT');
+        lines.push(`DTSTART${e.time ? '' : ';VALUE=DATE'}:${dtStart}`);
+        lines.push(`SUMMARY:${(e.title || 'Diary entry').replace(/[,;]/g, ' ')}`);
+        lines.push(`DESCRIPTION:${(e.body || '').slice(0, 200).replace(/\n/g, '\\n').replace(/[,;]/g, ' ')}`);
+        lines.push('END:VEVENT');
+      }
+      lines.push('END:VCALENDAR');
+      const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'mydiary.ics'; a.click();
+      URL.revokeObjectURL(url);
+      showToast('Calendar file downloaded');
+    };
+
+    const modal = el('div', { class: 'overlay-modal' }, [
+      el('div', { class: 'overlay-title', text: 'Calendar Sync' }),
+      el('div', { class: 'share-notice', text: 'Export your diary entries as an iCal (.ics) file to import into Google Calendar, Outlook, Apple Calendar, or any calendar app.' }),
+      el('button', { class: 'btn', type: 'button', onclick: exportIcal }, [
+        el('span', { class: 'btn-ic', text: '📅' }),
+        el('span', { text: 'Download .ics calendar file' })
+      ]),
+      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Close' })])
+    ]);
+    overlay.append(modal);
+    document.body.append(overlay);
+    return overlay;
+  }
+
+  // ── Fitness / Health Data ──────────────────────────────────────────────────────
+  function renderFitnessOverlay(entry) {
+    if (!entry) return;
+    const overlay = el('div', { class: 'overlay-backdrop' });
+    const cur = normalizeEntry(entry);
+
+    const stepsIn = el('input', { type: 'number', class: 'date-input', placeholder: 'Steps today', value: cur.steps || '' });
+    const hrIn = el('input', { type: 'number', class: 'date-input', placeholder: 'Heart rate (bpm)', value: cur.heartRate || '' });
+    const weightIn = el('input', { type: 'number', class: 'date-input', placeholder: 'Weight (kg)', value: cur.weight || '' });
+    const sleepIn = el('input', { type: 'number', class: 'date-input', placeholder: 'Sleep hours', value: cur.sleepHours || '' });
+
+    const saveBtn = el('button', {
+      class: 'btn',
+      type: 'button',
+      onclick: () => {
+        updateSelected({
+          steps: stepsIn.value ? Number(stepsIn.value) : '',
+          heartRate: hrIn.value || '',
+          weight: weightIn.value || '',
+          sleepHours: sleepIn.value || ''
+        });
+        showToast('Health data saved');
+        overlay.remove();
+      }
+    }, [el('span', { text: 'Save health data' })]);
+
+    const modal = el('div', { class: 'overlay-modal' }, [
+      el('div', { class: 'overlay-title', text: 'Fitness & Health Data' }),
+      el('div', { class: 'fitness-grid' }, [
+        el('label', { class: 'tiny', text: 'Steps' }), stepsIn,
+        el('label', { class: 'tiny', text: 'Heart rate (bpm)' }), hrIn,
+        el('label', { class: 'tiny', text: 'Weight (kg)' }), weightIn,
+        el('label', { class: 'tiny', text: 'Sleep (hours)' }), sleepIn
+      ]),
+      saveBtn,
+      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Close' })])
+    ]);
+    overlay.append(modal);
+    document.body.append(overlay);
+    return overlay;
   }
 
   // ── Audit Log Viewer ──────────────────────────────────────────────────────────
