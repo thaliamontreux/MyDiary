@@ -4753,6 +4753,112 @@ export function createApp(mount) {
     ]);
   }
 
+  // ── Voice Dictation ────────────────────────────────────────────────────────
+  function renderDictateButton(entry, textarea) {
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRec) return el('div'); // Browser doesn't support it
+
+    let recognition = null;
+    let isListening = false;
+    let interimTranscript = '';
+
+    const micIcon   = el('span', { class: 'btn-ic', text: '🎤' });
+    const micLabel  = el('span', { text: 'Dictate' });
+    const btn       = el('button', { class: 'btn ghost small-btn dictate-btn', type: 'button' }, [micIcon, micLabel]);
+
+    const liveBar   = el('div', { class: 'dictate-live-bar' });
+    const container = el('div', { class: 'dictate-wrap' }, [btn, liveBar]);
+
+    const setListening = (on) => {
+      isListening = on;
+      btn.classList.toggle('dictate-active', on);
+      micIcon.textContent = on ? '⏹' : '🎤';
+      micLabel.textContent = on ? 'Stop' : 'Dictate';
+      if (!on) liveBar.textContent = '';
+    };
+
+    const start = () => {
+      recognition = new SpeechRec();
+      recognition.lang = navigator.language || 'en-US';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+
+      recognition.onstart = () => setListening(true);
+
+      recognition.onresult = (event) => {
+        let interim = '';
+        let finalText = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const t = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalText += t;
+          } else {
+            interim += t;
+          }
+        }
+
+        // Show interim live
+        interimTranscript = interim;
+        liveBar.textContent = interim ? `"${interim}"` : '';
+
+        // Append finalized text to textarea + entry
+        if (finalText) {
+          const cur = textarea.value;
+          const needsSpace = cur.length > 0 && !cur.endsWith(' ') && !cur.endsWith('\n');
+          const appended = cur + (needsSpace ? ' ' : '') + finalText;
+          textarea.value = appended;
+          // Trigger the input event so the entry updates live
+          textarea.dispatchEvent(new Event('input', { bubbles: true }));
+          // Scroll textarea to bottom
+          textarea.scrollTop = textarea.scrollHeight;
+        }
+      };
+
+      recognition.onerror = (e) => {
+        if (e.error === 'not-allowed') {
+          showToast('Microphone access denied. Please allow it in your browser.');
+        } else if (e.error !== 'no-speech') {
+          showToast(`Dictation error: ${e.error}`);
+        }
+        setListening(false);
+      };
+
+      recognition.onend = () => {
+        // Auto-restart if user didn't explicitly stop (handles 60-second Chrome limit)
+        if (isListening) {
+          try { recognition.start(); } catch {}
+        } else {
+          setListening(false);
+        }
+      };
+
+      try {
+        recognition.start();
+      } catch (err) {
+        showToast('Could not start dictation: ' + (err?.message || 'unknown error'));
+      }
+    };
+
+    const stop = () => {
+      isListening = false;
+      try { recognition?.stop(); } catch {}
+      recognition = null;
+      setListening(false);
+      showToast('Dictation stopped — text saved to entry');
+    };
+
+    btn.onclick = () => {
+      if (isListening) {
+        stop();
+      } else {
+        start();
+      }
+    };
+
+    return container;
+  }
+
   function renderEditor(selected, keepEditorFocus) {
     if (!selected) {
       return el('div', { class: 'editor empty' }, [
@@ -5257,6 +5363,7 @@ export function createApp(mount) {
           el('span', { class: 'btn-ic', text: '♡' }),
           el('span', { text: 'Save all changes' })
         ]),
+        renderDictateButton(selected, plainTextEditor),
         el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderShareOverlay(selected) }, [
           el('span', { class: 'btn-ic', text: '🔗' }),
           el('span', { text: 'Share' })
