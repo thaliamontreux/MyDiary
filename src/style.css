@@ -64,7 +64,14 @@ html, body {
 }
 
 body {
-  background: linear-gradient(180deg, var(--bg1), var(--bg2));
+  /* Soft themed background plus the girly SVG image */
+  background:
+    linear-gradient(180deg, var(--bg1), var(--bg2));
+  background-image:
+    url('/girly-bg.svg');
+  background-size: cover;
+  background-position: center center;
+  background-attachment: fixed;
 }
 
 body::before {
@@ -72,9 +79,8 @@ body::before {
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(120% 180% at -10% 20%, rgba(255, 182, 193, 0.75), transparent 65%),
-    radial-gradient(90% 140% at 10% 80%, rgba(255, 192, 203, 0.45), transparent 70%);
-  opacity: 0.75;
+    radial-gradient(120% 180% at -10% 20%, rgba(255, 182, 193, 0.55), transparent 65%),
+    radial-gradient(90% 140% at 10% 80%, rgba(255, 192, 203, 0.30), transparent 70%);
   mix-blend-mode: normal;
   pointer-events: none;
 }
@@ -601,6 +607,16 @@ body::before {
   margin-top: 2px;
   font-size: 12px;
   color: var(--muted2);
+}
+/* Slight logo treatment for the brand/title area */
+.brand {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-title::before {
+  content: "🔒";
+  margin-right: 6px;
 }
 
 .top-actions {
@@ -1180,14 +1196,25 @@ body::before {
   padding-right: 4px;
 }
 
+.editor::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.editor {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
 .editor-card {
   min-height: 100%;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.06));
+  /* Match sidebar/rail cards so the middle column follows the theme */
+  background: var(--card2);
   border: 1px solid var(--border);
   border-radius: var(--radius2);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow2);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   overflow: hidden;
