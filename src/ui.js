@@ -5857,6 +5857,7 @@ export function createApp(mount) {
       }
     }
 
+    mount.replaceChildren(root);
     render();
   })();
 
