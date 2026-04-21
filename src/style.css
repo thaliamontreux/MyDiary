@@ -2757,6 +2757,93 @@ body::before {
 /* ── Biometric Button ────────────────────────────────────────────────────── */
 .biometric-btn { margin-top: 8px; width: 100%; justify-content: center; }
 
+/* ── Calendar Overlay enhancements ──────────────────────────────────────── */
+.overlay-calendar { max-width: 620px !important; }
+.cal-entry-badge {
+  display: inline-block;
+  background: #6366f1;
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 1px 5px;
+  margin-top: 2px;
+  line-height: 1.4;
+}
+.cal-cell.selected { background: rgba(99,102,241,0.28) !important; box-shadow: 0 0 0 2px #6366f1; }
+.cal-day-detail {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  min-height: 60px;
+}
+.cal-detail-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+.cal-day-entry-list { display: flex; flex-direction: column; gap: 8px; }
+.cal-day-entry-item {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.cal-day-entry-item:hover { background: rgba(99,102,241,0.08); }
+.cal-day-entry-title { font-size: 13px; font-weight: 700; color: var(--text); }
+.cal-day-entry-preview { font-size: 12px; color: var(--muted); margin: 3px 0; }
+.cal-day-entry-meta { font-size: 11px; color: var(--muted); }
+
+/* ── Advanced Search enhancements ────────────────────────────────────────── */
+.search-results-list { display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow-y: auto; margin-top: 10px; }
+.search-result-item {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.search-result-item:hover { background: rgba(99,102,241,0.07); }
+.sr-title { font-size: 13px; font-weight: 700; color: var(--text); }
+.sr-meta { font-size: 11px; color: var(--muted); margin: 3px 0; display: flex; gap: 6px; flex-wrap: wrap; }
+.sr-preview { font-size: 12px; color: var(--muted); }
+
+/* ── Template card enhancements ──────────────────────────────────────────── */
+.template-icon { font-size: 22px; margin-bottom: 4px; }
+.template-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.template-card { display: flex; flex-direction: column; }
+
+/* ── Writing Stats enhancements ──────────────────────────────────────────── */
+.stats-section-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 16px 0 6px;
+}
+.stat-bar-count { font-size: 9px; color: var(--muted); text-align: center; margin-top: 2px; }
+.mood-breakdown-list { display: flex; flex-direction: column; gap: 6px; }
+.mood-breakdown-row { display: flex; align-items: center; gap: 8px; }
+.mood-breakdown-label { font-size: 12px; color: var(--text); width: 90px; flex-shrink: 0; }
+.mood-breakdown-bar-track { flex: 1; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+.mood-breakdown-bar { height: 100%; background: #6366f1; border-radius: 4px; transition: width 0.4s; }
+.mood-breakdown-count { font-size: 12px; color: var(--muted); width: 28px; text-align: right; }
+.type-breakdown-list { display: flex; flex-direction: column; gap: 4px; }
+
+/* ── Export overlay enhancements ─────────────────────────────────────────── */
+.export-summary { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+.export-options-list { display: flex; flex-direction: column; gap: 10px; }
+.export-option-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.export-option-icon { font-size: 20px; font-weight: 700; width: 32px; text-align: center; flex-shrink: 0; }
+.export-option-info { flex: 1; }
+.export-option-title { font-size: 13px; font-weight: 700; color: var(--text); }
+.export-option-desc { font-size: 11px; color: var(--muted); }
+
 /* ── Profile Edit Form ───────────────────────────────────────────────────── */
 .profile-grid {
   display: grid;

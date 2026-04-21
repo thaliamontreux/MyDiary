@@ -4318,7 +4318,7 @@ export function createApp(mount) {
         el('button', {
           class: 'nav-item',
           type: 'button',
-          onclick: () => { state.showCalendar = !state.showCalendar; render(false); }
+          onclick: () => renderCalendarOverlay()
         }, [
           el('span', { class: 'nav-item-ic', text: '📅' }),
           el('span', { class: 'nav-item-label', text: 'Calendar view' })
@@ -4326,7 +4326,7 @@ export function createApp(mount) {
         el('button', {
           class: `nav-item ${state.showAdvancedSearch ? 'active' : ''}`,
           type: 'button',
-          onclick: () => { state.showAdvancedSearch = !state.showAdvancedSearch; render(false); }
+          onclick: () => renderAdvancedSearchOverlay()
         }, [
           el('span', { class: 'nav-item-ic', text: '🔍' }),
           el('span', { class: 'nav-item-label', text: 'Advanced search' })
@@ -4420,8 +4420,6 @@ export function createApp(mount) {
           el('span', { class: 'nav-item-label', text: 'Account & security' })
         ])
       ]),
-      renderCalendarView(),
-      renderAdvancedSearch(),
       state.unlocked ? el('div', { class: 'daily-prompt' }, [
         el('span', { class: 'tiny', text: '✦ Today\'s prompt' }),
         el('div', { class: 'prompt-text', text: getTodaysPrompt() })
@@ -5757,18 +5755,26 @@ export function createApp(mount) {
     ]);
   }
 
-  // ── Advanced Search Panel ────────────────────────────────────────────────────
-  function renderAdvancedSearch() {
-    if (!state.showAdvancedSearch) return el('div');
+  // ── Advanced Search Overlay ──────────────────────────────────────────────────
+  function renderAdvancedSearchOverlay() {
+    const overlay = el('div', { class: 'overlay-backdrop' });
     const allMoods = ['sparkly', 'cozy', 'melancholy', 'anxious', 'grateful', 'hopeful', 'angry', 'peaceful', 'excited', 'numb'];
+
+    const queryIn = el('input', { type: 'text', class: 'lock-input', placeholder: 'Search text…', value: state.searchQuery || '', style: 'font-size:14px' });
+
     const moodSel = el('select', { class: 'mood-select' }, [
       el('option', { value: '', text: 'Any mood' }),
       ...allMoods.map((m) => el('option', { value: m, text: moodLabel(m) }))
     ]);
     moodSel.value = state.searchFilters?.mood || '';
 
+    const typeSel = el('select', { class: 'mood-select' }, [
+      el('option', { value: '', text: 'Any type' }),
+      ...ENTRY_TYPE_OPTIONS.map(([v, l]) => el('option', { value: v, text: l }))
+    ]);
+
     const fromDate = el('input', { type: 'date', class: 'date-input', value: state.searchFilters?.fromDate || '' });
-    const toDate = el('input', { type: 'date', class: 'date-input', value: state.searchFilters?.toDate || '' });
+    const toDate   = el('input', { type: 'date', class: 'date-input', value: state.searchFilters?.toDate || '' });
 
     const tagSel = el('select', { class: 'mood-select' }, [
       el('option', { value: '', text: 'Any tag' }),
@@ -5776,142 +5782,245 @@ export function createApp(mount) {
     ]);
     tagSel.value = state.searchFilters?.tagId || '';
 
-    const applyBtn = el('button', {
-      class: 'btn small-btn',
-      type: 'button',
-      onclick: () => {
-        state.searchFilters = {
-          mood: moodSel.value,
-          fromDate: fromDate.value,
-          toDate: toDate.value,
-          tagId: tagSel.value
-        };
-        render(false);
-      }
-    }, [el('span', { text: 'Apply filters' })]);
+    const resultsEl = el('div', { class: 'search-results-list' });
+    const countEl   = el('div', { class: 'tiny', text: '' });
 
-    const clearBtn = el('button', {
-      class: 'btn ghost small-btn',
-      type: 'button',
-      onclick: () => {
-        state.searchFilters = {};
-        render(false);
-      }
-    }, [el('span', { text: 'Clear' })]);
+    const doSearch = () => {
+      const q = queryIn.value.trim().toLowerCase();
+      const mood = moodSel.value;
+      const type = typeSel.value;
+      const from = fromDate.value;
+      const to   = toDate.value;
+      const tagId = tagSel.value;
 
-    return el('div', { class: 'advanced-search-panel' }, [
-      el('div', { class: 'adv-search-row' }, [
-        el('label', { class: 'adv-search-label', text: 'Mood' }),
-        moodSel
-      ]),
-      el('div', { class: 'adv-search-row' }, [
-        el('label', { class: 'adv-search-label', text: 'From' }),
-        fromDate,
-        el('label', { class: 'adv-search-label', text: 'To' }),
-        toDate
-      ]),
-      el('div', { class: 'adv-search-row' }, [
-        el('label', { class: 'adv-search-label', text: 'Tag' }),
-        tagSel
-      ]),
-      el('div', { class: 'adv-search-row' }, [applyBtn, clearBtn])
-    ]);
-  }
+      let results = (state.vault?.entries || []).map(normalizeEntry);
+      if (q)    results = results.filter((e) => ((e.title || '') + ' ' + (e.body || '')).toLowerCase().includes(q));
+      if (mood) results = results.filter((e) => e.mood === mood);
+      if (type) results = results.filter((e) => e.entryType === type);
+      if (from) results = results.filter((e) => e.date >= from);
+      if (to)   results = results.filter((e) => e.date <= to);
 
-  // ── Calendar View ────────────────────────────────────────────────────────────
-  function renderCalendarView() {
-    if (!state.showCalendar) return el('div');
-    const now = state.calendarMonth ? new Date(state.calendarMonth + '-01') : new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const firstDay = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const monthLabel = now.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+      results = results.sort((a, b) => ((b.date || '') + (b.time || '')).localeCompare((a.date || '') + (a.time || '')));
+      countEl.textContent = `${results.length} result${results.length === 1 ? '' : 's'}`;
 
-    const entryMap = {};
-    for (const entry of (state.vault?.entries || [])) {
-      const d = entry.date;
-      if (d) {
-        if (!entryMap[d]) entryMap[d] = [];
-        entryMap[d].push(entry);
-      }
-    }
-
-    const cells = [];
-    for (let i = 0; i < firstDay; i++) cells.push(el('div', { class: 'cal-cell empty' }));
-    for (let d = 1; d <= daysInMonth; d++) {
-      const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const dayEntries = entryMap[iso] || [];
-      const dot = dayEntries.length > 0 ? el('span', { class: 'cal-dot' }) : null;
-      const preview = dayEntries[0]
-        ? el('div', { class: 'cal-preview', text: (dayEntries[0].title || dayEntries[0].body || '').slice(0, 22) })
-        : null;
-      const cell = el('div', {
-        class: `cal-cell ${dayEntries.length ? 'has-entries' : ''} ${iso === isoDate() ? 'today' : ''}`,
-        onclick: () => {
-          if (dayEntries.length) {
-            state.selectedId = dayEntries[0].id;
-            state.showCalendar = false;
+      resultsEl.replaceChildren(...results.slice(0, 100).map((e) => {
+        const words = (e.body || '').split(/\s+/).filter(Boolean).length;
+        return el('div', {
+          class: 'search-result-item',
+          onclick: () => {
+            state.selectedId = e.id;
+            state.searchFilters = { mood, fromDate: from, toDate: to, tagId };
+            overlay.remove();
             render(false);
           }
-        }
-      }, [
-        el('span', { class: 'cal-day-num', text: String(d) }),
-        ...(dot ? [dot] : []),
-        ...(preview ? [preview] : [])
-      ]);
-      cells.push(cell);
-    }
+        }, [
+          el('div', { class: 'sr-title', text: e.title || 'Untitled' }),
+          el('div', { class: 'sr-meta' }, [
+            el('span', { text: e.date || '' }),
+            el('span', { text: ` · ${moodLabel(e.mood)}` }),
+            el('span', { text: ` · ${words}w` })
+          ]),
+          el('div', { class: 'sr-preview', text: summarizeBody(e.body) })
+        ]);
+      }));
+    };
 
-    const prevMonth = new Date(year, month - 1, 1);
-    const nextMonth = new Date(year, month + 1, 1);
-    const fmtMon = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    queryIn.addEventListener('input', doSearch);
+    moodSel.addEventListener('change', doSearch);
+    typeSel.addEventListener('change', doSearch);
+    fromDate.addEventListener('change', doSearch);
+    toDate.addEventListener('change', doSearch);
+    tagSel.addEventListener('change', doSearch);
 
-    return el('div', { class: 'calendar-view' }, [
-      el('div', { class: 'cal-header' }, [
-        el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => { state.calendarMonth = fmtMon(prevMonth); render(false); } }, [el('span', { text: '←' })]),
-        el('span', { class: 'cal-month-label', text: monthLabel }),
-        el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => { state.calendarMonth = fmtMon(nextMonth); render(false); } }, [el('span', { text: '→' })])
+    const clearBtn = el('button', {
+      class: 'btn ghost small-btn', type: 'button',
+      onclick: () => { queryIn.value = ''; moodSel.value = ''; typeSel.value = ''; fromDate.value = ''; toDate.value = ''; tagSel.value = ''; state.searchFilters = {}; doSearch(); }
+    }, [el('span', { text: 'Clear all' })]);
+
+    const modal = el('div', { class: 'overlay-modal overlay-wide' }, [
+      el('div', { class: 'overlay-title', text: '🔍 Advanced Search' }),
+      el('div', { class: 'adv-search-form' }, [
+        queryIn,
+        el('div', { class: 'adv-search-filters' }, [
+          el('div', { class: 'adv-filter-group' }, [el('label', { class: 'adv-search-label', text: 'Mood' }), moodSel]),
+          el('div', { class: 'adv-filter-group' }, [el('label', { class: 'adv-search-label', text: 'Type' }), typeSel]),
+          el('div', { class: 'adv-filter-group' }, [el('label', { class: 'adv-search-label', text: 'Tag' }), tagSel]),
+          el('div', { class: 'adv-filter-group' }, [el('label', { class: 'adv-search-label', text: 'From' }), fromDate]),
+          el('div', { class: 'adv-filter-group' }, [el('label', { class: 'adv-search-label', text: 'To' }), toDate]),
+          clearBtn
+        ]),
+        countEl
       ]),
-      el('div', { class: 'cal-weekdays' }, ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => el('div', { class: 'cal-wday', text: d }))),
-      el('div', { class: 'cal-grid' }, cells),
-      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => { state.showCalendar = false; render(false); } }, [el('span', { text: 'Close calendar' })])
+      resultsEl,
+      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Close' })])
     ]);
+    overlay.append(modal);
+    document.body.append(overlay);
+    doSearch();
+    setTimeout(() => queryIn.focus(), 50);
+    return overlay;
+  }
+
+  // ── Calendar Overlay ─────────────────────────────────────────────────────────
+  function renderCalendarOverlay() {
+    const overlay = el('div', { class: 'overlay-backdrop' });
+    const fmtMon = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    let currentMonth = state.calendarMonth || fmtMon(new Date());
+
+    const dayDetailEl = el('div', { class: 'cal-day-detail' });
+
+    const showDayDetail = (iso, dayEntries) => {
+      dayDetailEl.replaceChildren(
+        el('div', { class: 'cal-detail-title', text: formatPrettyDate(iso) }),
+        dayEntries.length === 0
+          ? el('div', { class: 'tiny', text: 'No entries on this day.' })
+          : el('div', { class: 'cal-day-entry-list' }, dayEntries.map((e) =>
+              el('div', {
+                class: 'cal-day-entry-item',
+                onclick: () => {
+                  state.selectedId = e.id;
+                  state.calendarMonth = currentMonth;
+                  overlay.remove();
+                  render(false);
+                }
+              }, [
+                el('div', { class: 'cal-day-entry-title', text: e.title || 'Untitled' }),
+                el('div', { class: 'cal-day-entry-preview', text: summarizeBody(e.body) }),
+                el('div', { class: 'cal-day-entry-meta', text: `${moodLabel(e.mood || '')} · ${(e.body || '').split(/\s+/).filter(Boolean).length}w` })
+              ])
+            ))
+      );
+    };
+
+    const buildCalendar = () => {
+      const now = new Date(currentMonth + '-01');
+      const year = now.getFullYear();
+      const month = now.getMonth();
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const monthLabel = now.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+
+      const entryMap = {};
+      for (const entry of (state.vault?.entries || [])) {
+        const d = entry.date;
+        if (d) {
+          if (!entryMap[d]) entryMap[d] = [];
+          entryMap[d].push(entry);
+        }
+      }
+
+      const cells = [];
+      for (let i = 0; i < firstDay; i++) cells.push(el('div', { class: 'cal-cell empty' }));
+      for (let d = 1; d <= daysInMonth; d++) {
+        const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const dayEntries = entryMap[iso] || [];
+        const count = dayEntries.length;
+        const isToday = iso === isoDate();
+
+        const cell = el('div', {
+          class: `cal-cell ${count ? 'has-entries' : ''} ${isToday ? 'today' : ''}`,
+          onclick: () => {
+            // Highlight selected
+            calGrid.querySelectorAll('.cal-cell').forEach((c) => c.classList.remove('selected'));
+            cell.classList.add('selected');
+            showDayDetail(iso, dayEntries);
+          }
+        }, [
+          el('span', { class: 'cal-day-num', text: String(d) }),
+          ...(count ? [el('span', { class: 'cal-entry-badge', text: String(count) })] : [])
+        ]);
+        cells.push(cell);
+      }
+
+      const prevMonthDate = new Date(year, month - 1, 1);
+      const nextMonthDate = new Date(year, month + 1, 1);
+
+      header.replaceChildren(
+        el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => { currentMonth = fmtMon(prevMonthDate); buildCalendar(); } }, [el('span', { text: '←' })]),
+        el('span', { class: 'cal-month-label', text: monthLabel }),
+        el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => { currentMonth = fmtMon(new Date()); buildCalendar(); } }, [el('span', { text: 'Today' })]),
+        el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => { currentMonth = fmtMon(nextMonthDate); buildCalendar(); } }, [el('span', { text: '→' })])
+      );
+      calGrid.replaceChildren(...cells);
+      dayDetailEl.replaceChildren();
+    };
+
+    const header = el('div', { class: 'cal-header' });
+    const calGrid = el('div', { class: 'cal-grid' });
+
+    const modal = el('div', { class: 'overlay-modal overlay-wide overlay-calendar' }, [
+      el('div', { class: 'overlay-title', text: '📅 Calendar View' }),
+      header,
+      el('div', { class: 'cal-weekdays' }, ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => el('div', { class: 'cal-wday', text: d }))),
+      calGrid,
+      dayDetailEl,
+      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => { state.calendarMonth = currentMonth; overlay.remove(); } }, [el('span', { text: 'Close' })])
+    ]);
+
+    overlay.append(modal);
+    document.body.append(overlay);
+    buildCalendar();
+    return overlay;
   }
 
   // ── Entry Templates ──────────────────────────────────────────────────────────
   const ENTRY_TEMPLATES = [
-    { id: 'daily', label: 'Daily Journal', body: '## Morning thoughts\n\n\n## What happened today\n\n\n## Grateful for\n\n\n## Tomorrow I want to\n\n' },
-    { id: 'gratitude', label: 'Gratitude', body: '## Three things I\'m grateful for\n1. \n2. \n3. \n\n## Why I\'m grateful\n\n' },
-    { id: 'travel', label: 'Travel Log', body: '## Where I am\n\n## What I saw\n\n## Food I tried\n\n## Moments to remember\n\n' },
-    { id: 'dream', label: 'Dream Log', body: '## The dream\n\n## How it felt\n\n## Symbols or themes\n\n' },
-    { id: 'weekly', label: 'Weekly Review', body: '## Wins this week\n\n## Challenges\n\n## Lessons learned\n\n## Next week goals\n\n' },
-    { id: 'mood', label: 'Mood Check-in', body: '## Current mood\n\n## Why I feel this way\n\n## What I need\n\n## One thing I can do\n\n' }
+    { id: 'daily',     icon: '📓', label: 'Daily Journal',   body: '## Morning thoughts\n\n\n## What happened today\n\n\n## Grateful for\n\n\n## Tomorrow I want to\n\n' },
+    { id: 'gratitude', icon: '🙏', label: 'Gratitude',       body: '## Three things I\'m grateful for\n1. \n2. \n3. \n\n## Why I\'m grateful\n\n## One person I appreciate today\n\n' },
+    { id: 'travel',    icon: '✈️', label: 'Travel Log',      body: '## Where I am\n\n## How I got here\n\n## What I saw\n\n## Food I tried\n\n## Moments to remember\n\n' },
+    { id: 'dream',     icon: '🌙', label: 'Dream Log',       body: '## The dream\n\n## How it felt\n\n## People / places involved\n\n## Symbols or themes\n\n## What it might mean\n\n' },
+    { id: 'weekly',    icon: '📆', label: 'Weekly Review',   body: '## Wins this week\n\n## Challenges\n\n## Lessons learned\n\n## Habits score\n\n## Next week goals\n\n' },
+    { id: 'mood',      icon: '💭', label: 'Mood Check-in',   body: '## Current mood\n\n## Why I feel this way\n\n## Physical sensations\n\n## What I need right now\n\n## One thing I can do\n\n' },
+    { id: 'morning',   icon: '☀️', label: 'Morning Pages',   body: '## Stream of consciousness\n\n\n\n\n## Intention for today\n\n## One thing I\'m looking forward to\n\n' },
+    { id: 'evening',   icon: '🌆', label: 'Evening Reflect', body: '## How today went\n\n## Best moment\n\n## What drained me\n\n## What I\'d do differently\n\n## Tomorrow\'s priority\n\n' },
+    { id: 'anxiety',   icon: '🌊', label: 'Anxiety Release', body: '## What\'s worrying me\n\n## Is this within my control?\n\n## Worst case / best case\n\n## What I can do right now\n\n## A calming reminder\n\n' },
+    { id: 'letter',    icon: '✉️', label: 'Letter to Self',  body: '## Dear future me,\n\n\n\n\n## What I want you to remember\n\n## What I hope has changed\n\n## With love,\n\n' },
+    { id: 'creative',  icon: '✍️', label: 'Creative Writing', body: '## Scene / setting\n\n## Character\n\n## Conflict\n\n## The story\n\n\n\n' },
+    { id: 'health',    icon: '🏃', label: 'Health & Fitness', body: '## Today\'s exercise\n\n## Meals\n\n## Water intake\n\n## Sleep last night\n\n## How my body feels\n\n## Goals\n\n' }
   ];
 
   function renderTemplateOverlay() {
     const overlay = el('div', { class: 'overlay-backdrop' });
     const closeOverlay = () => overlay.remove();
 
+    const applyToEntry = (tmpl) => {
+      const entry = getSelectedEntry();
+      if (entry) {
+        if (entry.body && entry.body.trim() && !confirm('Replace the current content with this template?')) return;
+        updateSelected({ body: tmpl.body, title: entry.title || tmpl.label });
+        showToast(`Template "${tmpl.label}" applied`);
+      } else {
+        showToast('Open or create an entry first');
+      }
+      closeOverlay();
+    };
+
+    const createWithTemplate = (tmpl) => {
+      const newId = `entry-${Date.now()}`;
+      const entry = normalizeEntry({ id: newId, date: isoDate(), title: tmpl.label, body: tmpl.body, moduleType: 'diary' });
+      if (!state.vault) return;
+      state.vault.entries = [entry, ...(state.vault.entries || [])];
+      state.selectedId = newId;
+      persistVault();
+      showToast(`New entry from "${tmpl.label}" template`);
+      closeOverlay();
+      render(false);
+    };
+
     const cards = ENTRY_TEMPLATES.map((tmpl) =>
-      el('div', {
-        class: 'template-card',
-        onclick: () => {
-          const entry = getSelectedEntry();
-          if (entry) {
-            if (entry.body && entry.body.trim() && !confirm('Replace the current content with this template?')) return;
-            updateSelected({ body: tmpl.body });
-          }
-          closeOverlay();
-        }
-      }, [
+      el('div', { class: 'template-card' }, [
+        el('div', { class: 'template-icon', text: tmpl.icon }),
         el('div', { class: 'template-name', text: tmpl.label }),
-        el('div', { class: 'template-preview', text: tmpl.body.replace(/^#+\s*/gm, '').slice(0, 80) })
+        el('div', { class: 'template-preview', text: tmpl.body.replace(/^#+\s*/gm, '').slice(0, 70) }),
+        el('div', { class: 'template-actions' }, [
+          el('button', { class: 'btn small-btn', type: 'button', onclick: (e) => { e.stopPropagation(); createWithTemplate(tmpl); } }, [el('span', { text: '+ New entry' })]),
+          el('button', { class: 'btn ghost small-btn', type: 'button', onclick: (e) => { e.stopPropagation(); applyToEntry(tmpl); } }, [el('span', { text: 'Apply to current' })])
+        ])
       ])
     );
 
-    const modal = el('div', { class: 'overlay-modal' }, [
-      el('div', { class: 'overlay-title', text: 'Choose a template' }),
+    const modal = el('div', { class: 'overlay-modal overlay-wide' }, [
+      el('div', { class: 'overlay-title', text: '📋 Entry Templates' }),
       el('div', { class: 'template-grid' }, cards),
       el('button', { class: 'btn ghost small-btn', type: 'button', onclick: closeOverlay }, [el('span', { text: 'Cancel' })])
     ]);
@@ -5967,22 +6076,63 @@ export function createApp(mount) {
 
     const bars = months.map(([mon, count]) =>
       el('div', { class: 'stat-bar-col' }, [
-        el('div', { class: 'stat-bar', style: `height:${Math.round((count / maxVal) * 80)}px` }),
-        el('div', { class: 'stat-bar-label', text: mon.slice(5) })
+        el('div', { class: 'stat-bar', style: `height:${Math.round((count / maxVal) * 80)}px`, title: `${mon}: ${count} entries` }),
+        el('div', { class: 'stat-bar-label', text: mon.slice(5) }),
+        el('div', { class: 'stat-bar-count', text: String(count) })
       ])
     );
 
-    const modal = el('div', { class: 'overlay-modal' }, [
-      el('div', { class: 'overlay-title', text: 'Writing Statistics' }),
+    // Mood breakdown
+    const entries = state.vault?.entries || [];
+    const moodBreakdown = {};
+    for (const e of entries) { if (e.mood) moodBreakdown[e.mood] = (moodBreakdown[e.mood] || 0) + 1; }
+    const topMoods = Object.entries(moodBreakdown).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    const moodMax = Math.max(1, topMoods[0]?.[1] || 1);
+
+    // Entry type breakdown
+    const typeCounts = {};
+    for (const e of entries) { const t = e.entryType || 'journal'; typeCounts[t] = (typeCounts[t] || 0) + 1; }
+    const typeRows = Object.entries(typeCounts).sort((a, b) => b[1] - a[1]);
+
+    // Longest entry
+    const longest = entries.reduce((best, e) => {
+      const w = (e.body || '').split(/\s+/).filter(Boolean).length;
+      return w > (best.words || 0) ? { title: e.title || 'Untitled', date: e.date, words: w } : best;
+    }, {});
+
+    const modal = el('div', { class: 'overlay-modal overlay-wide' }, [
+      el('div', { class: 'overlay-title', text: '📊 Writing Statistics' }),
       el('div', { class: 'stats-grid' }, [
         el('div', { class: 'stat-card' }, [el('div', { class: 'stat-val', text: String(stats.total) }), el('div', { class: 'stat-label', text: 'Total entries' })]),
-        el('div', { class: 'stat-card' }, [el('div', { class: 'stat-val', text: String(stats.totalWords) }), el('div', { class: 'stat-label', text: 'Total words' })]),
+        el('div', { class: 'stat-card' }, [el('div', { class: 'stat-val', text: stats.totalWords.toLocaleString() }), el('div', { class: 'stat-label', text: 'Total words' })]),
         el('div', { class: 'stat-card' }, [el('div', { class: 'stat-val', text: String(stats.avgWords) }), el('div', { class: 'stat-label', text: 'Avg words/entry' })]),
-        el('div', { class: 'stat-card' }, [el('div', { class: 'stat-val', text: String(stats.streak) }), el('div', { class: 'stat-label', text: 'Current streak (days)' })]),
-        el('div', { class: 'stat-card' }, [el('div', { class: 'stat-val', text: String(stats.maxStreak) }), el('div', { class: 'stat-label', text: 'Longest streak (days)' })])
+        el('div', { class: 'stat-card' }, [el('div', { class: 'stat-val', text: `${stats.streak}🔥` }), el('div', { class: 'stat-label', text: 'Current streak' })]),
+        el('div', { class: 'stat-card' }, [el('div', { class: 'stat-val', text: String(stats.maxStreak) }), el('div', { class: 'stat-label', text: 'Best streak (days)' })]),
+        el('div', { class: 'stat-card' }, [el('div', { class: 'stat-val', text: longest.words ? `${longest.words}w` : '—' }), el('div', { class: 'stat-label', text: longest.title ? `Longest: "${longest.title.slice(0,20)}"` : 'Longest entry' })])
       ]),
-      el('div', { class: 'stat-chart', title: 'Entries per month (last 12 months)' }, bars),
-      el('div', { class: 'stat-chart-label', text: 'Entries per month' }),
+      el('div', { class: 'stats-section-label', text: 'Entries per month' }),
+      el('div', { class: 'stat-chart' }, bars),
+      el('div', { class: 'stats-section-label', text: 'Activity heatmap (past year)' }),
+      renderActivityHeatmap(),
+      el('div', { class: 'stats-section-label', text: 'Mood over recent entries' }),
+      renderMoodChart(),
+      el('div', { class: 'stats-section-label', text: 'Mood breakdown' }),
+      el('div', { class: 'mood-breakdown-list' }, topMoods.map(([mood, count]) =>
+        el('div', { class: 'mood-breakdown-row' }, [
+          el('span', { class: 'mood-breakdown-label', text: moodLabel(mood) }),
+          el('div', { class: 'mood-breakdown-bar-track' }, [
+            el('div', { class: 'mood-breakdown-bar', style: `width:${Math.round((count / moodMax) * 100)}%` })
+          ]),
+          el('span', { class: 'mood-breakdown-count', text: String(count) })
+        ])
+      )),
+      el('div', { class: 'stats-section-label', text: 'Entry types' }),
+      el('div', { class: 'type-breakdown-list' }, typeRows.map(([type, count]) =>
+        el('div', { class: 'mood-breakdown-row' }, [
+          el('span', { class: 'mood-breakdown-label', text: entryTypeLabel(type) }),
+          el('span', { class: 'mood-breakdown-count', text: String(count) })
+        ])
+      )),
       el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Close' })])
     ]);
     overlay.append(modal);
@@ -6120,23 +6270,48 @@ export function createApp(mount) {
     showToast('Print dialog opened — save as PDF');
   }
 
+  function exportToCsv() {
+    const entries = sortEntriesDesc(state.vault?.entries || []);
+    const header = 'Date,Title,Mood,Words,Type,Tags';
+    const rows = entries.map((e) => [
+      e.date || '',
+      `"${(e.title || '').replace(/"/g, '\'\'')}"`  ,
+      moodLabel(e.mood || ''),
+      (e.body || '').split(/\s+/).filter(Boolean).length,
+      e.entryType || 'journal',
+      `"${(e.tags || []).join(', ')}"`
+    ].join(','));
+    const blob = new Blob([[header, ...rows].join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `mydiary-export-${isoDate()}.csv`; a.click();
+    URL.revokeObjectURL(url);
+    showToast('Exported as CSV');
+  }
+
   function renderExportOverlay() {
     const overlay = el('div', { class: 'overlay-backdrop' });
+    const total = (state.vault?.entries || []).length;
+    const totalWords = (state.vault?.entries || []).reduce((s, e) => s + (e.body || '').split(/\s+/).filter(Boolean).length, 0);
+
+    const exportOption = (icon, title, desc, action) =>
+      el('div', { class: 'export-option-card' }, [
+        el('div', { class: 'export-option-icon', text: icon }),
+        el('div', { class: 'export-option-info' }, [
+          el('div', { class: 'export-option-title', text: title }),
+          el('div', { class: 'export-option-desc', text: desc })
+        ]),
+        el('button', { class: 'btn small-btn', type: 'button', onclick: () => { action(); overlay.remove(); } }, [el('span', { text: 'Export' })])
+      ]);
+
     const modal = el('div', { class: 'overlay-modal' }, [
-      el('div', { class: 'overlay-title', text: 'Export your diary' }),
-      el('div', { class: 'export-options' }, [
-        el('button', { class: 'btn ghost', type: 'button', onclick: () => { exportToJson(); overlay.remove(); } }, [
-          el('span', { class: 'btn-ic', text: '{}' }),
-          el('span', { text: 'Export as JSON' })
-        ]),
-        el('button', { class: 'btn ghost', type: 'button', onclick: () => { exportToMarkdown(); overlay.remove(); } }, [
-          el('span', { class: 'btn-ic', text: 'MD' }),
-          el('span', { text: 'Export as Markdown' })
-        ]),
-        el('button', { class: 'btn ghost', type: 'button', onclick: () => { exportToPdf(); overlay.remove(); } }, [
-          el('span', { class: 'btn-ic', text: '📄' }),
-          el('span', { text: 'Export / Print as PDF' })
-        ])
+      el('div', { class: 'overlay-title', text: '⬇️ Export Diary' }),
+      el('div', { class: 'export-summary', text: `${total} entries · ${totalWords.toLocaleString()} words` }),
+      el('div', { class: 'export-options-list' }, [
+        exportOption('{}', 'JSON', 'Full data with all fields. Best for backups or re-importing.', exportToJson),
+        exportOption('MD', 'Markdown', 'Readable text format. Opens in any text editor or Notion.', exportToMarkdown),
+        exportOption('📄', 'PDF / Print', 'Opens a print dialog — choose Save as PDF.', exportToPdf),
+        exportOption('📊', 'CSV', 'Spreadsheet format. Date, title, mood, word count per row.', exportToCsv)
       ]),
       el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Cancel' })])
     ]);
