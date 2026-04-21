@@ -314,6 +314,14 @@ export async function deleteAccount(token) {
   });
 }
 
+export async function updateProfile(token, payload) {
+  return request('/api/auth/profile', {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+}
+
 export async function getAuditLogs(token, limit = 50) {
   return request(`/api/audit-logs?limit=${limit}`, {
     method: 'GET',

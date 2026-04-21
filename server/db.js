@@ -743,6 +743,53 @@ export async function adminUpdateUserProfile({
   return findUserById(id);
 }
 
+export async function selfUpdateUserProfile({
+  id,
+  firstName,
+  middleName,
+  lastName,
+  addressLine,
+  city,
+  stateRegion,
+  postalCode,
+  countryCode,
+  username
+}) {
+  ensurePool();
+  const existing = await findUserById(id);
+  if (!existing) return null;
+
+  // Username is locked once set — ignore incoming username if already exists
+  const finalUsername = existing.username ? existing.username : (username || null);
+
+  await pool.query(
+    `UPDATE users
+       SET first_name = ?,
+           middle_name = ?,
+           last_name = ?,
+           address_line = ?,
+           city = ?,
+           state_region = ?,
+           postal_code = ?,
+           country_code = ?,
+           username = ?
+       WHERE id = ?`,
+    [
+      firstName || null,
+      middleName || null,
+      lastName || null,
+      addressLine || null,
+      city || null,
+      stateRegion || null,
+      postalCode || null,
+      countryCode || null,
+      finalUsername,
+      id
+    ]
+  );
+  return findUserById(id);
+}
+
 export async function setUserAdminFlag(userId, isAdmin) {
   ensurePool();
   await pool.query('UPDATE users SET is_admin = ? WHERE id = ?', [isAdmin ? 1 : 0, userId]);

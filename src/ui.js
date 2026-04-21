@@ -58,7 +58,8 @@ import {
   get2faStatus,
   setup2fa,
   saveRecoveryCodes,
-  getRecoveryStatus
+  getRecoveryStatus,
+  updateProfile
 } from './api.js';
 
 function el(tag, attrs = {}, children = []) {
@@ -3044,45 +3045,118 @@ export function createApp(mount) {
       }
     }
 
-    const nameRow = el('div', { class: 'account-row' }, [
-      el('div', { class: 'account-label', text: 'Name' }),
-      el('div', { class: 'account-value', text: displayName })
-    ]);
+    // ── Editable profile form ──────────────────────────────────────────────
+    const profileStatus = el('div', { class: 'lock-status', text: '' });
 
-    const emailRow = el('div', { class: 'account-row' }, [
+    const mkInput = (placeholder, value, opts = {}) => el('input', {
+      class: 'lock-input profile-field',
+      type: opts.type || 'text',
+      placeholder,
+      value: value || '',
+      ...(opts.readonly ? { readonly: 'readonly' } : {})
+    });
+
+    const firstNameIn  = mkInput('First name',         user.firstName);
+    const middleNameIn = mkInput('Middle name (optional)', user.middleName);
+    const lastNameIn   = mkInput('Last name',           user.lastName);
+
+    // Username: editable only if not yet set
+    const usernameIn = mkInput(
+      user.username ? user.username : 'Choose a username (permanent once set)',
+      user.username || '',
+      user.username ? { readonly: true } : {}
+    );
+    const usernameHint = user.username
+      ? el('div', { class: 'profile-hint', text: '🔒 Username is permanent and cannot be changed.' })
+      : el('div', { class: 'profile-hint', text: '⚠️ Choose carefully — username cannot be changed once set.' });
+
+    const emailDisplay = el('div', { class: 'account-row' }, [
       el('div', { class: 'account-label', text: 'Email' }),
       el('div', { class: 'account-value', text: user.email })
     ]);
 
-    let usernameRow;
-    if (user.username) {
-      usernameRow = el('div', { class: 'account-row' }, [
-        el('div', { class: 'account-label', text: 'Username' }),
-        el('div', { class: 'account-value', text: user.username })
-      ]);
-    } else {
-      const setBtn = el('button', {
-        class: 'btn ghost small-btn',
-        type: 'button',
-        onclick: () => {
-          const overlay = renderUsernameOverlay();
-          root.append(overlay);
-        }
-      }, [
-        el('span', { class: 'btn-ic', text: '✧' }),
-        el('span', { text: 'Set username' })
-      ]);
-      usernameRow = el('div', { class: 'account-row' }, [
-        el('div', { class: 'account-label', text: 'Username' }),
-        el('div', { class: 'account-value', text: 'Not set yet' }),
-        setBtn
-      ]);
-    }
+    const addressLine1In = mkInput('Street address (line 1)', user.addressLine);
+    const cityIn         = mkInput('City',                    user.city);
+    const stateIn        = mkInput('State / Region',          user.stateRegion);
+    const postalIn       = mkInput('ZIP / Postal code',       user.postalCode);
 
-    const locationBits = [user.city, user.stateRegion, user.countryCode].filter(Boolean).join(', ');
-    const locationRow = el('div', { class: 'account-row' }, [
-      el('div', { class: 'account-label', text: 'Location' }),
-      el('div', { class: 'account-value', text: locationBits || '—' })
+    const COUNTRY_OPTIONS = [
+      ['', 'Select country'],
+      ['US', 'United States'], ['CA', 'Canada'], ['GB', 'United Kingdom'],
+      ['AU', 'Australia'], ['NZ', 'New Zealand'], ['IE', 'Ireland'],
+      ['DE', 'Germany'], ['FR', 'France'], ['BR', 'Brazil'],
+      ['IN', 'India'], ['ZA', 'South Africa'], ['MX', 'Mexico'],
+      ['JP', 'Japan'], ['KR', 'South Korea'], ['CN', 'China'],
+      ['SG', 'Singapore'], ['PH', 'Philippines'], ['NG', 'Nigeria'],
+      ['GH', 'Ghana'], ['KE', 'Kenya'], ['AR', 'Argentina'],
+      ['CL', 'Chile'], ['CO', 'Colombia'], ['IT', 'Italy'],
+      ['ES', 'Spain'], ['PT', 'Portugal'], ['NL', 'Netherlands'],
+      ['SE', 'Sweden'], ['NO', 'Norway'], ['DK', 'Denmark'],
+      ['FI', 'Finland'], ['PL', 'Poland'], ['RU', 'Russia'],
+      ['UA', 'Ukraine'], ['TR', 'Turkey'], ['EG', 'Egypt'],
+      ['OTHER', 'Other']
+    ];
+    const countrySelect = el('select', { class: 'lock-input profile-field' },
+      COUNTRY_OPTIONS.map(([val, label]) => el('option', { value: val, text: label }))
+    );
+    countrySelect.value = user.countryCode || '';
+
+    const saveProfileBtn = el('button', {
+      class: 'btn small-btn',
+      type: 'button',
+      onclick: async () => {
+        profileStatus.textContent = 'Saving…';
+        saveProfileBtn.disabled = true;
+        try {
+          const payload = {
+            firstName:   firstNameIn.value.trim(),
+            middleName:  middleNameIn.value.trim() || null,
+            lastName:    lastNameIn.value.trim(),
+            addressLine: addressLine1In.value.trim(),
+            city:        cityIn.value.trim(),
+            stateRegion: stateIn.value.trim(),
+            postalCode:  postalIn.value.trim(),
+            countryCode: countrySelect.value || null
+          };
+          if (!user.username) {
+            payload.username = usernameIn.value.trim();
+          }
+          const result = await updateProfile(state.auth.token, payload);
+          state.auth.user = result.user;
+          saveAuthSession({ ...state.auth });
+          profileStatus.textContent = '✓ Profile saved';
+          showToast('Profile updated');
+          render(false);
+        } catch (err) {
+          profileStatus.textContent = err?.message || 'Failed to save';
+        } finally {
+          saveProfileBtn.disabled = false;
+        }
+      }
+    }, [
+      el('span', { class: 'btn-ic', text: '✓' }),
+      el('span', { text: 'Save profile' })
+    ]);
+
+    const profileSection = el('div', { class: 'account-section' }, [
+      el('div', { class: 'account-section-title', text: 'Profile information' }),
+      el('div', { class: 'profile-grid' }, [
+        el('label', { class: 'profile-label', text: 'First name' }), firstNameIn,
+        el('label', { class: 'profile-label', text: 'Middle name' }), middleNameIn,
+        el('label', { class: 'profile-label', text: 'Last name' }), lastNameIn,
+        el('label', { class: 'profile-label', text: 'Username' }), usernameIn,
+      ]),
+      usernameHint,
+      emailDisplay,
+      el('div', { class: 'account-section-title', style: 'margin-top:14px', text: 'Address' }),
+      el('div', { class: 'profile-grid' }, [
+        el('label', { class: 'profile-label', text: 'Street address' }), addressLine1In,
+        el('label', { class: 'profile-label', text: 'City' }), cityIn,
+        el('label', { class: 'profile-label', text: 'State / Region' }), stateIn,
+        el('label', { class: 'profile-label', text: 'ZIP / Postal' }), postalIn,
+        el('label', { class: 'profile-label', text: 'Country' }), countrySelect,
+      ]),
+      el('div', { class: 'profile-save-row' }, [saveProfileBtn, profileStatus])
     ]);
 
     const keyLabel = el('div', { class: 'account-label', text: 'Diary encryption key' });
@@ -3192,10 +3266,7 @@ export function createApp(mount) {
 
     const card = el('div', { class: 'account-card' }, [
       el('div', { class: 'lock-title', text: 'Your account & security' }),
-      nameRow,
-      emailRow,
-      usernameRow,
-      locationRow,
+      profileSection,
       passwordRow,
       keyLabel,
       keyHelper,

@@ -45,7 +45,8 @@ import {
   setUserTotp,
   getUserTotp,
   setUserRecoveryCodes,
-  getUserRecoveryCodes
+  getUserRecoveryCodes,
+  selfUpdateUserProfile
 } from './db.js';
 import { requireAuth, signAuthToken } from './auth.js';
 import { log, logError, requestLogger } from './logger.js';
@@ -1022,6 +1023,68 @@ app.get('/api/tags/:id/entries', requireAuth, async (req, res) => {
   } catch (error) {
     logError('tag_entries_list_failed', error, { requestId: req.requestId, userId: req.user?.id });
     res.status(500).json({ error: 'Failed to load entries for tag' });
+  }
+});
+
+// ── Self-service profile update ──────────────────────────────────────────────
+app.patch('/api/auth/profile', requireAuth, async (req, res) => {
+  try {
+    const user = await findUserById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    const body = req.body || {};
+
+    // Username: only settable once — send back error if they try to change an existing one
+    if (body.username && user.username && body.username !== user.username) {
+      return res.status(400).json({ error: 'Username cannot be changed once set' });
+    }
+
+    // Validate username uniqueness if setting for the first time
+    if (body.username && !user.username) {
+      const trimmed = String(body.username).trim();
+      if (trimmed.length < 3) return res.status(400).json({ error: 'Username must be at least 3 characters' });
+      const taken = await findUserByUsername(trimmed);
+      if (taken && taken.id !== user.id) return res.status(409).json({ error: 'That username is already taken' });
+    }
+
+    const updated = await selfUpdateUserProfile({
+      id: req.user.id,
+      firstName: body.firstName !== undefined ? String(body.firstName || '').trim() : user.first_name,
+      middleName: body.middleName !== undefined ? String(body.middleName || '').trim() || null : user.middle_name,
+      lastName: body.lastName !== undefined ? String(body.lastName || '').trim() : user.last_name,
+      username: body.username !== undefined ? String(body.username || '').trim() || null : user.username,
+      addressLine: body.addressLine !== undefined ? String(body.addressLine || '').trim() : user.address_line,
+      city: body.city !== undefined ? String(body.city || '').trim() : user.city,
+      stateRegion: body.stateRegion !== undefined ? String(body.stateRegion || '').trim() : user.state_region,
+      postalCode: body.postalCode !== undefined ? String(body.postalCode || '').trim() : user.postal_code,
+      countryCode: body.countryCode !== undefined ? String(body.countryCode || '').trim().toUpperCase() : user.country_code
+    });
+
+    if (!updated) return res.status(500).json({ error: 'Update failed' });
+
+    await createAuditLog(req.user.id, 'profile_updated', null, req.ip);
+
+    res.json({
+      user: {
+        id: updated.id,
+        email: updated.email,
+        firstName: updated.first_name || null,
+        middleName: updated.middle_name || null,
+        lastName: updated.last_name || null,
+        username: updated.username || null,
+        addressLine: updated.address_line || null,
+        city: updated.city || null,
+        stateRegion: updated.state_region || null,
+        postalCode: updated.postal_code || null,
+        countryCode: updated.country_code || null,
+        tosAccepted: Boolean(updated.tos_accepted_at),
+        isAdmin: Boolean(updated.is_admin),
+        mustChangePassword: Boolean(updated.must_change_password)
+      }
+    });
+  } catch (err) {
+    logError('profile_update_failed', err, { requestId: req.requestId, userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to update profile' });
   }
 });
 
