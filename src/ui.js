@@ -3688,8 +3688,7 @@ export function createApp(mount) {
           el('span', { class: 'btn-ic', text: '♡' }),
           el('span', { text: 'Save all changes' })
         ]),
-        el('div', { class: 'tiny', text: footerSummary }),
-        el('div', { class: 'tiny', text: 'Encrypted locally with Argon2id + XChaCha20-Poly1305' })
+        el('div', { class: 'tiny', text: footerSummary })
       ])
     ]);
 
