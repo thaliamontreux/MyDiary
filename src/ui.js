@@ -16,7 +16,10 @@ import {
   saveUiPrefs,
   saveVaultMeta,
   safeMemzeroKey,
-  wipeAllData
+  wipeAllData,
+  loadAuthSession,
+  saveAuthSession,
+  clearAuthSession
 } from './storage.js';
 import {
   loadVaultFromServer,
@@ -40,385 +43,6 @@ function el(tag, attrs = {}, children = []) {
     else if (k === 'text') node.textContent = v;
     else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2), v);
     else node.setAttribute(k, v);
-  }
-
-  async function ensureAdminUsersLoaded() {
-    if (!state.auth.token) return;
-    if (state.adminUsersLoading) return;
-    state.adminUsersLoading = true;
-    try {
-      const { users } = await adminListUsers(state.auth.token, 200);
-      state.adminUsers = users || [];
-    } catch (e) {
-      showToast(e?.message || 'Failed to load users');
-    } finally {
-      state.adminUsersLoading = false;
-      render(false);
-    }
-  }
-
-  async function ensureSiteSummaryLoaded() {
-    if (!state.auth.token) return;
-    if (state.adminSiteSummaryLoading) return;
-    state.adminSiteSummaryLoading = true;
-    try {
-      state.adminSiteSummary = await adminGetSiteSummary(state.auth.token);
-    } catch (e) {
-      showToast(e?.message || 'Failed to load site summary');
-    } finally {
-      state.adminSiteSummaryLoading = false;
-      render(false);
-    }
-  }
-
-  function renderAdminPasswordOverlay() {
-    const user = state.auth.user;
-    if (!user || !user.isAdmin || !user.mustChangePassword) return null;
-
-    const wrap = el('div', { class: 'agreement-overlay' });
-    const heading = el('div', { class: 'agreement-title', text: 'Change your admin password' });
-    const body = el('div', {
-      class: 'agreement-body',
-      text: 'This admin account is using the default password. For your safety, please choose a strong new password before continuing.'
-    });
-
-    const currentInput = el('input', {
-      class: 'lock-input',
-      type: 'password',
-      placeholder: 'Current password (admin)'
-    });
-    const newInput = el('input', {
-      class: 'lock-input',
-      type: 'password',
-      placeholder: 'New password (min 10 characters)'
-    });
-    const confirmInput = el('input', {
-      class: 'lock-input',
-      type: 'password',
-      placeholder: 'Confirm new password'
-    });
-
-    const status = el('div', { class: 'lock-status', text: '' });
-
-    const submitBtn = el('button', {
-      class: 'btn',
-      onclick: async () => {
-        status.textContent = 'Updating password…';
-        try {
-          if (newInput.value.length < 10) throw new Error('Use at least 10 characters');
-          if (newInput.value !== confirmInput.value) throw new Error('New passwords do not match');
-          await changePassword(state.auth.token, currentInput.value, newInput.value);
-          state.auth.user = { ...(state.auth.user || {}), mustChangePassword: false };
-          showToast('Admin password updated');
-          render(false);
-        } catch (e) {
-          status.textContent = e?.message || 'Could not change password yet';
-        }
-      }
-    }, [
-      el('span', { class: 'btn-ic', text: '✓' }),
-      el('span', { text: 'Save new password' })
-    ]);
-
-    const card = el('div', { class: 'agreement-card' }, [
-      heading,
-      body,
-      currentInput,
-      newInput,
-      confirmInput,
-      submitBtn,
-      status
-    ]);
-
-    wrap.append(card);
-    return wrap;
-  }
-
-  function renderSignupOverlay(presetEmail = '', presetPassword = '') {
-    const backDrop = el('div', { class: 'signup-overlay' });
-
-    const firstName = el('input', { class: 'lock-input', placeholder: 'First name' });
-    const middleName = el('input', { class: 'lock-input', placeholder: 'Middle name (optional)' });
-    const lastName = el('input', { class: 'lock-input', placeholder: 'Last name' });
-    const username = el('input', { class: 'lock-input', placeholder: 'Username' });
-    const emailInput = el('input', { class: 'lock-input', type: 'email', placeholder: 'Email address', value: presetEmail });
-    const addressLine = el('input', { class: 'lock-input', placeholder: 'Street address' });
-    const city = el('input', { class: 'lock-input', placeholder: 'City' });
-    const stateRegion = el('input', { class: 'lock-input', placeholder: 'State / Region' });
-    const postalCode = el('input', { class: 'lock-input', placeholder: 'ZIP / Postal code' });
-
-    const country = el('select', { class: 'lock-input' }, [
-      el('option', { value: '', text: 'Select your country' }),
-      el('option', { value: 'US', text: 'United States' }),
-      el('option', { value: 'CA', text: 'Canada' }),
-      el('option', { value: 'GB', text: 'United Kingdom' }),
-      el('option', { value: 'AU', text: 'Australia' }),
-      el('option', { value: 'NZ', text: 'New Zealand' }),
-      el('option', { value: 'IE', text: 'Ireland' }),
-      el('option', { value: 'DE', text: 'Germany' }),
-      el('option', { value: 'FR', text: 'France' }),
-      el('option', { value: 'BR', text: 'Brazil' }),
-      el('option', { value: 'IN', text: 'India' }),
-      el('option', { value: 'ZA', text: 'South Africa' })
-    ]);
-
-    const pwd1 = el('input', { class: 'lock-input', type: 'password', placeholder: 'Create a password', value: presetPassword });
-    const pwd2 = el('input', { class: 'lock-input', type: 'password', placeholder: 'Confirm password' });
-
-    const status = el('div', { class: 'lock-status', text: '' });
-
-    const submitBtn = el('button', {
-      class: 'btn big',
-      onclick: async () => {
-        status.textContent = 'Creating your account…';
-        try {
-          if (pwd1.value.length < 10) throw new Error('Use at least 10 characters');
-          if (pwd1.value !== pwd2.value) throw new Error('Passwords do not match');
-
-          await unlockWithServer(emailInput.value, pwd1.value, 'register', {
-            firstName: firstName.value,
-            middleName: middleName.value,
-            lastName: lastName.value,
-            username: username.value,
-            addressLine: addressLine.value,
-            city: city.value,
-            stateRegion: stateRegion.value,
-            postalCode: postalCode.value,
-            countryCode: country.value
-          });
-
-          showToast('Welcome to your diary');
-          backDrop.remove();
-        } catch (e) {
-          status.textContent = e?.message || 'Failed to sign up';
-        }
-      }
-    }, [
-      el('span', { class: 'btn-ic', text: '♡' }),
-      el('span', { text: 'Create my account' })
-    ]);
-
-    const cancelBtn = el('button', {
-      class: 'btn ghost',
-      onclick: () => backDrop.remove()
-    }, [
-      el('span', { class: 'btn-ic', text: '✕' }),
-      el('span', { text: 'Cancel' })
-    ]);
-
-    const card = el('div', { class: 'signup-card' }, [
-      el('div', { class: 'lock-title', text: 'Sign up for your private diary' }),
-      firstName,
-      middleName,
-      lastName,
-      username,
-      emailInput,
-      addressLine,
-      city,
-      stateRegion,
-      postalCode,
-      country,
-      pwd1,
-      pwd2,
-      submitBtn,
-      cancelBtn,
-      status
-    ]);
-
-    backDrop.append(card);
-    return backDrop;
-  }
-
-  function renderUserManagerOverlay() {
-    if (!state.showUserManagerOverlay || !state.auth.user?.isAdmin) return null;
-    const rows = state.adminUsers || [];
-
-    const title = el('div', { class: 'lock-title', text: 'User Manager' });
-    const subtitle = el('div', { class: 'lock-subtle', text: 'See who has access and gently promote or remove admins.' });
-
-    const headerRow = el('div', { class: 'admin-table-row admin-table-header' }, [
-      el('div', { class: 'admin-cell', text: 'Email' }),
-      el('div', { class: 'admin-cell', text: 'Username' }),
-      el('div', { class: 'admin-cell', text: 'Admin' }),
-      el('div', { class: 'admin-cell', text: 'ToS' }),
-      el('div', { class: 'admin-cell', text: 'Actions' })
-    ]);
-
-    const bodyRows = rows.map((u) => {
-      const toggleBtn = el('button', {
-        class: 'admin-menu-item',
-        type: 'button',
-        onclick: async () => {
-          try {
-            await adminSetUserAdmin(state.auth.token, u.id, !u.isAdmin);
-            showToast(!u.isAdmin ? 'User promoted to admin' : 'Admin rights removed');
-            await ensureAdminUsersLoaded();
-          } catch (e) {
-            showToast(e?.message || 'Failed to update admin flag');
-          }
-        }
-      }, [el('span', { text: u.isAdmin ? 'Remove admin' : 'Make admin' })]);
-
-      const deleteBtn = el('button', {
-        class: 'admin-menu-item',
-        type: 'button',
-        onclick: async () => {
-          if (!confirm('Delete this user and their vault data? This cannot be undone.')) return;
-          try {
-            await adminDeleteUser(state.auth.token, u.id);
-            showToast('User deleted');
-            await ensureAdminUsersLoaded();
-          } catch (e) {
-            showToast(e?.message || 'Failed to delete user');
-          }
-        }
-      }, [el('span', { text: 'Delete' })]);
-
-      return el('div', { class: 'admin-table-row' }, [
-        el('div', { class: 'admin-cell', text: u.email }),
-        el('div', { class: 'admin-cell', text: u.username || '—' }),
-        el('div', { class: 'admin-cell', text: u.isAdmin ? 'Yes' : 'No' }),
-        el('div', { class: 'admin-cell', text: u.tosAccepted ? 'Accepted' : 'Pending' }),
-        el('div', { class: 'admin-cell admin-cell-actions' }, [toggleBtn, deleteBtn])
-      ]);
-    });
-
-    const loadingRow = state.adminUsersLoading
-      ? el('div', { class: 'lock-status', text: 'Loading users…' })
-      : el('div');
-
-    const closeBtn = el('button', {
-      class: 'btn ghost small-btn',
-      type: 'button',
-      onclick: () => {
-        state.showUserManagerOverlay = false;
-        render(false);
-      }
-    }, [
-      el('span', { class: 'btn-ic', text: '✕' }),
-      el('span', { text: 'Close' })
-    ]);
-
-    const card = el('div', { class: 'account-card' }, [
-      title,
-      subtitle,
-      headerRow,
-      ...bodyRows,
-      loadingRow,
-      closeBtn
-    ]);
-
-    return el('div', { class: 'account-overlay' }, [card]);
-  }
-
-  function renderSiteManagerOverlay() {
-    if (!state.showSiteManagerOverlay || !state.auth.user?.isAdmin) return null;
-    const summary = state.adminSiteSummary;
-
-    const title = el('div', { class: 'lock-title', text: 'Site Manager' });
-    const subtitle = el('div', { class: 'lock-subtle', text: 'High-level health and usage for this diary installation.' });
-
-    const grid = summary ? el('div', { class: 'admin-summary-grid' }, [
-      el('div', { class: 'summary-card' }, [
-        el('div', { class: 'summary-label', text: 'Total users' }),
-        el('div', { class: 'summary-value', text: String(summary.totalUsers) })
-      ]),
-      el('div', { class: 'summary-card' }, [
-        el('div', { class: 'summary-label', text: 'Admins' }),
-        el('div', { class: 'summary-value', text: String(summary.adminUsers) })
-      ]),
-      el('div', { class: 'summary-card' }, [
-        el('div', { class: 'summary-label', text: 'ToS accepted' }),
-        el('div', { class: 'summary-value', text: String(summary.tosAcceptedUsers) })
-      ]),
-      el('div', { class: 'summary-card' }, [
-        el('div', { class: 'summary-label', text: 'Environment' }),
-        el('div', { class: 'summary-value', text: summary.nodeEnv || 'unknown' })
-      ])
-    ]) : el('div', { class: 'lock-status', text: state.adminSiteSummaryLoading ? 'Loading site summary…' : 'No summary yet.' });
-
-    const closeBtn = el('button', {
-      class: 'btn ghost small-btn',
-      type: 'button',
-      onclick: () => {
-        state.showSiteManagerOverlay = false;
-        render(false);
-      }
-    }, [
-      el('span', { class: 'btn-ic', text: '✕' }),
-      el('span', { text: 'Close' })
-    ]);
-
-    const card = el('div', { class: 'account-card' }, [
-      title,
-      subtitle,
-      grid,
-      closeBtn
-    ]);
-
-    return el('div', { class: 'account-overlay' }, [card]);
-  }
-
-  function renderPasswordChangeOverlay() {
-    const backDrop = el('div', { class: 'signup-overlay' });
-    const currentInput = el('input', {
-      class: 'lock-input',
-      type: 'password',
-      placeholder: 'Current password'
-    });
-    const newInput = el('input', {
-      class: 'lock-input',
-      type: 'password',
-      placeholder: 'New password (min 10 characters)'
-    });
-    const confirmInput = el('input', {
-      class: 'lock-input',
-      type: 'password',
-      placeholder: 'Confirm new password'
-    });
-    const status = el('div', { class: 'lock-status', text: '' });
-
-    const submitBtn = el('button', {
-      class: 'btn big',
-      onclick: async () => {
-        status.textContent = 'Updating password…';
-        try {
-          if (newInput.value.length < 10) throw new Error('Use at least 10 characters');
-          if (newInput.value !== confirmInput.value) throw new Error('New passwords do not match');
-          await changePassword(state.auth.token, currentInput.value, newInput.value);
-          state.auth.user = { ...(state.auth.user || {}), mustChangePassword: false };
-          showToast('Password updated');
-          backDrop.remove();
-          render(false);
-        } catch (e) {
-          status.textContent = e?.message || 'Could not change password yet';
-        }
-      }
-    }, [
-      el('span', { class: 'btn-ic', text: '✓' }),
-      el('span', { text: 'Save new password' })
-    ]);
-
-    const cancelBtn = el('button', {
-      class: 'btn ghost',
-      onclick: () => backDrop.remove()
-    }, [
-      el('span', { class: 'btn-ic', text: '✕' }),
-      el('span', { text: 'Cancel' })
-    ]);
-
-    const card = el('div', { class: 'signup-card' }, [
-      el('div', { class: 'lock-title', text: 'Change your password' }),
-      currentInput,
-      newInput,
-      confirmInput,
-      submitBtn,
-      cancelBtn,
-      status
-    ]);
-
-    backDrop.append(card);
-    return backDrop;
   }
   for (const c of children) node.append(c);
   return node;
@@ -1740,6 +1364,7 @@ function suggestedPromptForEntry(entry) {
 
 export function createApp(mount) {
   const storedUi = loadUiPrefs() || {};
+  const storedAuth = loadAuthSession() || null;
   const state = {
     unlocked: false,
     key: null,
@@ -1760,9 +1385,9 @@ export function createApp(mount) {
       platformAuthenticator: false
     },
     auth: {
-      token: null,
-      email: '',
-      user: null
+      token: storedAuth?.token || null,
+      email: storedAuth?.email || '',
+      user: storedAuth?.user || null
     },
     ui: {
       themeId: storedUi.themeId || 'light',
@@ -1804,6 +1429,387 @@ export function createApp(mount) {
   mount.replaceChildren(root);
   const brandTitleNode = topbar.querySelector('.brand-title');
   const brandSubNode = topbar.querySelector('.brand-sub');
+
+  function renderSignupOverlay(presetEmail = '', presetPassword = '') {
+    const backDrop = el('div', { class: 'signup-overlay' });
+
+    const firstName = el('input', { class: 'lock-input', placeholder: 'First name' });
+    const middleName = el('input', { class: 'lock-input', placeholder: 'Middle name (optional)' });
+    const lastName = el('input', { class: 'lock-input', placeholder: 'Last name' });
+    const username = el('input', { class: 'lock-input', placeholder: 'Username' });
+    const emailInput = el('input', { class: 'lock-input', type: 'email', placeholder: 'Email address', value: presetEmail });
+    const addressLine = el('input', { class: 'lock-input', placeholder: 'Street address' });
+    const city = el('input', { class: 'lock-input', placeholder: 'City' });
+    const stateRegion = el('input', { class: 'lock-input', placeholder: 'State / Region' });
+    const postalCode = el('input', { class: 'lock-input', placeholder: 'ZIP / Postal code' });
+
+    const country = el('select', { class: 'lock-input' }, [
+      el('option', { value: '', text: 'Select your country' }),
+      el('option', { value: 'US', text: 'United States' }),
+      el('option', { value: 'CA', text: 'Canada' }),
+      el('option', { value: 'GB', text: 'United Kingdom' }),
+      el('option', { value: 'AU', text: 'Australia' }),
+      el('option', { value: 'NZ', text: 'New Zealand' }),
+      el('option', { value: 'IE', text: 'Ireland' }),
+      el('option', { value: 'DE', text: 'Germany' }),
+      el('option', { value: 'FR', text: 'France' }),
+      el('option', { value: 'BR', text: 'Brazil' }),
+      el('option', { value: 'IN', text: 'India' }),
+      el('option', { value: 'ZA', text: 'South Africa' })
+    ]);
+
+    const pwd1 = el('input', { class: 'lock-input', type: 'password', placeholder: 'Create a password', value: presetPassword });
+    const pwd2 = el('input', { class: 'lock-input', type: 'password', placeholder: 'Confirm password' });
+
+    const status = el('div', { class: 'lock-status', text: '' });
+
+    const submitBtn = el('button', {
+      class: 'btn big',
+      onclick: async () => {
+        status.textContent = 'Creating your account…';
+        try {
+          if (pwd1.value.length < 10) throw new Error('Use at least 10 characters');
+          if (pwd1.value !== pwd2.value) throw new Error('Passwords do not match');
+
+          await unlockWithServer(emailInput.value, pwd1.value, 'register', {
+            firstName: firstName.value,
+            middleName: middleName.value,
+            lastName: lastName.value,
+            username: username.value,
+            addressLine: addressLine.value,
+            city: city.value,
+            stateRegion: stateRegion.value,
+            postalCode: postalCode.value,
+            countryCode: country.value
+          });
+
+          showToast('Welcome to your diary');
+          backDrop.remove();
+        } catch (e) {
+          status.textContent = e?.message || 'Failed to sign up';
+        }
+      }
+    }, [
+      el('span', { class: 'btn-ic', text: '♡' }),
+      el('span', { text: 'Create my account' })
+    ]);
+
+    const cancelBtn = el('button', {
+      class: 'btn ghost',
+      onclick: () => backDrop.remove()
+    }, [
+      el('span', { class: 'btn-ic', text: '✕' }),
+      el('span', { text: 'Cancel' })
+    ]);
+
+    const card = el('div', { class: 'signup-card' }, [
+      el('div', { class: 'lock-title', text: 'Sign up for your private diary' }),
+      firstName,
+      middleName,
+      lastName,
+      username,
+      emailInput,
+      addressLine,
+      city,
+      stateRegion,
+      postalCode,
+      country,
+      pwd1,
+      pwd2,
+      submitBtn,
+      cancelBtn,
+      status
+    ]);
+
+    backDrop.append(card);
+    return backDrop;
+  }
+
+  async function ensureAdminUsersLoaded() {
+    if (!state.auth.token) return;
+    if (state.adminUsersLoading) return;
+    state.adminUsersLoading = true;
+    try {
+      const { users } = await adminListUsers(state.auth.token, 200);
+      state.adminUsers = users || [];
+    } catch (e) {
+      showToast(e?.message || 'Failed to load users');
+    } finally {
+      state.adminUsersLoading = false;
+      render(false);
+    }
+  }
+
+  async function ensureSiteSummaryLoaded() {
+    if (!state.auth.token) return;
+    if (state.adminSiteSummaryLoading) return;
+    state.adminSiteSummaryLoading = true;
+    try {
+      state.adminSiteSummary = await adminGetSiteSummary(state.auth.token);
+    } catch (e) {
+      showToast(e?.message || 'Failed to load site summary');
+    } finally {
+      state.adminSiteSummaryLoading = false;
+      render(false);
+    }
+  }
+
+  function renderAdminPasswordOverlay() {
+    const user = state.auth.user;
+    if (!user || !user.isAdmin || !user.mustChangePassword) return null;
+
+    const wrap = el('div', { class: 'agreement-overlay' });
+    const heading = el('div', { class: 'agreement-title', text: 'Change your admin password' });
+    const body = el('div', {
+      class: 'agreement-body',
+      text: 'This admin account is using the default password. For your safety, please choose a strong new password before continuing.'
+    });
+
+    const currentInput = el('input', {
+      class: 'lock-input',
+      type: 'password',
+      placeholder: 'Current password (admin)'
+    });
+    const newInput = el('input', {
+      class: 'lock-input',
+      type: 'password',
+      placeholder: 'New password (min 10 characters)'
+    });
+    const confirmInput = el('input', {
+      class: 'lock-input',
+      type: 'password',
+      placeholder: 'Confirm new password'
+    });
+
+    const status = el('div', { class: 'lock-status', text: '' });
+
+    const submitBtn = el('button', {
+      class: 'btn big',
+      onclick: async () => {
+        status.textContent = 'Updating password…';
+        try {
+          if (newInput.value.length < 10) throw new Error('Use at least 10 characters');
+          if (newInput.value !== confirmInput.value) throw new Error('New passwords do not match');
+          await changePassword(state.auth.token, currentInput.value, newInput.value);
+          state.auth.user = { ...(state.auth.user || {}), mustChangePassword: false };
+          saveAuthSession({ token: state.auth.token, email: state.auth.email, user: state.auth.user });
+          showToast('Admin password updated');
+          render(false);
+        } catch (e) {
+          status.textContent = e?.message || 'Could not change password yet';
+        }
+      }
+    }, [
+      el('span', { class: 'btn-ic', text: '✓' }),
+      el('span', { text: 'Save new password' })
+    ]);
+
+    const card = el('div', { class: 'agreement-card' }, [
+      heading,
+      body,
+      currentInput,
+      newInput,
+      confirmInput,
+      submitBtn,
+      status
+    ]);
+
+    wrap.append(card);
+    return wrap;
+  }
+
+  function renderUserManagerOverlay() {
+    if (!state.showUserManagerOverlay || !state.auth.user?.isAdmin) return null;
+    const rows = state.adminUsers || [];
+
+    const title = el('div', { class: 'lock-title', text: 'User Manager' });
+    const subtitle = el('div', { class: 'lock-subtle', text: 'See who has access and gently promote or remove admins.' });
+
+    const headerRow = el('div', { class: 'admin-table-row admin-table-header' }, [
+      el('div', { class: 'admin-cell', text: 'Email' }),
+      el('div', { class: 'admin-cell', text: 'Username' }),
+      el('div', { class: 'admin-cell', text: 'Admin' }),
+      el('div', { class: 'admin-cell', text: 'ToS' }),
+      el('div', { class: 'admin-cell', text: 'Actions' })
+    ]);
+
+    const bodyRows = rows.map((u) => {
+      const toggleBtn = el('button', {
+        class: 'admin-menu-item',
+        type: 'button',
+        onclick: async () => {
+          try {
+            await adminSetUserAdmin(state.auth.token, u.id, !u.isAdmin);
+            showToast(!u.isAdmin ? 'User promoted to admin' : 'Admin rights removed');
+            await ensureAdminUsersLoaded();
+          } catch (e) {
+            showToast(e?.message || 'Failed to update admin flag');
+          }
+        }
+      }, [el('span', { text: u.isAdmin ? 'Remove admin' : 'Make admin' })]);
+
+      const deleteBtn = el('button', {
+        class: 'admin-menu-item',
+        type: 'button',
+        onclick: async () => {
+          if (!confirm('Delete this user and their vault data? This cannot be undone.')) return;
+          try {
+            await adminDeleteUser(state.auth.token, u.id);
+            showToast('User deleted');
+            await ensureAdminUsersLoaded();
+          } catch (e) {
+            showToast(e?.message || 'Failed to delete user');
+          }
+        }
+      }, [el('span', { text: 'Delete' })]);
+
+      return el('div', { class: 'admin-table-row' }, [
+        el('div', { class: 'admin-cell', text: u.email }),
+        el('div', { class: 'admin-cell', text: u.username || '—' }),
+        el('div', { class: 'admin-cell', text: u.isAdmin ? 'Yes' : 'No' }),
+        el('div', { class: 'admin-cell', text: u.tosAccepted ? 'Accepted' : 'Pending' }),
+        el('div', { class: 'admin-cell admin-cell-actions' }, [toggleBtn, deleteBtn])
+      ]);
+    });
+
+    const loadingRow = state.adminUsersLoading
+      ? el('div', { class: 'lock-status', text: 'Loading users…' })
+      : el('div');
+
+    const closeBtn = el('button', {
+      class: 'btn ghost small-btn',
+      type: 'button',
+      onclick: () => {
+        state.showUserManagerOverlay = false;
+        render(false);
+      }
+    }, [
+      el('span', { class: 'btn-ic', text: '✕' }),
+      el('span', { text: 'Close' })
+    ]);
+
+    const card = el('div', { class: 'account-card' }, [
+      title,
+      subtitle,
+      headerRow,
+      ...bodyRows,
+      loadingRow,
+      closeBtn
+    ]);
+
+    return el('div', { class: 'account-overlay' }, [card]);
+  }
+
+  function renderSiteManagerOverlay() {
+    if (!state.showSiteManagerOverlay || !state.auth.user?.isAdmin) return null;
+    const summary = state.adminSiteSummary;
+
+    const title = el('div', { class: 'lock-title', text: 'Site Manager' });
+    const subtitle = el('div', { class: 'lock-subtle', text: 'High-level health and usage for this diary installation.' });
+
+    const grid = summary ? el('div', { class: 'admin-summary-grid' }, [
+      el('div', { class: 'summary-card' }, [
+        el('div', { class: 'summary-label', text: 'Total users' }),
+        el('div', { class: 'summary-value', text: String(summary.totalUsers) })
+      ]),
+      el('div', { class: 'summary-card' }, [
+        el('div', { class: 'summary-label', text: 'Admins' }),
+        el('div', { class: 'summary-value', text: String(summary.adminUsers) })
+      ]),
+      el('div', { class: 'summary-card' }, [
+        el('div', { class: 'summary-label', text: 'ToS accepted' }),
+        el('div', { class: 'summary-value', text: String(summary.tosAcceptedUsers) })
+      ]),
+      el('div', { class: 'summary-card' }, [
+        el('div', { class: 'summary-label', text: 'Environment' }),
+        el('div', { class: 'summary-value', text: summary.nodeEnv || 'unknown' })
+      ])
+    ]) : el('div', { class: 'lock-status', text: state.adminSiteSummaryLoading ? 'Loading site summary…' : 'No summary yet.' });
+
+    const closeBtn = el('button', {
+      class: 'btn ghost small-btn',
+      type: 'button',
+      onclick: () => {
+        state.showSiteManagerOverlay = false;
+        render(false);
+      }
+    }, [
+      el('span', { class: 'btn-ic', text: '✕' }),
+      el('span', { text: 'Close' })
+    ]);
+
+    const card = el('div', { class: 'account-card' }, [
+      title,
+      subtitle,
+      grid,
+      closeBtn
+    ]);
+
+    return el('div', { class: 'account-overlay' }, [card]);
+  }
+
+  function renderPasswordChangeOverlay() {
+    const backDrop = el('div', { class: 'signup-overlay' });
+    const currentInput = el('input', {
+      class: 'lock-input',
+      type: 'password',
+      placeholder: 'Current password'
+    });
+    const newInput = el('input', {
+      class: 'lock-input',
+      type: 'password',
+      placeholder: 'New password (min 10 characters)'
+    });
+    const confirmInput = el('input', {
+      class: 'lock-input',
+      type: 'password',
+      placeholder: 'Confirm new password'
+    });
+    const status = el('div', { class: 'lock-status', text: '' });
+
+    const submitBtn = el('button', {
+      class: 'btn big',
+      onclick: async () => {
+        status.textContent = 'Updating password…';
+        try {
+          if (newInput.value.length < 10) throw new Error('Use at least 10 characters');
+          if (newInput.value !== confirmInput.value) throw new Error('New passwords do not match');
+          await changePassword(state.auth.token, currentInput.value, newInput.value);
+          state.auth.user = { ...(state.auth.user || {}), mustChangePassword: false };
+          saveAuthSession({ token: state.auth.token, email: state.auth.email, user: state.auth.user });
+          showToast('Password updated');
+          backDrop.remove();
+          render(false);
+        } catch (e) {
+          status.textContent = e?.message || 'Could not change password yet';
+        }
+      }
+    }, [
+      el('span', { class: 'btn-ic', text: '✓' }),
+      el('span', { text: 'Save new password' })
+    ]);
+
+    const cancelBtn = el('button', {
+      class: 'btn ghost',
+      onclick: () => backDrop.remove()
+    }, [
+      el('span', { class: 'btn-ic', text: '✕' }),
+      el('span', { text: 'Cancel' })
+    ]);
+
+    const card = el('div', { class: 'signup-card' }, [
+      el('div', { class: 'lock-title', text: 'Change your password' }),
+      currentInput,
+      newInput,
+      confirmInput,
+      submitBtn,
+      cancelBtn,
+      status
+    ]);
+
+    backDrop.append(card);
+    return backDrop;
+  }
 
   function applyTheme() {
     root.dataset.theme = state.ui.themeId;
@@ -2058,6 +2064,7 @@ export function createApp(mount) {
     state.auth.token = null;
     state.auth.email = '';
     state.auth.user = null;
+    clearAuthSession();
     render();
   }
 
@@ -2383,6 +2390,7 @@ export function createApp(mount) {
     state.auth.token = auth.token;
     state.auth.email = normalizedEmail;
     state.auth.user = auth.user || null;
+    saveAuthSession({ token: state.auth.token, email: state.auth.email, user: state.auth.user });
 
     const remoteVault = await loadVaultFromServer(state.auth.token, state.activeVaultSlot);
     const remoteMeta = remoteVault?.meta;
