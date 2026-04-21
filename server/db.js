@@ -501,7 +501,9 @@ export async function updateUsername(userId, username) {
        state_region,
        postal_code,
        country_code,
-       tos_accepted_at
+       tos_accepted_at,
+       is_admin,
+       must_change_password
      FROM users
      WHERE id = ?
      LIMIT 1`,

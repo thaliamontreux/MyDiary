@@ -81,6 +81,10 @@ app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
+  if (req.path && req.path.startsWith('/api/')) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.setHeader('Pragma', 'no-cache');
+  }
   next();
 });
 
@@ -498,7 +502,9 @@ app.post('/api/auth/username', requireAuth, async (req, res) => {
         stateRegion: updated.state_region || null,
         postalCode: updated.postal_code || null,
         countryCode: updated.country_code || null,
-        tosAccepted: Boolean(updated.tos_accepted_at)
+        tosAccepted: Boolean(updated.tos_accepted_at),
+        isAdmin: Boolean(updated.is_admin),
+        mustChangePassword: Boolean(updated.must_change_password)
       }
     });
   } catch (error) {
@@ -537,7 +543,9 @@ app.post('/api/auth/accept-tos', requireAuth, async (req, res) => {
         stateRegion: updated.state_region || null,
         postalCode: updated.postal_code || null,
         countryCode: updated.country_code || null,
-        tosAccepted: Boolean(updated.tos_accepted_at)
+        tosAccepted: Boolean(updated.tos_accepted_at),
+        isAdmin: Boolean(updated.is_admin),
+        mustChangePassword: Boolean(updated.must_change_password)
       }
     });
   } catch (error) {
