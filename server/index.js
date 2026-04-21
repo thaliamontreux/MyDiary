@@ -311,20 +311,25 @@ app.patch('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) =>
       return;
     }
     const payload = req.body || {};
+    const existing = await findUserById(targetId);
+    if (!existing) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
     const updated = await adminUpdateUserProfile({
       id: targetId,
-      email: String(payload.email || ''),
-      firstName: String(payload.firstName || ''),
-      middleName: String(payload.middleName || ''),
-      lastName: String(payload.lastName || ''),
-      username: String(payload.username || ''),
-      addressLine: String(payload.addressLine || ''),
-      city: String(payload.city || ''),
-      stateRegion: String(payload.stateRegion || ''),
-      postalCode: String(payload.postalCode || ''),
-      countryCode: String(payload.countryCode || ''),
-      isAdmin: Boolean(payload.isAdmin),
-      mustChangePassword: Boolean(payload.mustChangePassword)
+      email: payload.email !== undefined ? String(payload.email) : existing.email,
+      firstName: payload.firstName !== undefined ? String(payload.firstName) : existing.first_name,
+      middleName: payload.middleName !== undefined ? String(payload.middleName) : existing.middle_name,
+      lastName: payload.lastName !== undefined ? String(payload.lastName) : existing.last_name,
+      username: payload.username !== undefined ? String(payload.username) : existing.username,
+      addressLine: payload.addressLine !== undefined ? String(payload.addressLine) : existing.address_line,
+      city: payload.city !== undefined ? String(payload.city) : existing.city,
+      stateRegion: payload.stateRegion !== undefined ? String(payload.stateRegion) : existing.state_region,
+      postalCode: payload.postalCode !== undefined ? String(payload.postalCode) : existing.postal_code,
+      countryCode: payload.countryCode !== undefined ? String(payload.countryCode) : existing.country_code,
+      isAdmin: payload.isAdmin !== undefined ? Boolean(payload.isAdmin) : Boolean(existing.is_admin),
+      mustChangePassword: payload.mustChangePassword !== undefined ? Boolean(payload.mustChangePassword) : Boolean(existing.must_change_password)
     });
     if (!updated) {
       res.status(404).json({ error: 'User not found' });
