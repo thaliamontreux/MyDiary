@@ -1615,7 +1615,8 @@ export function createApp(mount) {
       lastVaultSlot: storedUi.lastVaultSlot || 'primary'
     },
     showAccountOverlay: false,
-    showEncryptionKey: false
+    showEncryptionKey: false,
+    showAdminMenu: false
   };
 
   // setupActivityListeners(); // Auto-lock completely disabled
@@ -1726,6 +1727,23 @@ export function createApp(mount) {
     if (state.auth.user) {
       const u = state.auth.user;
       const label = u.username || [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email;
+      const children = [
+        el('span', { class: 'user-chip-avatar', text: (label || '?').slice(0, 1).toUpperCase() }),
+        el('span', { class: 'user-chip-label', text: `Signed in as ${label}` })
+      ];
+      if (u.isAdmin) {
+        children.push(el('span', {
+          class: 'user-chip-admin-toggle',
+          title: 'Open admin menu',
+          onclick: (ev) => {
+            ev.stopPropagation();
+            state.showAdminMenu = !state.showAdminMenu;
+            render(false);
+          }
+        }, [
+          el('span', { text: 'Admin ▾' })
+        ]));
+      }
       const chip = el('button', {
         class: 'user-chip',
         type: 'button',
@@ -1735,11 +1753,41 @@ export function createApp(mount) {
           state.showEncryptionKey = false;
           render(false);
         }
-      }, [
-        el('span', { class: 'user-chip-avatar', text: (label || '?').slice(0, 1).toUpperCase() }),
-        el('span', { class: 'user-chip-label', text: `Signed in as ${label}` })
-      ]);
-      actions.push(chip);
+      }, children);
+
+      let adminMenu = null;
+      if (u.isAdmin && state.showAdminMenu) {
+        adminMenu = el('div', { class: 'admin-menu' }, [
+          el('div', { class: 'admin-menu-header', text: 'Admin tools' }),
+          el('button', {
+            class: 'admin-menu-item',
+            type: 'button',
+            onclick: () => {
+              const overlay = renderPasswordChangeOverlay();
+              document.body.append(overlay);
+              state.showAdminMenu = false;
+            }
+          }, [
+            el('span', { text: 'Change admin password' })
+          ]),
+          el('button', {
+            class: 'admin-menu-item',
+            type: 'button',
+            onclick: () => {
+              state.showAdminMenu = false;
+              lock();
+            }
+          }, [
+            el('span', { text: 'Sign out admin' })
+          ])
+        ]);
+      }
+
+      const wrapChildren = [chip];
+      if (adminMenu) wrapChildren.push(adminMenu);
+      const wrap = el('div', { class: 'user-chip-wrap' }, wrapChildren);
+
+      actions.push(wrap);
     }
     topbar.querySelector('.top-actions').replaceChildren(...actions);
   }
