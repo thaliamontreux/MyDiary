@@ -6,6 +6,9 @@ set -euo pipefail
 APP_DIR="${APP_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 cd "$APP_DIR"
 
+# Add node_modules/.bin to PATH so locally installed binaries (e.g., vite) can be found
+export PATH="$APP_DIR/node_modules/.bin:/usr/local/bin:/usr/bin:/bin:$PATH"
+
 LOG_TAG="mydiary-updater"
 log() { logger -t "$LOG_TAG" -- "$*"; echo "[$LOG_TAG] $*"; }
 
