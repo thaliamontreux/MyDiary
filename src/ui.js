@@ -2554,10 +2554,19 @@ export function createApp(mount) {
     saveAuthSession({ token: state.auth.token, email: state.auth.email, user: state.auth.user });
 
     const remoteVault = await loadVaultFromServer(state.auth.token, state.activeVaultSlot);
-    const remoteMeta = remoteVault?.meta;
-    const remotePayload = remoteVault?.data;
+    const remoteMeta = remoteVault?.meta || null;
+    const remotePayload = remoteVault?.data || null;
 
-    state.meta = remoteMeta || {
+    const localMeta = loadVaultMeta(state.activeVaultSlot) || null;
+    const localPayload = loadEncryptedVault(state.activeVaultSlot) || null;
+
+    // Prefer the server copy when it exists; otherwise fall back to the local
+    // encrypted vault so entries created before registration or while offline
+    // are not lost.
+    const chosenMeta = remoteMeta || localMeta;
+    const chosenPayload = remotePayload || localPayload;
+
+    state.meta = chosenMeta || {
       v: 1,
       kdf: 'argon2id',
       salt: createNewVaultSalt(),
@@ -2568,7 +2577,7 @@ export function createApp(mount) {
     const key = await deriveVaultKey(password, state.meta.salt);
     let vault;
     try {
-      vault = decryptVaultOrThrow(remotePayload, key);
+      vault = decryptVaultOrThrow(chosenPayload, key);
     } catch {
       safeMemzeroKey(key);
       throw new Error('Wrong password for this vault');
@@ -2584,7 +2593,8 @@ export function createApp(mount) {
     state.lockNotice = '';
     scheduleAutoLock();
 
-    if (!remotePayload) {
+    if (!chosenPayload) {
+      // No vault yet anywhere: create a fresh starter vault for this slot
       state.vault = state.activeVaultSlot === 'decoy' ? createDecoyStarterVault() : createEmptyVault();
       const payload = encryptVault(state.vault, state.key);
       saveEncryptedVault(payload, state.activeVaultSlot);
@@ -2593,7 +2603,17 @@ export function createApp(mount) {
         data: payload
       });
     } else {
-      saveEncryptedVault(remotePayload, state.activeVaultSlot);
+      // Persist whatever we just decrypted locally for faster future unlocks
+      saveEncryptedVault(chosenPayload, state.activeVaultSlot);
+
+      // If the data only existed locally, push it to the server now so it
+      // follows the account on future devices/logins.
+      if (!remotePayload && localPayload) {
+        await saveVaultToServer(state.auth.token, state.activeVaultSlot, {
+          meta: state.meta,
+          data: chosenPayload
+        });
+      }
     }
 
     if (!state.selectedId && state.vault.entries.length) {
