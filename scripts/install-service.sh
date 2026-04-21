@@ -18,7 +18,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-APP_DIR="${APP_DIR:-$REPO_DIR}"
+APP_DIR="${APP_DIR:-/opt/MyDiary}"
 SERVICE_USER="${SERVICE_USER:-mydiary}"
 UPDATE_INTERVAL="${UPDATE_INTERVAL:-5min}"
 BRANCH="${BRANCH:-main}"

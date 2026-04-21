@@ -25,12 +25,24 @@ up three units:
 
 ### Steps
 
-1. Clone the repo to your target box, e.g.:
-   - `sudo git clone https://github.com/thaliamontreux/MyDiary /opt/mydiary`
-2. Copy `.env.example` → `.env` and fill in required values (`JWT_SECRET`, MySQL settings).
+1. Clone the repo anywhere (e.g. your home), then run the installer. By default it
+   installs to `/opt/MyDiary` and runs as a `mydiary` service user.
+   - `git clone https://github.com/thaliamontreux/MyDiary ~/MyDiary`
+2. Copy `.env.example` → `.env` in the clone and fill in required values
+   (`JWT_SECRET`, MySQL settings). The installer will copy it to `/opt/MyDiary`.
 3. Install Node.js 18+ (if not already installed).
 4. Run the installer (as root):
-   - `sudo APP_DIR=/opt/mydiary SERVICE_USER=mydiary UPDATE_INTERVAL=5min ./scripts/install-service.sh`
+   - `sudo ~/MyDiary/scripts/install-service.sh`
+
+Override defaults with env vars:
+
+```bash
+sudo APP_DIR=/opt/MyDiary \
+     SERVICE_USER=mydiary \
+     UPDATE_INTERVAL=5min \
+     BRANCH=main \
+     ~/MyDiary/scripts/install-service.sh
+```
 
 The installer is idempotent — safe to re-run.
 
