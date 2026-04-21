@@ -322,7 +322,7 @@ export async function findUserByUsername(username) {
        country_code,
        tos_accepted_at
      FROM users
-     WHERE username = ?
+     WHERE LOWER(username) = LOWER(?)
      LIMIT 1`,
     [username]
   );
@@ -360,6 +360,37 @@ export async function pingDatabase() {
 export async function markUserTosAccepted(userId) {
   ensurePool();
   await pool.query('UPDATE users SET tos_accepted_at = CURRENT_TIMESTAMP WHERE id = ?', [userId]);
+  const [rows] = await pool.query(
+    `SELECT
+       id,
+       email,
+       first_name,
+       middle_name,
+       last_name,
+       username,
+       address_line,
+       city,
+       state_region,
+       postal_code,
+       country_code,
+       tos_accepted_at
+     FROM users
+     WHERE id = ?
+     LIMIT 1`,
+    [userId]
+  );
+  return rows[0] || null;
+}
+
+export async function deleteUserById(userId) {
+  ensurePool();
+  const [result] = await pool.query('DELETE FROM users WHERE id = ? LIMIT 1', [userId]);
+  return result.affectedRows > 0;
+}
+
+export async function updateUsername(userId, username) {
+  ensurePool();
+  await pool.query('UPDATE users SET username = ? WHERE id = ?', [username, userId]);
   const [rows] = await pool.query(
     `SELECT
        id,

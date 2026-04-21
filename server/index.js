@@ -4,7 +4,7 @@ import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
 
-import { createUser, findUserByEmail, findUserByUsername, getVault, initializeDatabase, markUserTosAccepted, pingDatabase, upsertVault } from './db.js';
+import { createUser, findUserByEmail, findUserByUsername, getVault, initializeDatabase, markUserTosAccepted, pingDatabase, upsertVault, deleteUserById, updateUsername } from './db.js';
 import { requireAuth, signAuthToken } from './auth.js';
 import { log, logError, requestLogger } from './logger.js';
 import { createRateLimiter } from './rateLimit.js';
@@ -75,6 +75,57 @@ app.get('/api/ready', async (_req, res) => {
     res.json({ ok: true });
   } catch {
     res.status(503).json({ ok: false, error: 'Database unavailable' });
+  }
+});
+
+app.post('/api/auth/username', requireAuth, async (req, res) => {
+  try {
+    const rawUsername = String(req.body?.username || '').trim();
+    if (!rawUsername || rawUsername.length < 3) {
+      res.status(400).json({ error: 'Username must be at least 3 characters' });
+      return;
+    }
+
+    const existing = await findUserByUsername(rawUsername);
+    if (existing && existing.id !== req.user.id) {
+      res.status(409).json({ error: 'That username is already taken' });
+      return;
+    }
+
+    const updated = await updateUsername(req.user.id, rawUsername);
+    res.json({
+      user: {
+        id: updated.id,
+        email: updated.email,
+        firstName: updated.first_name || null,
+        middleName: updated.middle_name || null,
+        lastName: updated.last_name || null,
+        username: updated.username || null,
+        addressLine: updated.address_line || null,
+        city: updated.city || null,
+        stateRegion: updated.state_region || null,
+        postalCode: updated.postal_code || null,
+        countryCode: updated.country_code || null,
+        tosAccepted: Boolean(updated.tos_accepted_at)
+      }
+    });
+  } catch (error) {
+    logError('username_update_failed', error, { requestId: req.requestId, userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to update username' });
+  }
+});
+
+app.delete('/api/auth/account', requireAuth, async (req, res) => {
+  try {
+    const ok = await deleteUserById(req.user.id);
+    if (!ok) {
+      res.status(404).json({ error: 'Account not found' });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (error) {
+    logError('account_delete_failed', error, { requestId: req.requestId, userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to delete account' });
   }
 });
 

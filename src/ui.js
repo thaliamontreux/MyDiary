@@ -23,7 +23,9 @@ import {
   loginUser,
   registerUser,
   saveVaultToServer,
-  acceptTerms
+  acceptTerms,
+  deleteAccount,
+  setUsername
 } from './api.js';
 
 function el(tag, attrs = {}, children = []) {
@@ -1700,25 +1702,56 @@ export function createApp(mount) {
       class: 'agreement-body',
       text: 'By continuing, you agree that you will not use this diary for any harmful or abusive intent. Your pages are encrypted uniquely for your account, so even if someone steals a copy of the data, it is designed to remain unreadable to them. The person hosting this diary cannot see inside your private entries and is not responsible for how you choose to use the app.'
     });
+    const checkboxId = 'agreement-checkbox';
+    const checkbox = el('input', { id: checkboxId, type: 'checkbox' });
+    const checkboxLabel = el('label', { for: checkboxId, class: 'agreement-checkbox-label', text: 'I have read this promise and I agree to these rules for how I use my diary.' });
+
+    const status = el('div', { class: 'lock-status', text: '' });
 
     const agreeBtn = el('button', {
       class: 'btn',
+      disabled: 'disabled',
       onclick: async () => {
+        if (!checkbox.checked) return;
+        status.textContent = 'Saving your agreement…';
         try {
           await acceptTerms(state.auth.token);
           state.auth.user = { ...(state.auth.user || {}), tosAccepted: true };
           render();
         } catch (e) {
-          // Best-effort; surface a toast if something fails
-          showToast(e?.message || 'Could not save your agreement right now');
+          status.textContent = e?.message || 'Could not save your agreement right now';
         }
       }
     }, [
       el('span', { class: 'btn-ic', text: '✓' }),
-      el('span', { text: 'I understand and agree' })
+      el('span', { text: 'I accept and want to continue' })
     ]);
 
-    const card = el('div', { class: 'agreement-card' }, [heading, body, agreeBtn]);
+    checkbox.addEventListener('change', () => {
+      if (checkbox.checked) agreeBtn.removeAttribute('disabled');
+      else agreeBtn.setAttribute('disabled', 'disabled');
+    });
+
+    const deleteBtn = el('button', {
+      class: 'btn danger ghost',
+      type: 'button',
+      onclick: async () => {
+        if (!confirm('This will permanently delete your account and all diary data on this server. This cannot be undone. Continue?')) return;
+        try {
+          await deleteAccount(state.auth.token);
+        } catch (e) {
+          showToast(e?.message || 'Failed to delete account');
+        }
+        lock();
+      }
+    }, [
+      el('span', { class: 'btn-ic', text: '✕' }),
+      el('span', { text: 'Delete my account instead' })
+    ]);
+
+    const actionsRow = el('div', { class: 'agreement-actions' }, [agreeBtn, deleteBtn]);
+
+    const card = el('div', { class: 'agreement-card' }, [heading, body, checkbox, checkboxLabel, actionsRow, status]);
     return el('div', { class: 'agreement-overlay' }, [card]);
   }
 
@@ -1751,10 +1784,30 @@ export function createApp(mount) {
       el('div', { class: 'account-value', text: user.email })
     ]);
 
-    const usernameRow = el('div', { class: 'account-row' }, [
-      el('div', { class: 'account-label', text: 'Username' }),
-      el('div', { class: 'account-value', text: user.username || 'Not set' })
-    ]);
+    let usernameRow;
+    if (user.username) {
+      usernameRow = el('div', { class: 'account-row' }, [
+        el('div', { class: 'account-label', text: 'Username' }),
+        el('div', { class: 'account-value', text: user.username })
+      ]);
+    } else {
+      const setBtn = el('button', {
+        class: 'btn ghost small-btn',
+        type: 'button',
+        onclick: () => {
+          const overlay = renderUsernameOverlay();
+          root.append(overlay);
+        }
+      }, [
+        el('span', { class: 'btn-ic', text: '✧' }),
+        el('span', { text: 'Set username' })
+      ]);
+      usernameRow = el('div', { class: 'account-row' }, [
+        el('div', { class: 'account-label', text: 'Username' }),
+        el('div', { class: 'account-value', text: 'Not set yet' }),
+        setBtn
+      ]);
+    }
 
     const locationBits = [user.city, user.stateRegion, user.countryCode].filter(Boolean).join(', ');
     const locationRow = el('div', { class: 'account-row' }, [
@@ -1838,6 +1891,51 @@ export function createApp(mount) {
     ]);
 
     return el('div', { class: 'account-overlay' }, [card]);
+  }
+
+  function renderUsernameOverlay() {
+    const backDrop = el('div', { class: 'signup-overlay' });
+    const input = el('input', { class: 'lock-input', placeholder: 'Choose a username (min 3 characters)' });
+    const status = el('div', { class: 'lock-status', text: '' });
+
+    const submitBtn = el('button', {
+      class: 'btn big',
+      onclick: async () => {
+        status.textContent = 'Checking username…';
+        try {
+          if (!input.value || input.value.trim().length < 3) throw new Error('Use at least 3 characters');
+          const { user } = await setUsername(state.auth.token, input.value.trim());
+          state.auth.user = user || state.auth.user;
+          showToast('Username saved');
+          backDrop.remove();
+          render(false);
+        } catch (e) {
+          status.textContent = e?.message || 'Could not save username right now';
+        }
+      }
+    }, [
+      el('span', { class: 'btn-ic', text: '✓' }),
+      el('span', { text: 'Save username' })
+    ]);
+
+    const cancelBtn = el('button', {
+      class: 'btn ghost',
+      onclick: () => backDrop.remove()
+    }, [
+      el('span', { class: 'btn-ic', text: '✕' }),
+      el('span', { text: 'Cancel' })
+    ]);
+
+    const card = el('div', { class: 'signup-card' }, [
+      el('div', { class: 'lock-title', text: 'Set your username' }),
+      input,
+      submitBtn,
+      cancelBtn,
+      status
+    ]);
+
+    backDrop.append(card);
+    return backDrop;
   }
 
   function ensureMetaExists() {
@@ -2827,6 +2925,9 @@ export function createApp(mount) {
     main.replaceChildren(
       el('div', { class: 'layout layout-wide' }, [sidebar, feedColumn, rightRail])
     );
+
+    // Remove any existing overlays before adding new ones to avoid duplicates
+    root.querySelectorAll('.agreement-overlay, .account-overlay').forEach((node) => node.remove());
 
     const tosOverlay = renderAgreementOverlay();
     if (tosOverlay) {

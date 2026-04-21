@@ -43,6 +43,16 @@ export async function loadVaultFromServer(token, slot = 'primary') {
   });
 }
 
+export async function setUsername(token, username) {
+  return request('/api/auth/username', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ username })
+  });
+}
+
 export async function saveVaultToServer(token, slot = 'primary', payload) {
   return request(`/api/vault/${encodeURIComponent(slot)}`, {
     method: 'PUT',
@@ -56,6 +66,15 @@ export async function saveVaultToServer(token, slot = 'primary', payload) {
 export async function acceptTerms(token) {
   return request('/api/auth/accept-tos', {
     method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+}
+
+export async function deleteAccount(token) {
+  return request('/api/auth/account', {
+    method: 'DELETE',
     headers: {
       Authorization: `Bearer ${token}`
     }
