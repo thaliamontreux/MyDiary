@@ -41,7 +41,7 @@ git reset --hard "origin/$BRANCH"
 
 # Stop services before clean install to prevent crashes when node_modules is deleted
 log "stopping services"
-for svc in mydiary-api; do
+for svc in mydiary-api mydiary-web; do
   if systemctl list-unit-files | grep -q "^${svc}.service"; then
     log "stopping ${svc}.service"
     systemctl stop "${svc}.service" || true
@@ -63,7 +63,7 @@ log "building frontend"
 npm run build
 
 # Restart services if they exist
-for svc in mydiary-api; do
+for svc in mydiary-api mydiary-web; do
   if systemctl list-unit-files | grep -q "^${svc}.service"; then
     log "restarting ${svc}.service"
     systemctl restart "${svc}.service" || true
