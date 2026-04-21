@@ -3,6 +3,13 @@ import express from 'express';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import fs from 'node:fs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DIST_DIR = path.resolve(__dirname, '..', 'dist');
 
 import {
   createUser,
@@ -1143,6 +1150,21 @@ app.get('/api/recovery/status', requireAuth, async (req, res) => {
     res.status(500).json({ error: 'Failed to check recovery status' });
   }
 });
+
+// ── Serve built frontend (SPA) ───────────────────────────────────────────────
+if (fs.existsSync(DIST_DIR)) {
+  app.use(express.static(DIST_DIR, { maxAge: '1h' }));
+  // SPA fallback — return index.html for any non-API route
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/')) return next();
+    const indexPath = path.join(DIST_DIR, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      next();
+    }
+  });
+}
 
 initializeDatabase()
   .then(() => {
