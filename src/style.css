@@ -22,6 +22,7 @@
 .app-shell[data-theme='dark'] {
   --bg1: #0b1120;
   --bg2: #020617;
+  /* Slightly lighten cards compared to the page background for better contrast */
   --card: #020617;
   --card2: #020617;
   --border: rgba(148, 163, 184, 0.35);
@@ -497,6 +498,7 @@ body::before {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  color: var(--text);
 }
 
 .account-overlay {
@@ -523,6 +525,7 @@ body::before {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  color: var(--text);
 }
 
 .account-row {
@@ -692,6 +695,7 @@ body::before {
   font-size: 12px;
   padding: 4px 4px;
   align-items: center;
+  color: var(--text);
 }
 
 .admin-table-header {
@@ -801,6 +805,33 @@ body::before {
   gap: 14px;
   overflow-y: auto;
   padding-right: 4px;
+}
+
+/* Make each main column independently scrollable but hide scrollbars for a cleaner look */
+.layout > .sidebar,
+.layout > .feed-column,
+.layout > .side-rail {
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+.layout > .sidebar::-webkit-scrollbar,
+.layout > .feed-column::-webkit-scrollbar,
+.layout > .side-rail::-webkit-scrollbar,
+.admin-users-column::-webkit-scrollbar,
+.admin-user-detail-column::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.layout > .sidebar,
+.layout > .feed-column,
+.layout > .side-rail,
+.admin-users-column,
+.admin-user-detail-column {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
 }
 
 .side-rail > * {
