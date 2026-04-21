@@ -1294,7 +1294,8 @@ function normalizeEntry(entry = {}) {
     heartRate: entry.heartRate || '',
     goalIds: Array.isArray(entry.goalIds) ? entry.goalIds : [],
     weight: entry.weight || '',
-    sleepHours: entry.sleepHours || ''
+    sleepHours: entry.sleepHours || '',
+    coverImage: entry.coverImage || ''
   };
 }
 
@@ -1627,6 +1628,7 @@ export function createApp(mount) {
       ])
     ]),
     el('div', { class: 'topbar-right top-actions' }, [
+      el('div', { class: 'streak-pill', id: 'topbar-streak' }),
       themeToggleBtn
     ])
   ]);
@@ -4202,8 +4204,11 @@ export function createApp(mount) {
     showToast('Prompt added');
   }
 
+  let updateStreakPill = () => {};
+
   function render(keepEditorFocus = true) {
     applyTheme();
+    updateStreakPill();
     const focusState = keepEditorFocus ? null : captureFocusState();
 
     if (!state.unlocked) {
@@ -4282,6 +4287,9 @@ export function createApp(mount) {
           el('div', { class: 'entry-preview', text: summarizeEntry(e) }),
           e.tags?.length
             ? el('div', { class: 'tag-row' }, e.tags.slice(0, 3).map((tag) => el('span', { class: 'mini-tag', text: `#${tag}` })))
+            : el('div'),
+          e.coverImage
+            ? el('img', { class: 'entry-card-cover', src: e.coverImage, alt: 'Cover' })
             : el('div')
         ]);
       }) : [
@@ -5544,6 +5552,55 @@ export function createApp(mount) {
           }, [
             el('span', { class: 'btn-ic', text: '📍' }),
             el('span', { text: 'Location' })
+          ]),
+          (() => {
+            const coverFileInput = el('input', { type: 'file', accept: 'image/*', style: 'display:none' });
+            coverFileInput.addEventListener('change', async () => {
+              const file = coverFileInput.files?.[0];
+              if (!file) return;
+              if (file.size > 2 * 1024 * 1024) { showToast('Cover image too large (max 2MB)'); return; }
+              try {
+                const dataUrl = await fileToDataUri(file);
+                updateSelected({ coverImage: dataUrl });
+                showToast('Cover image set!');
+              } catch { showToast('Failed to load image'); }
+              coverFileInput.value = '';
+            });
+            const btn = el('button', {
+              class: 'btn ghost small-btn', type: 'button',
+              onclick: () => coverFileInput.click()
+            }, [
+              el('span', { class: 'btn-ic', text: '🖼' }),
+              el('span', { text: selected.coverImage ? 'Change cover' : 'Cover image' })
+            ]);
+            return el('div', {}, [coverFileInput, btn]);
+          })(),
+          el('button', {
+            class: 'btn ghost small-btn', type: 'button',
+            onclick: () => {
+              const printWin = window.open('', '_blank');
+              const body = selected.body ? renderMarkdownToHtml(selected.body) : '<p><em>No content</em></p>';
+              printWin.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${selected.title || 'Entry'}</title><style>
+                body{font-family:Georgia,serif;max-width:680px;margin:40px auto;color:#111;line-height:1.75}
+                h1{font-size:2em;margin-bottom:4px}
+                .meta{color:#666;font-size:13px;margin-bottom:32px}
+                h2,h3{margin-top:1.5em}
+                blockquote{border-left:4px solid #6366f1;padding:6px 16px;margin:0;font-style:italic;color:#444}
+                code{background:#f3f4f6;padding:2px 6px;border-radius:4px;font-size:0.88em}
+                pre{background:#f3f4f6;padding:12px;border-radius:8px;overflow:auto}
+                @media print{body{margin:20px}}
+              </style></head><body>
+                <h1>${escapeHtml(selected.title || 'Untitled')}</h1>
+                <div class="meta">${formatPrettyDate(selected.date)} &nbsp;•&nbsp; ${moodLabel(selected.mood)}</div>
+                ${body}
+              </body></html>`);
+              printWin.document.close();
+              printWin.focus();
+              printWin.print();
+            }
+          }, [
+            el('span', { class: 'btn-ic', text: '🖨' }),
+            el('span', { text: 'Print' })
           ])
         ]),
         el('div', { class: 'editor-foot-meta' }, [
@@ -5760,6 +5817,29 @@ export function createApp(mount) {
     // Sync theme toggle icon to initial theme
     const initIcon = themeToggleBtn.querySelector('.theme-toggle-icon');
     if (initIcon) initIcon.textContent = (state.ui.themeId === 'dark') ? '☀️' : '🌙';
+
+    // Update streak pill every render
+    updateStreakPill = () => {
+      const pill = document.getElementById('topbar-streak');
+      if (!pill || !state.vault) return;
+      const entries = state.vault.entries || [];
+      const dates = [...new Set(entries.map((e) => e.date).filter(Boolean))].sort().reverse();
+      let streak = 0;
+      let cursor = new Date(isoDate());
+      for (const d of dates) {
+        const dDate = new Date(d);
+        const diff = Math.round((cursor.getTime() - dDate.getTime()) / 86400000);
+        if (diff === 0 || diff === 1) { streak++; cursor = dDate; }
+        else break;
+      }
+      if (streak > 0) {
+        pill.textContent = `🔥 ${streak} day streak`;
+        pill.style.display = 'flex';
+      } else {
+        pill.style.display = 'none';
+      }
+    };
+    updateStreakPill();
 
     // Close mobile sidebar when clicking the main content area
     main.addEventListener('click', () => root.classList.remove('sidebar-open'));
@@ -6645,42 +6725,99 @@ export function createApp(mount) {
     const overlay = el('div', { class: 'overlay-backdrop' });
     const prefs = loadUiPrefs() || {};
 
-    const enabledToggle = el('input', { type: 'checkbox', id: 'reminder-toggle' });
+    const REMINDER_PRESETS = [
+      { label: 'Morning', time: '08:00', icon: '🌅' },
+      { label: 'Afternoon', time: '14:00', icon: '☀️' },
+      { label: 'Evening', time: '20:00', icon: '🌆' },
+      { label: 'Night', time: '22:00', icon: '🌙' }
+    ];
+
+    const enabledToggle = el('input', { type: 'checkbox', class: 'reminder-toggle-chk' });
     enabledToggle.checked = Boolean(prefs.reminderEnabled);
 
     const timeInput = el('input', { type: 'time', class: 'date-input', value: prefs.reminderTime || '20:00' });
+    const noteInput = el('input', { type: 'text', class: 'lock-input', placeholder: 'Custom reminder message (optional)', value: prefs.reminderNote || '', style: 'font-size:13px' });
+
+    const notifStatus = el('div', { class: 'reminder-notif-status' });
+    const updateNotifStatus = () => {
+      if (!('Notification' in window)) {
+        notifStatus.textContent = '⚠️ Browser notifications not supported';
+        notifStatus.style.color = 'var(--danger)';
+      } else if (Notification.permission === 'granted') {
+        notifStatus.textContent = '✅ Browser notifications enabled';
+        notifStatus.style.color = '#22c55e';
+      } else if (Notification.permission === 'denied') {
+        notifStatus.textContent = '🚫 Notifications blocked — change in browser settings';
+        notifStatus.style.color = 'var(--danger)';
+      } else {
+        notifStatus.textContent = '💬 Permission not yet requested — will ask on save';
+        notifStatus.style.color = 'var(--muted)';
+      }
+    };
+    updateNotifStatus();
+
+    const testBtn = el('button', {
+      class: 'btn ghost small-btn', type: 'button',
+      onclick: async () => {
+        if ('Notification' in window && Notification.permission !== 'granted') {
+          await Notification.requestPermission();
+          updateNotifStatus();
+        }
+        if (Notification.permission === 'granted') {
+          new Notification('MyDiary test 🔔', { body: noteInput.value || 'Time to write in your diary!', icon: '/favicon.ico' });
+          showToast('Test notification sent!');
+        } else {
+          showToast('🔔 Time to write in your diary!');
+        }
+      }
+    }, [el('span', { text: '🔔 Test notification' })]);
+
+    const presetBtns = REMINDER_PRESETS.map((p) =>
+      el('button', {
+        class: 'btn ghost small-btn', type: 'button',
+        onclick: () => { timeInput.value = p.time; }
+      }, [el('span', { text: `${p.icon} ${p.label}` })])
+    );
 
     const saveBtn = el('button', {
-      class: 'btn',
-      type: 'button',
+      class: 'btn', type: 'button',
       onclick: async () => {
-        const updPrefs = { ...(loadUiPrefs() || {}), reminderEnabled: enabledToggle.checked, reminderTime: timeInput.value };
+        const updPrefs = {
+          ...(loadUiPrefs() || {}),
+          reminderEnabled: enabledToggle.checked,
+          reminderTime: timeInput.value,
+          reminderNote: noteInput.value
+        };
         saveUiPrefs(updPrefs);
         if (enabledToggle.checked && 'Notification' in window && Notification.permission === 'default') {
           await Notification.requestPermission();
+          updateNotifStatus();
         }
-        overlay.remove();
-        showToast('Reminder settings saved');
         if (enabledToggle.checked) initDailyReminderCheck();
+        overlay.remove();
+        showToast(enabledToggle.checked
+          ? `✅ Reminder set for ${timeInput.value}`
+          : 'Reminders disabled');
       }
     }, [el('span', { text: 'Save reminder' })]);
 
-    const modal = el('div', { class: 'overlay-modal' }, [
-      el('div', { class: 'overlay-title', text: 'Daily reminder' }),
-      el('label', { class: 'account-row' }, [
-        el('input', { type: 'checkbox', id: 'reminder-toggle-chk' }),
-        el('span', { class: 'account-label', text: 'Enable daily reminder' })
+    const modal = el('div', { class: 'overlay-modal overlay-wide' }, [
+      el('div', { class: 'overlay-title', text: '🔔 Reminders' }),
+      el('div', { class: 'overlay-sub', text: 'Get a gentle nudge to write each day.' }),
+      el('label', { class: 'reminder-toggle-row' }, [
+        enabledToggle,
+        el('span', { class: 'reminder-toggle-label', text: 'Enable daily writing reminder' })
       ]),
-      el('div', { class: 'account-row' }, [
-        el('span', { class: 'account-label', text: 'Remind me at' }),
-        timeInput
-      ]),
-      saveBtn,
+      el('div', { class: 'reminder-section-label', text: 'Remind me at' }),
+      el('div', { class: 'reminder-preset-row' }, presetBtns),
+      timeInput,
+      el('div', { class: 'reminder-section-label', text: 'Custom message' }),
+      noteInput,
+      el('div', { class: 'reminder-section-label', text: 'Browser notifications' }),
+      notifStatus,
+      el('div', { class: 'reminder-actions' }, [testBtn, saveBtn]),
       el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Cancel' })])
     ]);
-
-    const chk = modal.querySelector('#reminder-toggle-chk');
-    if (chk) chk.checked = Boolean(prefs.reminderEnabled);
 
     overlay.append(modal);
     document.body.append(overlay);
@@ -6699,62 +6836,108 @@ export function createApp(mount) {
     const overlay = el('div', { class: 'overlay-backdrop' });
     let goals = loadGoals();
 
+    const MILESTONE_BADGES = [
+      { pct: 25, label: '25%', icon: '🌱' },
+      { pct: 50, label: 'Halfway!', icon: '⚡' },
+      { pct: 75, label: '75%', icon: '🔥' },
+      { pct: 100, label: 'Complete!', icon: '🏆' }
+    ];
+
+    const getBadge = (pct) => {
+      const earned = MILESTONE_BADGES.filter((b) => pct >= b.pct);
+      return earned.length ? earned[earned.length - 1] : null;
+    };
+
     const refreshList = () => {
-      list.replaceChildren(...goals.map((g) => {
-        const progress = el('div', {
-          class: 'goal-progress-bar',
-          style: `width:${Math.min(100, Math.round((g.current / Math.max(1, g.target)) * 100))}%`
-        });
-        const pct = el('span', { class: 'tiny', text: `${g.current}/${g.target} entries` });
-        const doneBtn = el('button', {
-          class: 'btn mini ghost',
-          type: 'button',
+      list.replaceChildren(...(goals.length ? goals.map((g) => {
+        const pct = Math.min(100, Math.round((g.current / Math.max(1, g.target)) * 100));
+        const badge = getBadge(pct);
+        const isComplete = pct >= 100;
+        const daysLeft = g.dueDate
+          ? Math.max(0, Math.ceil((new Date(g.dueDate) - new Date()) / 86400000))
+          : null;
+
+        const progressBar = el('div', { class: 'goal-progress-track' }, [
+          el('div', {
+            class: `goal-progress-bar${isComplete ? ' goal-complete' : ''}`,
+            style: `width:${pct}%`
+          })
+        ]);
+
+        const incBtn = el('button', {
+          class: 'btn mini ghost', type: 'button',
           onclick: () => {
             g.current = Math.min(g.target, g.current + 1);
-            saveGoals(goals);
-            refreshList();
+            saveGoals(goals); refreshList();
+            if (g.current === g.target) showToast(`🏆 Goal "${g.name}" complete!`);
           }
         }, [el('span', { text: '+1' })]);
+
+        const decBtn = el('button', {
+          class: 'btn mini ghost', type: 'button',
+          onclick: () => { g.current = Math.max(0, g.current - 1); saveGoals(goals); refreshList(); }
+        }, [el('span', { text: '−1' })]);
+
         const delBtn = el('button', {
-          class: 'btn mini ghost',
-          type: 'button',
-          onclick: () => {
-            goals = goals.filter((x) => x.id !== g.id);
-            saveGoals(goals);
-            refreshList();
-          }
+          class: 'btn mini ghost', type: 'button',
+          onclick: () => { goals = goals.filter((x) => x.id !== g.id); saveGoals(goals); refreshList(); }
         }, [el('span', { text: '✕' })]);
-        return el('div', { class: 'goal-item' }, [
-          el('div', { class: 'goal-name', text: g.name }),
-          el('div', { class: 'goal-progress-track' }, [progress]),
-          el('div', { class: 'goal-row' }, [pct, doneBtn, delBtn])
+
+        return el('div', { class: `goal-item${isComplete ? ' goal-item-complete' : ''}` }, [
+          el('div', { class: 'goal-item-header' }, [
+            badge ? el('span', { class: 'goal-badge', text: badge.icon }) : el('span'),
+            el('div', { class: 'goal-name', text: g.name }),
+            el('span', { class: 'goal-pct-label', text: `${pct}%` })
+          ]),
+          progressBar,
+          el('div', { class: 'goal-item-meta' }, [
+            el('span', { class: 'tiny', text: `${g.current.toLocaleString()} / ${g.target.toLocaleString()}` }),
+            daysLeft !== null
+              ? el('span', { class: `tiny ${daysLeft <= 3 ? 'goal-due-urgent' : ''}`, text: daysLeft === 0 ? '📅 Due today!' : `📅 ${daysLeft}d left` })
+              : el('span'),
+            badge ? el('span', { class: 'goal-badge-label', text: badge.label }) : el('span')
+          ]),
+          el('div', { class: 'goal-actions' }, [incBtn, decBtn, delBtn])
         ]);
-      }));
+      }) : [el('div', { class: 'tiny', text: 'No goals yet. Add one below!' })]));
     };
 
     const list = el('div', { class: 'goals-list' });
     refreshList();
 
-    const nameInput = el('input', { type: 'text', class: 'lock-input', placeholder: 'Goal name', style: 'font-size:13px' });
-    const targetInput = el('input', { type: 'number', class: 'date-input', placeholder: 'Target (entries)', value: '30' });
+    const nameInput = el('input', { type: 'text', class: 'lock-input', placeholder: 'Goal name (e.g. Write 30 entries)', style: 'font-size:13px' });
+    const targetInput = el('input', { type: 'number', class: 'date-input', placeholder: 'Target count', value: '30', min: '1', style: 'width:100px' });
+    const dueDateInput = el('input', { type: 'date', class: 'date-input', title: 'Due date (optional)' });
 
     const addBtn = el('button', {
-      class: 'btn small-btn',
-      type: 'button',
+      class: 'btn small-btn', type: 'button',
       onclick: () => {
         const name = nameInput.value.trim();
         if (!name) return;
-        goals.push({ id: `goal-${Date.now()}`, name, target: Number(targetInput.value) || 30, current: 0, createdAt: new Date().toISOString() });
+        goals.push({
+          id: `goal-${Date.now()}`,
+          name,
+          target: Number(targetInput.value) || 30,
+          current: 0,
+          dueDate: dueDateInput.value || null,
+          createdAt: new Date().toISOString()
+        });
         saveGoals(goals);
         nameInput.value = '';
+        dueDateInput.value = '';
         refreshList();
+        showToast('Goal added!');
       }
-    }, [el('span', { text: 'Add goal' })]);
+    }, [el('span', { text: '+ Add goal' })]);
 
-    const modal = el('div', { class: 'overlay-modal' }, [
-      el('div', { class: 'overlay-title', text: 'Goals & Milestones' }),
+    const modal = el('div', { class: 'overlay-modal overlay-wide' }, [
+      el('div', { class: 'overlay-title', text: '🎯 Goals & Milestones' }),
+      el('div', { class: 'overlay-sub', text: 'Track what matters. Celebrate every step.' }),
       list,
-      el('div', { class: 'goal-add-row' }, [nameInput, targetInput, addBtn]),
+      el('div', { class: 'goal-add-form' }, [
+        nameInput,
+        el('div', { class: 'goal-add-row' }, [targetInput, dueDateInput, addBtn])
+      ]),
       el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Close' })])
     ]);
     overlay.append(modal);
@@ -6834,43 +7017,75 @@ export function createApp(mount) {
     let habits = loadHabits();
     const todayIso = isoDate();
 
+    // Build last-N-days array
+    const buildLastDays = (n) => {
+      const days = [];
+      for (let i = n - 1; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        days.push(d.toISOString().slice(0, 10));
+      }
+      return days;
+    };
+    const last28 = buildLastDays(28);
+    const last7 = buildLastDays(7);
+    const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+
     const refreshHabits = () => {
-      habitList.replaceChildren(...habits.map((h) => {
-        const completedToday = (h.completedDates || []).includes(todayIso);
+      habitList.replaceChildren(...(habits.length ? habits.map((h) => {
+        const completed = new Set(h.completedDates || []);
+        const completedToday = completed.has(todayIso);
         const streak = calcHabitStreak(h.completedDates || []);
+        const rate = Math.round((last28.filter((d) => completed.has(d)).length / 28) * 100);
+
         const checkBtn = el('button', {
-          class: `btn small-btn ${completedToday ? '' : 'ghost'}`,
-          type: 'button',
+          class: `btn small-btn ${completedToday ? '' : 'ghost'}`, type: 'button',
           onclick: () => {
             if (!completedToday) {
               h.completedDates = [...(h.completedDates || []), todayIso];
             } else {
               h.completedDates = (h.completedDates || []).filter((d) => d !== todayIso);
             }
-            saveHabits(habits);
-            refreshHabits();
+            saveHabits(habits); refreshHabits();
           }
         }, [el('span', { text: completedToday ? '✓ Done today' : 'Mark done' })]);
+
         const delBtn = el('button', {
-          class: 'btn mini ghost',
-          type: 'button',
+          class: 'btn mini ghost', type: 'button',
           onclick: () => { habits = habits.filter((x) => x.id !== h.id); saveHabits(habits); refreshHabits(); }
         }, [el('span', { text: '✕' })]);
+
+        // 7-day mini grid
+        const grid7 = el('div', { class: 'habit-week-grid' }, last7.map((d) => {
+          const done = completed.has(d);
+          const isToday = d === todayIso;
+          const dayOfWeek = new Date(d + 'T12:00:00').getDay();
+          return el('div', { class: `habit-day-cell${done ? ' done' : ''}${isToday ? ' today' : ''}`, title: d }, [
+            el('div', { class: 'habit-day-label', text: DAY_LABELS[dayOfWeek] }),
+            el('div', { class: 'habit-day-dot' })
+          ]);
+        }));
+
         return el('div', { class: 'habit-item' }, [
-          el('div', { class: 'habit-name', text: h.name }),
-          el('div', { class: 'habit-meta', text: `🔥 ${streak} day streak` }),
+          el('div', { class: 'habit-item-header' }, [
+            el('div', { class: 'habit-name', text: h.name }),
+            el('div', { class: 'habit-stats' }, [
+              el('span', { class: 'habit-streak', text: `🔥 ${streak}` }),
+              el('span', { class: 'habit-rate', text: `${rate}% (28d)` })
+            ])
+          ]),
+          grid7,
           el('div', { class: 'habit-actions' }, [checkBtn, delBtn])
         ]);
-      }));
+      }) : [el('div', { class: 'tiny', text: 'No habits yet. Add one below!' })]));
     };
 
     const habitList = el('div', { class: 'habits-list' });
     refreshHabits();
 
-    const nameIn = el('input', { type: 'text', class: 'lock-input', placeholder: 'New habit name', style: 'font-size:13px' });
+    const nameIn = el('input', { type: 'text', class: 'lock-input', placeholder: 'New habit (e.g. Meditate, Exercise, Read)', style: 'font-size:13px' });
     const addBtn = el('button', {
-      class: 'btn small-btn',
-      type: 'button',
+      class: 'btn small-btn', type: 'button',
       onclick: () => {
         const name = nameIn.value.trim();
         if (!name) return;
@@ -6878,11 +7093,13 @@ export function createApp(mount) {
         saveHabits(habits);
         nameIn.value = '';
         refreshHabits();
+        showToast('Habit added!');
       }
-    }, [el('span', { text: 'Add habit' })]);
+    }, [el('span', { text: '+ Add habit' })]);
 
-    const modal = el('div', { class: 'overlay-modal' }, [
-      el('div', { class: 'overlay-title', text: 'Habit Tracker' }),
+    const modal = el('div', { class: 'overlay-modal overlay-wide' }, [
+      el('div', { class: 'overlay-title', text: '🌱 Habit Tracker' }),
+      el('div', { class: 'overlay-sub', text: 'Build daily habits. Track your 7-day streak at a glance.' }),
       habitList,
       el('div', { class: 'goal-add-row' }, [nameIn, addBtn]),
       el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Close' })])

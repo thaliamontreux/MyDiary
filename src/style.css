@@ -2896,6 +2896,167 @@ body::before {
 .export-option-title { font-size: 13px; font-weight: 700; color: var(--text); }
 .export-option-desc { font-size: 11px; color: var(--muted); }
 
+/* ── Streak pill ─────────────────────────────────────────────────────────── */
+.streak-pill {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #f97316;
+  background: rgba(249,115,22,0.1);
+  border: 1px solid rgba(249,115,22,0.25);
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+/* ── Entry card cover image ───────────────────────────────────────────────── */
+.entry-card-cover {
+  width: 100%;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-top: 6px;
+  display: block;
+}
+
+/* ── Overlay wide modifier ────────────────────────────────────────────────── */
+.overlay-wide {
+  max-width: 560px !important;
+  width: 95vw;
+}
+.overlay-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin: -8px 0 12px;
+}
+
+/* ── Goals overlay enhancements ──────────────────────────────────────────── */
+.goal-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.goal-item {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  background: var(--card2);
+  transition: border-color 0.2s;
+}
+.goal-item-complete {
+  border-color: #22c55e;
+  background: rgba(34,197,94,0.05);
+}
+.goal-item-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.goal-badge { font-size: 18px; flex-shrink: 0; }
+.goal-name { flex: 1; font-weight: 700; font-size: 13px; }
+.goal-pct-label { font-size: 12px; font-weight: 700; color: #6366f1; }
+.goal-progress-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(99,102,241,0.12);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 6px 0;
+}
+.goal-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #a855f7);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+.goal-progress-bar.goal-complete {
+  background: linear-gradient(90deg, #22c55e, #4ade80);
+}
+.goal-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0;
+}
+.goal-due-urgent { color: #ef4444 !important; font-weight: 700; }
+.goal-badge-label { font-size: 10px; font-weight: 700; color: #f59e0b; background: rgba(245,158,11,0.12); border-radius: 4px; padding: 1px 5px; }
+.goal-actions { display: flex; gap: 6px; margin-top: 6px; }
+
+/* ── Habit tracker 7-day grid ─────────────────────────────────────────────── */
+.habit-item {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  background: var(--card2);
+}
+.habit-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.habit-name { font-weight: 700; font-size: 13px; }
+.habit-stats { display: flex; gap: 8px; font-size: 11px; }
+.habit-streak { font-weight: 700; color: #f97316; }
+.habit-rate { color: var(--muted); }
+.habit-week-grid {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.habit-day-cell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.habit-day-label { font-size: 9px; color: var(--muted); text-transform: uppercase; }
+.habit-day-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(99,102,241,0.1);
+  border: 1.5px solid var(--border);
+  transition: background 0.15s, border-color 0.15s;
+}
+.habit-day-cell.done .habit-day-dot {
+  background: #6366f1;
+  border-color: #6366f1;
+}
+.habit-day-cell.today .habit-day-dot {
+  border-color: #f97316;
+  box-shadow: 0 0 0 2px rgba(249,115,22,0.25);
+}
+.habit-day-cell.done.today .habit-day-dot {
+  background: #22c55e;
+  border-color: #22c55e;
+}
+.habit-actions { display: flex; gap: 6px; }
+
+/* ── Reminders overlay ────────────────────────────────────────────────────── */
+.reminder-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  cursor: pointer;
+}
+.reminder-toggle-chk { width: 16px; height: 16px; cursor: pointer; accent-color: #6366f1; }
+.reminder-toggle-label { font-size: 14px; font-weight: 600; }
+.reminder-section-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 10px 0 4px; }
+.reminder-preset-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.reminder-notif-status { font-size: 12px; padding: 6px 0; }
+.reminder-actions { display: flex; gap: 8px; margin-top: 14px; align-items: center; }
+
 /* ── Topbar layout ───────────────────────────────────────────────────────── */
 .topbar-left {
   display: flex;
