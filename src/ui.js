@@ -2506,7 +2506,11 @@ export function createApp(mount) {
 
   function renderUsernameOverlay() {
     const backDrop = el('div', { class: 'signup-overlay' });
-    const input = el('input', { class: 'lock-input', placeholder: 'Choose a username (min 3 characters)' });
+    const input = el('input', {
+      class: 'lock-input',
+      placeholder: 'Choose a username (min 3 characters)',
+      value: state.auth.user?.username || ''
+    });
     const status = el('div', { class: 'lock-status', text: '' });
 
     const submitBtn = el('button', {
@@ -2514,8 +2518,12 @@ export function createApp(mount) {
       onclick: async () => {
         status.textContent = 'Checking username…';
         try {
-          if (!input.value || input.value.trim().length < 3) throw new Error('Use at least 3 characters');
-          const { user } = await setUsername(state.auth.token, input.value.trim());
+          const next = (input.value || '').trim();
+          if (!next) {
+            status.textContent = 'Please enter a username';
+            return;
+          }
+          const { user } = await setUsername(state.auth.token, next);
           state.auth.user = user || state.auth.user;
           showToast('Username saved');
           backDrop.remove();
