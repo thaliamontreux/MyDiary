@@ -1673,6 +1673,17 @@ export function createApp(mount) {
     const listColumn = el('div', { class: 'admin-users-column' }, listColumnChildren);
 
     const detail = state.adminSelectedUser;
+    const detailChildren = [];
+
+    if (state.adminSelectedUserLoading) {
+      detailChildren.push(el('div', { class: 'lock-status', text: 'Loading account…' }));
+    } else if (detail) {
+      const status = el('div', { class: 'lock-status', text: '' });
+
+      const emailInput = el('input', { class: 'lock-input', type: 'email', value: detail.email || '' });
+      const usernameInput = el('input', { class: 'lock-input', value: detail.username || '' });
+      const firstNameInput = el('input', { class: 'lock-input', value: detail.firstName || '' });
+      const middleNameInput = el('input', { class: 'lock-input', value: detail.middleName || '' });
       const lastNameInput = el('input', { class: 'lock-input', value: detail.lastName || '' });
       const addressInput = el('input', { class: 'lock-input', value: detail.addressLine || '' });
       const cityInput = el('input', { class: 'lock-input', value: detail.city || '' });
