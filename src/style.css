@@ -2276,3 +2276,51 @@ body::before {
   background: rgba(0,0,0,0.06);
   border-color: rgba(0,0,0,0.12);
 }
+
+/* Folder & Vault Manager */
+.account-folders {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.account-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.folder-manager-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.folder-manager-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: rgba(0,0,0,0.06);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  flex-wrap: wrap;
+}
+
+:root[data-theme='dark'] .folder-manager-row {
+  background: rgba(255,255,255,0.04);
+}
+
+.folder-manager-info {
+  flex: 1;
+  min-width: 160px;
+}
+
+.folder-manager-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}

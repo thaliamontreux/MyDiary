@@ -1540,56 +1540,283 @@ export function createApp(mount) {
     return backDrop;
   }
 
+  function countEntriesInFolder(folderPath) {
+    return state.vault.entries.filter((entry) => entry.folder === folderPath).length;
+  }
+
+  async function handleRenameFolder(folder) {
+    const nextName = window.prompt(`Rename folder "${folder.path}" to:`, folder.path);
+    if (nextName == null) return;
+    const trimmed = nextName.trim();
+    if (!trimmed || trimmed === folder.path) return;
+    try {
+      const { folder: updated } = await updateFolder(state.auth.token, folder.id, { path: trimmed });
+      let changed = 0;
+      for (const entry of state.vault.entries) {
+        if (entry.folder === folder.path) {
+          entry.folder = updated.path;
+          changed += 1;
+        }
+      }
+      if (changed) persistVault();
+      state.folders = state.folders.map((f) => (f.id === folder.id ? updated : f));
+      if (state.activeFolderPath === folder.path) state.activeFolderPath = updated.path;
+      showToast(`Renamed to "${updated.path}"`);
+      render(false);
+    } catch (e) {
+      showToast(e?.message || 'Failed to rename folder');
+    }
+  }
+
+  async function handleSetFolderPassword(folder) {
+    const newPassword = window.prompt(
+      folder.hasPassword
+        ? `Set a new password for "${folder.path}" (leave empty to keep current):`
+        : `Set a password for "${folder.path}":`
+    );
+    if (newPassword == null) return;
+    const pw = String(newPassword);
+    if (!pw) return;
+    try {
+      const { folder: updated } = await updateFolder(state.auth.token, folder.id, { newPassword: pw });
+      state.folders = state.folders.map((f) => (f.id === folder.id ? updated : f));
+      state.unlockedFolderIds.add(folder.id);
+      showToast(`Password ${folder.hasPassword ? 'changed' : 'set'} for "${folder.path}"`);
+      render(false);
+    } catch (e) {
+      showToast(e?.message || 'Failed to set folder password');
+    }
+  }
+
+  async function handleRemoveFolderPassword(folder) {
+    if (!folder.hasPassword) return;
+    if (!confirm(`Remove password from "${folder.path}"?`)) return;
+    try {
+      const { folder: updated } = await updateFolder(state.auth.token, folder.id, { clearPassword: true });
+      state.folders = state.folders.map((f) => (f.id === folder.id ? updated : f));
+      showToast('Password removed');
+      render(false);
+    } catch (e) {
+      showToast(e?.message || 'Failed to remove password');
+    }
+  }
+
+  async function handleDeleteFolder(folder) {
+    if (!confirm(`Delete folder "${folder.path}"? Entries will be kept but unassigned from this folder.`)) return;
+    try {
+      if (state.auth.token && typeof folder.id === 'number') {
+        await deleteFolder(state.auth.token, folder.id);
+      }
+      let changed = 0;
+      for (const entry of state.vault.entries) {
+        if (entry.folder === folder.path) {
+          entry.folder = '';
+          changed += 1;
+        }
+      }
+      if (changed) persistVault();
+      state.folders = state.folders.filter((f) => f.id !== folder.id);
+      if (state.activeFolderPath === folder.path) state.activeFolderPath = null;
+      state.unlockedFolderIds.delete(folder.id);
+      showToast('Folder deleted');
+      render(false);
+    } catch (e) {
+      showToast(e?.message || 'Failed to delete folder');
+    }
+  }
+
+  async function handlePurgeFolder(folder) {
+    const count = countEntriesInFolder(folder.path);
+    if (!confirm(`PURGE folder "${folder.path}"?\nThis will PERMANENTLY move ${count} entr${count === 1 ? 'y' : 'ies'} to trash and remove the folder. Continue?`)) return;
+    try {
+      const now = new Date().toISOString();
+      const keep = [];
+      const trashed = [];
+      for (const entry of state.vault.entries) {
+        if (entry.folder === folder.path) {
+          trashed.push({ ...entry, trashedAt: now });
+        } else {
+          keep.push(entry);
+        }
+      }
+      state.vault.entries = keep;
+      state.vault.trash = [...(state.vault.trash || []), ...trashed];
+      if (state.selectedId && trashed.find((e) => e.id === state.selectedId)) {
+        state.selectedId = keep.length ? keep[0].id : null;
+      }
+      persistVault();
+      if (state.auth.token && typeof folder.id === 'number') {
+        await deleteFolder(state.auth.token, folder.id);
+      }
+      state.folders = state.folders.filter((f) => f.id !== folder.id);
+      if (state.activeFolderPath === folder.path) state.activeFolderPath = null;
+      state.unlockedFolderIds.delete(folder.id);
+      showToast(`Purged "${folder.path}" (${trashed.length} moved to trash)`);
+      render(false);
+    } catch (e) {
+      showToast(e?.message || 'Failed to purge folder');
+    }
+  }
+
+  async function handleCreateFolderFromManager() {
+    const name = window.prompt('New folder name:');
+    if (name == null) return;
+    const trimmed = String(name).trim();
+    if (!trimmed) return;
+    const pw = window.prompt(`Optional password for "${trimmed}" (leave empty for no password):`);
+    if (pw == null) return;
+    try {
+      const { folder } = await createFolder(state.auth.token, { path: trimmed, password: String(pw) });
+      state.folders.push(folder);
+      if (folder.hasPassword) state.unlockedFolderIds.add(folder.id);
+      showToast(`Folder "${folder.path}" created`);
+      render(false);
+    } catch (e) {
+      showToast(e?.message || 'Failed to create folder');
+    }
+  }
+
   function renderAccountFoldersSection() {
     if (!state.auth.user) return el('div');
 
     const rows = (state.folders || []).map((folder) => {
-      const hasPasswordText = folder.hasPassword ? 'Password set' : 'No password';
-      const meta = el('div', { class: 'account-helper', text: hasPasswordText });
+      const count = countEntriesInFolder(folder.path);
+      const meta = el('div', {
+        class: 'account-helper',
+        text: `${count} entr${count === 1 ? 'y' : 'ies'} • ${folder.hasPassword ? 'Password set' : 'No password'}`
+      });
 
-      const deleteBtn = el('button', {
-        class: 'btn danger ghost small-btn',
-        type: 'button',
-        onclick: async () => {
-          if (!confirm(`Delete folder "${folder.path}" and unassign it from entries?`)) return;
-          try {
-            if (state.auth.token && typeof folder.id === 'number') {
-              await deleteFolder(state.auth.token, folder.id);
-            }
-            let changed = false;
-            for (const entry of state.vault.entries) {
-              if (entry.folder === folder.path) {
-                entry.folder = '';
-                changed = true;
-              }
-            }
-            if (changed) {
-              persistVault();
-            }
-            state.folders = state.folders.filter((f) => f.path !== folder.path);
-            if (state.activeFolderPath === folder.path) state.activeFolderPath = null;
-            showToast('Folder deleted');
-            render(false);
-          } catch (e) {
-            showToast(e?.message || 'Failed to delete folder');
-          }
-        }
-      }, [
-        el('span', { class: 'btn-ic', text: '✕' }),
-        el('span', { text: 'Delete' })
+      const actions = el('div', { class: 'folder-manager-actions' }, [
+        el('button', {
+          class: 'btn ghost small-btn',
+          type: 'button',
+          onclick: () => handleRenameFolder(folder)
+        }, [el('span', { class: 'btn-ic', text: '✎' }), el('span', { text: 'Rename' })]),
+        el('button', {
+          class: 'btn ghost small-btn',
+          type: 'button',
+          onclick: () => handleSetFolderPassword(folder)
+        }, [el('span', { class: 'btn-ic', text: folder.hasPassword ? '🔒' : '🔓' }), el('span', { text: folder.hasPassword ? 'Change password' : 'Lock' })]),
+        folder.hasPassword ? el('button', {
+          class: 'btn ghost small-btn',
+          type: 'button',
+          onclick: () => handleRemoveFolderPassword(folder)
+        }, [el('span', { class: 'btn-ic', text: '⚿' }), el('span', { text: 'Unlock' })]) : el('span'),
+        el('button', {
+          class: 'btn danger ghost small-btn',
+          type: 'button',
+          onclick: () => handleDeleteFolder(folder)
+        }, [el('span', { class: 'btn-ic', text: '✕' }), el('span', { text: 'Delete' })]),
+        el('button', {
+          class: 'btn danger small-btn',
+          type: 'button',
+          onclick: () => handlePurgeFolder(folder)
+        }, [el('span', { class: 'btn-ic', text: '⚠' }), el('span', { text: 'Purge' })])
       ]);
 
-      return el('div', { class: 'account-row' }, [
-        el('div', { class: 'account-label', text: folder.path }),
-        el('div', { class: 'account-value', text: '' }),
-        meta,
-        deleteBtn
+      return el('div', { class: 'folder-manager-row' }, [
+        el('div', { class: 'folder-manager-info' }, [
+          el('div', { class: 'account-label', text: folder.path }),
+          meta
+        ]),
+        actions
       ]);
     });
 
+    const emptyState = rows.length === 0
+      ? el('div', { class: 'account-helper', text: 'No folders yet. Create one below.' })
+      : null;
+
+    const createBtn = el('button', {
+      class: 'btn small-btn',
+      type: 'button',
+      onclick: handleCreateFolderFromManager
+    }, [el('span', { class: 'btn-ic', text: '+' }), el('span', { text: 'New folder' })]);
+
     return el('div', { class: 'account-folders' }, [
-      el('div', { class: 'account-label', text: 'Folders' }),
-      ...rows
+      el('div', { class: 'account-section-header' }, [
+        el('div', { class: 'account-label', text: 'Folder Manager' }),
+        createBtn
+      ]),
+      emptyState || el('div', { class: 'folder-manager-list' }, rows)
+    ]);
+  }
+
+  function renderAccountVaultsSection() {
+    if (!state.auth.user) return el('div');
+
+    const rows = VAULT_SLOT_OPTIONS.map(([slotValue, slotName]) => {
+      const hasData = slotHasStoredVault(slotValue);
+      const isActive = state.activeVaultSlot === slotValue;
+      const isPanic = state.ui.panicVaultSlot === slotValue;
+      const visible = slotValue === 'primary' || state.ui.showDecoyVault;
+      if (!visible && !isActive) return null;
+
+      const statusText = [
+        isActive ? 'Active' : null,
+        hasData ? 'Has data' : 'Empty',
+        isPanic ? 'Panic target' : null
+      ].filter(Boolean).join(' • ');
+
+      const switchBtn = el('button', {
+        class: 'btn ghost small-btn',
+        type: 'button',
+        onclick: () => {
+          if (isActive) return;
+          switchVaultAndLock(slotValue, `Unlock ${slotName} to continue.`);
+          state.showAccountOverlay = false;
+          render();
+        }
+      }, [el('span', { class: 'btn-ic', text: '⇆' }), el('span', { text: isActive ? 'Current' : 'Switch' })]);
+
+      const panicBtn = el('button', {
+        class: `btn ghost small-btn ${isPanic ? 'active' : ''}`,
+        type: 'button',
+        onclick: () => {
+          updateUiPrefs({ panicVaultSlot: slotValue });
+          render(false);
+        }
+      }, [el('span', { class: 'btn-ic', text: '⚠' }), el('span', { text: isPanic ? 'Panic target' : 'Set as panic' })]);
+
+      const showDecoyBtn = slotValue === 'decoy' ? el('button', {
+        class: 'btn ghost small-btn',
+        type: 'button',
+        onclick: () => {
+          updateUiPrefs({ showDecoyVault: !state.ui.showDecoyVault });
+          render(false);
+        }
+      }, [el('span', { class: 'btn-ic', text: state.ui.showDecoyVault ? '🙈' : '👁' }), el('span', { text: state.ui.showDecoyVault ? 'Hide decoy' : 'Show decoy' })]) : null;
+
+      return el('div', { class: 'folder-manager-row' }, [
+        el('div', { class: 'folder-manager-info' }, [
+          el('div', { class: 'account-label', text: slotName }),
+          el('div', { class: 'account-helper', text: statusText })
+        ]),
+        el('div', { class: 'folder-manager-actions' }, [
+          switchBtn,
+          panicBtn,
+          showDecoyBtn || el('span')
+        ])
+      ]);
+    }).filter(Boolean);
+
+    const toggleDecoyRow = !state.ui.showDecoyVault
+      ? el('button', {
+          class: 'btn ghost small-btn',
+          type: 'button',
+          onclick: () => {
+            updateUiPrefs({ showDecoyVault: true });
+            render(false);
+          }
+        }, [el('span', { class: 'btn-ic', text: '✧' }), el('span', { text: 'Enable decoy vault' })])
+      : null;
+
+    return el('div', { class: 'account-folders' }, [
+      el('div', { class: 'account-section-header' }, [
+        el('div', { class: 'account-label', text: 'Vault Manager' }),
+        toggleDecoyRow || el('span')
+      ]),
+      el('div', { class: 'folder-manager-list' }, rows)
     ]);
   }
 
@@ -2579,6 +2806,7 @@ export function createApp(mount) {
       keyLabel,
       keyHelper,
       keyRow,
+      renderAccountVaultsSection(),
       renderAccountFoldersSection(),
       closeBtn
     ]);
