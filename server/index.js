@@ -18,7 +18,8 @@ import {
   upsertUserPassword,
   updateUsername,
   upsertVault,
-  adminUpdateUserProfile
+  adminUpdateUserProfile,
+  initializeDatabase
 } from './db.js';
 import { requireAuth, signAuthToken } from './auth.js';
 import { log, logError, requestLogger } from './logger.js';
