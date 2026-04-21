@@ -33,7 +33,9 @@ import {
   adminListUsers,
   adminSetUserAdmin,
   adminDeleteUser,
-  adminGetSiteSummary
+  adminGetSiteSummary,
+  adminGetUser,
+  adminUpdateUser
 } from './api.js';
 
 function el(tag, attrs = {}, children = []) {
