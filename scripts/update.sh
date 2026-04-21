@@ -39,6 +39,12 @@ fi
 git checkout "$BRANCH"
 git reset --hard "origin/$BRANCH"
 
+# Fix node_modules ownership if it exists (may be owned by root from previous runs)
+if [ -d "$APP_DIR/node_modules" ]; then
+  log "fixing node_modules ownership"
+  chown -R "$(id -u):$(id -g)" "$APP_DIR/node_modules" 2>/dev/null || true
+fi
+
 # Install deps. We use `npm install` (not `npm ci`) so that drift between
 # package.json and package-lock.json does not abort the update. This also
 # ensures dev deps (e.g. vite) are present for the build step below.
