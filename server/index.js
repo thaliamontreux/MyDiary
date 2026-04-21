@@ -303,6 +303,58 @@ app.get('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+app.patch('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const targetId = Number(req.params.id);
+    if (!Number.isFinite(targetId) || targetId <= 0) {
+      res.status(400).json({ error: 'Invalid user id' });
+      return;
+    }
+    const payload = req.body || {};
+    const updated = await adminUpdateUserProfile({
+      id: targetId,
+      email: String(payload.email || ''),
+      firstName: String(payload.firstName || ''),
+      middleName: String(payload.middleName || ''),
+      lastName: String(payload.lastName || ''),
+      username: String(payload.username || ''),
+      addressLine: String(payload.addressLine || ''),
+      city: String(payload.city || ''),
+      stateRegion: String(payload.stateRegion || ''),
+      postalCode: String(payload.postalCode || ''),
+      countryCode: String(payload.countryCode || ''),
+      isAdmin: Boolean(payload.isAdmin),
+      mustChangePassword: Boolean(payload.mustChangePassword)
+    });
+    if (!updated) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    res.json({
+      user: {
+        id: updated.id,
+        email: updated.email,
+        firstName: updated.first_name || null,
+        middleName: updated.middle_name || null,
+        lastName: updated.last_name || null,
+        username: updated.username || null,
+        addressLine: updated.address_line || null,
+        city: updated.city || null,
+        stateRegion: updated.state_region || null,
+        postalCode: updated.postal_code || null,
+        countryCode: updated.country_code || null,
+        tosAccepted: Boolean(updated.tos_accepted_at),
+        isAdmin: Boolean(updated.is_admin),
+        mustChangePassword: Boolean(updated.must_change_password),
+        createdAt: updated.created_at
+      }
+    });
+  } catch (error) {
+    logError('admin_user_update_failed', error, { requestId: req.requestId, adminId: req.user?.id });
+    res.status(500).json({ error: 'Failed to update user' });
+  }
+});
+
 app.get('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
   try {
     const limit = Number(req.query.limit || '200');
