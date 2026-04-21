@@ -5,13 +5,17 @@ const browserIsLocalhost = /^(localhost|127\.0\.0\.1)$/i.test(browserHost);
 const API_BASE_URL = apiBasePointsToLocalhost && !browserIsLocalhost ? '' : rawApiBaseUrl;
 
 async function request(path, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const url = `${API_BASE_URL}${path}`;
+  const fetchOptions = {
     headers: {
       'Content-Type': 'application/json',
       ...(options.headers || {})
     },
     ...options
-  });
+  };
+  console.log('API Request:', { url, method: fetchOptions.method, body: fetchOptions.body });
+  const response = await fetch(url, fetchOptions);
+  console.log('API Response:', { status: response.status, ok: response.ok });
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
