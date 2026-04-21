@@ -2249,3 +2249,30 @@ body::before {
 :root[data-theme='sugar-plum'] body::before {
   background: radial-gradient(circle at 25% 35%, rgba(221,160,221,0.90), transparent 28%), linear-gradient(135deg, #4a0e4e, #8b3a8b, #ba55d3);
 }
+
+/* Light mode: swap hardcoded white text for dark grey for readability */
+:root[data-theme='light'] .sticker-button.active,
+:root[data-theme='light'] .pill.active,
+:root[data-theme='light'] .toggle-chip.active,
+:root[data-theme='light'] .mini-tool-btn:hover {
+  color: #374151;
+}
+
+:root[data-theme='light'] .btn {
+  color: #374151;
+}
+
+:root[data-theme='light'] .btn.danger,
+:root[data-theme='light'] .btn.big {
+  color: #ffffff;
+}
+
+:root[data-theme='light'] .entry-icon-badge {
+  color: #374151;
+}
+
+:root[data-theme='light'] .mini-color-select {
+  color: #374151;
+  background: rgba(0,0,0,0.06);
+  border-color: rgba(0,0,0,0.12);
+}
