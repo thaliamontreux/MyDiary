@@ -1531,6 +1531,53 @@ export function createApp(mount) {
     return backDrop;
   }
 
+  function renderFolderOverlay() {
+    const backDrop = el('div', { class: 'signup-overlay' });
+    const input = el('input', { class: 'lock-input', placeholder: 'New folder name' });
+    const status = el('div', { class: 'lock-status', text: '' });
+
+    const submitBtn = el('button', {
+      class: 'btn big',
+      onclick: () => {
+        const name = (input.value || '').trim();
+        if (!name) {
+          status.textContent = 'Please enter a folder name';
+          return;
+        }
+        const entry = getSelectedEntry();
+        if (!entry) {
+          status.textContent = 'No entry selected';
+          return;
+        }
+        updateSelected({ folder: name });
+        showToast(`Folder set to "${name}"`);
+        backDrop.remove();
+      }
+    }, [
+      el('span', { class: 'btn-ic', text: '✓' }),
+      el('span', { text: 'Save folder' })
+    ]);
+
+    const cancelBtn = el('button', {
+      class: 'btn ghost',
+      onclick: () => backDrop.remove()
+    }, [
+      el('span', { class: 'btn-ic', text: '✕' }),
+      el('span', { text: 'Cancel' })
+    ]);
+
+    const card = el('div', { class: 'signup-card' }, [
+      el('div', { class: 'lock-title', text: 'Add a folder' }),
+      input,
+      submitBtn,
+      cancelBtn,
+      status
+    ]);
+
+    backDrop.append(card);
+    return backDrop;
+  }
+
   async function ensureAdminUsersLoaded() {
     if (!state.auth.token) return;
     if (state.adminUsersLoading) return;
@@ -2135,7 +2182,7 @@ export function createApp(mount) {
             type: 'button',
             onclick: () => {
               state.showAdminMenu = false;
-              lock();
+              logoutCompletely('Signed out.');
             }
           }, [
             el('span', { text: 'Sign out admin' })
@@ -2213,6 +2260,9 @@ export function createApp(mount) {
   }
 
   function lock() {
+    // Soft lock: clear the in-memory encryption key and vault contents so
+    // entries cannot be viewed or edited until the password is entered
+    // again, but keep the auth session so the user stays "signed in".
     clearLockTimer();
     state.unlocked = false;
     state.selectedId = null;
@@ -2222,10 +2272,18 @@ export function createApp(mount) {
     state.key = null;
     state.vault = createEmptyVault();
     state.meta = loadVaultMeta(state.activeVaultSlot) || null;
+    render();
+  }
+
+  function logoutCompletely(notice) {
+    lock();
     state.auth.token = null;
     state.auth.email = '';
     state.auth.user = null;
     clearAuthSession();
+    if (typeof notice === 'string' && notice) {
+      state.lockNotice = notice;
+    }
     render();
   }
 
@@ -2277,7 +2335,7 @@ export function createApp(mount) {
         } catch (e) {
           showToast(e?.message || 'Failed to delete account');
         }
-        lock();
+        logoutCompletely('Account deleted.');
       }
     }, [
       el('span', { class: 'btn-ic', text: '✕' }),
@@ -2933,7 +2991,7 @@ export function createApp(mount) {
         saveEncryptedVault(bundle.data, state.activeVaultSlot);
         state.lockNotice = 'Encrypted backup imported. Unlock to continue.';
         state.meta = loadVaultMeta(state.activeVaultSlot) || null;
-        lock();
+        logoutCompletely('Backup imported.');
       } catch (error) {
         showToast(error?.message || 'Backup import failed');
       }
@@ -3288,13 +3346,9 @@ export function createApp(mount) {
     }
 
     setTopActions([
-      el('button', { class: 'btn danger ghost', onclick: () => panicLock(), title: 'Panic lock' }, [
-        el('span', { class: 'btn-ic', text: '!' }),
-        el('span', { text: 'Panic' })
-      ]),
-      el('button', { class: 'btn ghost', onclick: () => lock(), title: 'Lock' }, [
+      el('button', { class: 'btn ghost', onclick: () => panicLock(), title: 'Lock diary (keep account signed in)' }, [
         el('span', { class: 'btn-ic', text: '⟡' }),
-        el('span', { text: 'Lock' })
+        el('span', { text: 'Lock diary' })
       ]),
       el('button', { class: 'btn ghost', onclick: () => createEntry('quick') }, [
         el('span', { class: 'btn-ic', text: '✦' }),
@@ -3810,6 +3864,18 @@ export function createApp(mount) {
       placeholder: 'Folder name'
     });
 
+    const addFolderBtn = el('button', {
+      class: 'btn ghost small-btn',
+      type: 'button',
+      onclick: () => {
+        const overlay = renderFolderOverlay();
+        document.body.append(overlay);
+      }
+    }, [
+      el('span', { class: 'btn-ic', text: '+' }),
+      el('span', { text: 'Add folder' })
+    ]);
+
     const recipientInput = el('input', {
       class: 'meta-textarea',
       type: 'text',
@@ -3981,7 +4047,7 @@ export function createApp(mount) {
       detailCards.push(
         el('label', { class: 'detail-card' }, [
           el('span', { class: 'detail-label', text: 'Folder' }),
-          folderInput
+          el('div', { class: 'detail-inline' }, [folderInput, addFolderBtn])
         ]),
         el('label', { class: 'detail-card' }, [
           el('span', { class: 'detail-label', text: 'What this note is about' }),
@@ -4184,21 +4250,6 @@ export function createApp(mount) {
           el('span', { text: 'Sign up' })
         ]);
 
-    const dangerRow = el('div', { class: 'danger-row' }, [
-      el('button', {
-        class: 'btn danger ghost',
-        onclick: () => {
-          if (!confirm('This will delete your diary on this device. Continue?')) return;
-          wipeAllData();
-          state.meta = null;
-          lock();
-        }
-      }, [
-        el('span', { class: 'btn-ic', text: '!' }),
-        el('span', { text: 'Delete local diary' })
-      ])
-    ]);
-
     const cardChildren = [
       heading,
       sub,
@@ -4219,7 +4270,7 @@ export function createApp(mount) {
       cardChildren.push(createAccountBtn);
     }
 
-    cardChildren.push(status, dangerRow);
+    cardChildren.push(status);
 
     const card = el('div', { class: 'lock-card' }, cardChildren);
 
