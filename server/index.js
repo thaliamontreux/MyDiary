@@ -4,7 +4,22 @@ import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
 
-import { createUser, findUserByEmail, findUserByUsername, getVault, initializeDatabase, markUserTosAccepted, pingDatabase, upsertVault, deleteUserById, updateUsername, listUsers, setUserAdminFlag, getSiteSummary } from './db.js';
+import {
+  createUser,
+  deleteUserById,
+  findUserByEmail,
+  findUserById,
+  findUserByUsername,
+  getSiteSummary,
+  getVault,
+  listUsers,
+  pingDatabase,
+  setUserAdminFlag,
+  upsertUserPassword,
+  updateUsername,
+  upsertVault,
+  adminUpdateUserProfile
+} from './db.js';
 import { requireAuth, signAuthToken } from './auth.js';
 import { log, logError, requestLogger } from './logger.js';
 import { createRateLimiter } from './rateLimit.js';
@@ -83,6 +98,43 @@ app.get('/api/ready', async (_req, res) => {
     res.json({ ok: true });
   } catch {
     res.status(503).json({ ok: false, error: 'Database unavailable' });
+  }
+});
+
+app.get('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const targetId = Number(req.params.id);
+    if (!Number.isFinite(targetId) || targetId <= 0) {
+      res.status(400).json({ error: 'Invalid user id' });
+      return;
+    }
+    const user = await findUserById(targetId);
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    res.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.first_name || null,
+        middleName: user.middle_name || null,
+        lastName: user.last_name || null,
+        username: user.username || null,
+        addressLine: user.address_line || null,
+        city: user.city || null,
+        stateRegion: user.state_region || null,
+        postalCode: user.postal_code || null,
+        countryCode: user.country_code || null,
+        tosAccepted: Boolean(user.tos_accepted_at),
+        isAdmin: Boolean(user.is_admin),
+        mustChangePassword: Boolean(user.must_change_password),
+        createdAt: user.created_at
+      }
+    });
+  } catch (error) {
+    logError('admin_user_get_failed', error, { requestId: req.requestId, adminId: req.user?.id });
+    res.status(500).json({ error: 'Failed to load user' });
   }
 });
 

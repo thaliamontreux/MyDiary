@@ -352,6 +352,33 @@ export async function findUserByEmail(email) {
   return rows[0] || null;
 }
 
+export async function findUserById(userId) {
+  ensurePool();
+  const [rows] = await pool.query(
+    `SELECT
+       id,
+       email,
+       first_name,
+       middle_name,
+       last_name,
+       username,
+       address_line,
+       city,
+       state_region,
+       postal_code,
+       country_code,
+       tos_accepted_at,
+       is_admin,
+       must_change_password,
+       created_at
+     FROM users
+     WHERE id = ?
+     LIMIT 1`,
+    [userId]
+  );
+  return rows[0] || null;
+}
+
 export async function upsertUserPassword(userId, passwordHash) {
   ensurePool();
   await pool.query('UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?', [passwordHash, userId]);
@@ -496,6 +523,56 @@ export async function listUsers(limit = 200) {
     [safeLimit]
   );
   return rows;
+}
+
+export async function adminUpdateUserProfile({
+  id,
+  email,
+  firstName,
+  middleName,
+  lastName,
+  username,
+  addressLine,
+  city,
+  stateRegion,
+  postalCode,
+  countryCode,
+  isAdmin,
+  mustChangePassword
+}) {
+  ensurePool();
+  await pool.query(
+    `UPDATE users
+       SET email = ?,
+           first_name = ?,
+           middle_name = ?,
+           last_name = ?,
+           username = ?,
+           address_line = ?,
+           city = ?,
+           state_region = ?,
+           postal_code = ?,
+           country_code = ?,
+           is_admin = ?,
+           must_change_password = ?
+       WHERE id = ?`,
+    [
+      email,
+      firstName || null,
+      middleName || null,
+      lastName || null,
+      username || null,
+      addressLine || null,
+      city || null,
+      stateRegion || null,
+      postalCode || null,
+      countryCode || null,
+      isAdmin ? 1 : 0,
+      mustChangePassword ? 1 : 0,
+      id
+    ]
+  );
+  return findUserById(id);
 }
 
 export async function setUserAdminFlag(userId, isAdmin) {

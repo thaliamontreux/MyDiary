@@ -1409,6 +1409,10 @@ export function createApp(mount) {
     showSiteManagerOverlay: false,
     adminUsers: [],
     adminUsersLoading: false,
+    adminSelectedUserId: null,
+    adminSelectedUser: null,
+    adminSelectedUserLoading: false,
+    adminSelectedUserSaving: false,
     adminSiteSummary: null,
     adminSiteSummaryLoading: false
   };
@@ -1623,64 +1627,219 @@ export function createApp(mount) {
     const rows = state.adminUsers || [];
 
     const title = el('div', { class: 'lock-title', text: 'User Manager' });
-    const subtitle = el('div', { class: 'lock-subtle', text: 'See who has access and gently promote or remove admins.' });
+    const subtitle = el('div', { class: 'lock-subtle', text: 'Tap a user to view and edit their account details. Diaries remain encrypted and private to each user.' });
 
     const headerRow = el('div', { class: 'admin-table-row admin-table-header' }, [
       el('div', { class: 'admin-cell', text: 'Email' }),
       el('div', { class: 'admin-cell', text: 'Username' }),
       el('div', { class: 'admin-cell', text: 'Admin' }),
-      el('div', { class: 'admin-cell', text: 'ToS' }),
-      el('div', { class: 'admin-cell', text: 'Actions' })
+      el('div', { class: 'admin-cell', text: 'ToS' })
     ]);
 
     const bodyRows = rows.map((u) => {
-      const toggleBtn = el('button', {
-        class: 'admin-menu-item',
+      const row = el('button', {
+        class: 'admin-table-row admin-row-button',
         type: 'button',
         onclick: async () => {
+          state.adminSelectedUserId = u.id;
+          state.adminSelectedUserLoading = true;
+          render(false);
           try {
-            await adminSetUserAdmin(state.auth.token, u.id, !u.isAdmin);
-            showToast(!u.isAdmin ? 'User promoted to admin' : 'Admin rights removed');
-            await ensureAdminUsersLoaded();
+            const { user } = await adminGetUser(state.auth.token, u.id);
+            state.adminSelectedUser = user || null;
           } catch (e) {
-            showToast(e?.message || 'Failed to update admin flag');
+            showToast(e?.message || 'Failed to load user details');
+          } finally {
+            state.adminSelectedUserLoading = false;
+            render(false);
           }
         }
-      }, [el('span', { text: u.isAdmin ? 'Remove admin' : 'Make admin' })]);
-
-      const deleteBtn = el('button', {
-        class: 'admin-menu-item',
-        type: 'button',
-        onclick: async () => {
-          if (!confirm('Delete this user and their vault data? This cannot be undone.')) return;
-          try {
-            await adminDeleteUser(state.auth.token, u.id);
-            showToast('User deleted');
-            await ensureAdminUsersLoaded();
-          } catch (e) {
-            showToast(e?.message || 'Failed to delete user');
-          }
-        }
-      }, [el('span', { text: 'Delete' })]);
-
-      return el('div', { class: 'admin-table-row' }, [
+      }, [
         el('div', { class: 'admin-cell', text: u.email }),
         el('div', { class: 'admin-cell', text: u.username || '—' }),
         el('div', { class: 'admin-cell', text: u.isAdmin ? 'Yes' : 'No' }),
-        el('div', { class: 'admin-cell', text: u.tosAccepted ? 'Accepted' : 'Pending' }),
-        el('div', { class: 'admin-cell admin-cell-actions' }, [toggleBtn, deleteBtn])
+        el('div', { class: 'admin-cell', text: u.tosAccepted ? 'Accepted' : 'Pending' })
       ]);
+      return row;
     });
 
-    const loadingRow = state.adminUsersLoading
-      ? el('div', { class: 'lock-status', text: 'Loading users…' })
-      : el('div');
+    const listColumnChildren = [headerRow, ...bodyRows];
+    if (state.adminUsersLoading) {
+      listColumnChildren.push(el('div', { class: 'lock-status', text: 'Loading users…' }));
+    }
+
+    const listColumn = el('div', { class: 'admin-users-column' }, listColumnChildren);
+
+    const detail = state.adminSelectedUser;
+    const detailChildren = [];
+
+    if (state.adminSelectedUserLoading) {
+      detailChildren.push(el('div', { class: 'lock-status', text: 'Loading account…' }));
+    } else if (detail) {
+      const status = el('div', { class: 'lock-status', text: '' });
+
+      const emailInput = el('input', { class: 'lock-input', type: 'email', value: detail.email || '' });
+      const usernameInput = el('input', { class: 'lock-input', value: detail.username || '' });
+      const firstNameInput = el('input', { class: 'lock-input', value: detail.firstName || '' });
+      const middleNameInput = el('input', { class: 'lock-input', value: detail.middleName || '' });
+      const lastNameInput = el('input', { class: 'lock-input', value: detail.lastName || '' });
+      const addressInput = el('input', { class: 'lock-input', value: detail.addressLine || '' });
+      const cityInput = el('input', { class: 'lock-input', value: detail.city || '' });
+      const stateRegionInput = el('input', { class: 'lock-input', value: detail.stateRegion || '' });
+      const postalCodeInput = el('input', { class: 'lock-input', value: detail.postalCode || '' });
+      const countryCodeInput = el('input', { class: 'lock-input', value: detail.countryCode || '' });
+
+      const isAdminCheckbox = el('input', { type: 'checkbox' });
+      if (detail.isAdmin) isAdminCheckbox.checked = true;
+      const mcpCheckbox = el('input', { type: 'checkbox' });
+      if (detail.mustChangePassword) mcpCheckbox.checked = true;
+
+      const tosText = el('div', {
+        class: 'account-value',
+        text: detail.tosAccepted ? 'Accepted' : 'Not yet accepted'
+      });
+
+      const keyRow = el('div', { class: 'account-row' }, [
+        el('div', { class: 'account-label', text: 'Encryption key' }),
+        el('div', {
+          class: 'account-value',
+          text: 'Locked to this account. Admins cannot view or change the key or diary contents.'
+        })
+      ]);
+
+      const saveBtn = el('button', {
+        class: 'btn small-btn',
+        type: 'button',
+        onclick: async () => {
+          if (state.adminSelectedUserSaving) return;
+          state.adminSelectedUserSaving = true;
+          status.textContent = 'Saving changes…';
+          try {
+            const payload = {
+              email: emailInput.value,
+              username: usernameInput.value,
+              firstName: firstNameInput.value,
+              middleName: middleNameInput.value,
+              lastName: lastNameInput.value,
+              addressLine: addressInput.value,
+              city: cityInput.value,
+              stateRegion: stateRegionInput.value,
+              postalCode: postalCodeInput.value,
+              countryCode: countryCodeInput.value,
+              isAdmin: Boolean(isAdminCheckbox.checked),
+              mustChangePassword: Boolean(mcpCheckbox.checked)
+            };
+            const { user } = await adminUpdateUser(state.auth.token, detail.id, payload);
+            state.adminSelectedUser = user || null;
+            await ensureAdminUsersLoaded();
+            status.textContent = 'Saved';
+          } catch (e) {
+            status.textContent = e?.message || 'Failed to save changes';
+          } finally {
+            state.adminSelectedUserSaving = false;
+            render(false);
+          }
+        }
+      }, [
+        el('span', { class: 'btn-ic', text: '✓' }),
+        el('span', { text: 'Save account' })
+      ]);
+
+      const deleteBtn = el('button', {
+        class: 'btn danger ghost small-btn',
+        type: 'button',
+        onclick: async () => {
+          if (!confirm('Delete this user and all of their diary data? This cannot be undone.')) return;
+          try {
+            await adminDeleteUser(state.auth.token, detail.id);
+            showToast('User deleted');
+            state.adminSelectedUserId = null;
+            state.adminSelectedUser = null;
+            await ensureAdminUsersLoaded();
+          } catch (e) {
+            showToast(e?.message || 'Failed to delete user');
+          } finally {
+            render(false);
+          }
+        }
+      }, [
+        el('span', { class: 'btn-ic', text: '✕' }),
+        el('span', { text: 'Delete user' })
+      ]);
+
+      detailChildren.push(
+        el('div', { class: 'account-row' }, [
+          el('div', { class: 'account-label', text: 'Email' }),
+          emailInput
+        ]),
+        el('div', { class: 'account-row' }, [
+          el('div', { class: 'account-label', text: 'Username' }),
+          usernameInput
+        ]),
+        el('div', { class: 'account-row' }, [
+          el('div', { class: 'account-label', text: 'First name' }),
+          firstNameInput
+        ]),
+        el('div', { class: 'account-row' }, [
+          el('div', { class: 'account-label', text: 'Middle name' }),
+          middleNameInput
+        ]),
+        el('div', { class: 'account-row' }, [
+          el('div', { class: 'account-label', text: 'Last name' }),
+          lastNameInput
+        ]),
+        el('div', { class: 'account-row' }, [
+          el('div', { class: 'account-label', text: 'Street address' }),
+          addressInput
+        ]),
+        el('div', { class: 'account-row' }, [
+          el('div', { class: 'account-label', text: 'City' }),
+          cityInput
+        ]),
+        el('div', { class: 'account-row' }, [
+          el('div', { class: 'account-label', text: 'State / Region' }),
+          stateRegionInput
+        ]),
+        el('div', { class: 'account-row' }, [
+          el('div', { class: 'account-label', text: 'Postal code' }),
+          postalCodeInput
+        ]),
+        el('div', { class: 'account-row' }, [
+          el('div', { class: 'account-label', text: 'Country code' }),
+          countryCodeInput
+        ]),
+        el('div', { class: 'account-row' }, [
+          el('div', { class: 'account-label', text: 'Admin' }),
+          isAdminCheckbox
+        ]),
+        el('div', { class: 'account-row' }, [
+          el('div', { class: 'account-label', text: 'Must change password' }),
+          mcpCheckbox
+        ]),
+        el('div', { class: 'account-row' }, [
+          el('div', { class: 'account-label', text: 'Terms of Service' }),
+          tosText
+        ]),
+        keyRow,
+        el('div', { class: 'account-row' }, [
+          saveBtn,
+          deleteBtn
+        ]),
+        status
+      );
+    } else {
+      detailChildren.push(el('div', { class: 'lock-status', text: 'Select a user to manage their account.' }));
+    }
+
+    const detailColumn = el('div', { class: 'admin-user-detail-column' }, detailChildren);
 
     const closeBtn = el('button', {
       class: 'btn ghost small-btn',
       type: 'button',
       onclick: () => {
         state.showUserManagerOverlay = false;
+        state.adminSelectedUserId = null;
+        state.adminSelectedUser = null;
         render(false);
       }
     }, [
@@ -1688,12 +1847,12 @@ export function createApp(mount) {
       el('span', { text: 'Close' })
     ]);
 
+    const contentRow = el('div', { class: 'admin-user-manager-grid' }, [listColumn, detailColumn]);
+
     const card = el('div', { class: 'account-card' }, [
       title,
       subtitle,
-      headerRow,
-      ...bodyRows,
-      loadingRow,
+      contentRow,
       closeBtn
     ]);
 

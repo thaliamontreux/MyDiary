@@ -687,7 +687,7 @@ body::before {
 
 .admin-table-row {
   display: grid;
-  grid-template-columns: 2.5fr 1.5fr 0.8fr 1fr 2fr;
+  grid-template-columns: 2.5fr 1.5fr 0.8fr 1fr;
   gap: 6px;
   font-size: 12px;
   padding: 4px 4px;
@@ -739,6 +739,38 @@ body::before {
   margin-top: 4px;
   font-size: 18px;
   font-weight: 700;
+}
+
+.admin-row-button {
+  border: 0;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.admin-row-button:hover {
+  background: rgba(148,163,184,0.12);
+}
+
+.admin-user-manager-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr);
+  gap: 16px;
+  margin-top: 10px;
+}
+
+.admin-users-column {
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.admin-user-detail-column {
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .main {

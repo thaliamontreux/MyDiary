@@ -27,6 +27,25 @@ export async function registerUser(payload) {
   });
 }
 
+export async function adminGetUser(token, userId) {
+  return request(`/api/admin/users/${encodeURIComponent(userId)}`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+}
+
+export async function adminUpdateUser(token, userId, payload) {
+  return request(`/api/admin/users/${encodeURIComponent(userId)}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(payload)
+  });
+}
+
 export async function loginUser(email, password) {
   return request('/api/auth/login', {
     method: 'POST',
