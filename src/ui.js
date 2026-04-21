@@ -1601,17 +1601,38 @@ export function createApp(mount) {
   // setupActivityListeners(); // Auto-lock completely disabled
 
   const root = el('div', { class: 'app-shell' });
+
+  const themeToggleBtn = el('button', {
+    class: 'btn ghost small-btn topbar-icon-btn',
+    type: 'button',
+    title: 'Toggle dark / light mode',
+    onclick: () => setTheme(state.ui.themeId === 'dark' ? 'light' : 'dark')
+  }, [el('span', { class: 'theme-toggle-icon', text: '🌙' })]);
+
+  const hamburgerBtn = el('button', {
+    class: 'btn ghost small-btn topbar-icon-btn hamburger-btn',
+    type: 'button',
+    title: 'Toggle navigation',
+    onclick: () => {
+      root.classList.toggle('sidebar-open');
+    }
+  }, [el('span', { text: '☰' })]);
+
   const topbar = el('div', { class: 'topbar' }, [
-    el('div', { class: 'brand' }, [
-      el('div', { class: 'brand-title', text: 'My Secret Diary' }),
-      el('div', { class: 'brand-sub', text: 'private, pretty, and protected' })
+    el('div', { class: 'topbar-left' }, [
+      hamburgerBtn,
+      el('div', { class: 'brand' }, [
+        el('div', { class: 'brand-title', text: 'My Secret Diary' }),
+        el('div', { class: 'brand-sub', text: 'private, pretty, and protected' })
+      ])
     ]),
-    el('div', { class: 'top-actions' })
+    el('div', { class: 'topbar-right top-actions' }, [
+      themeToggleBtn
+    ])
   ]);
 
   const main = el('div', { class: 'main' });
   root.append(topbar, main);
-  mount.replaceChildren(root);
   const brandTitleNode = topbar.querySelector('.brand-title');
   const brandSubNode = topbar.querySelector('.brand-sub');
 
@@ -2823,6 +2844,8 @@ export function createApp(mount) {
 
   function setTheme(themeId) {
     updateUiPrefs({ themeId });
+    const icon = themeToggleBtn.querySelector('.theme-toggle-icon');
+    if (icon) icon.textContent = themeId === 'dark' ? '☀️' : '🌙';
   }
 
   function setTopActions(nodes) {
@@ -5414,6 +5437,52 @@ export function createApp(mount) {
       );
     }
 
+    // ── Live word/char counter ───────────────────────────────────────────────
+    const getBodyText = () => richEditor ? richEditor.innerText || '' : (selected.body || '');
+    const countWords = (t) => t.trim() ? t.trim().split(/\s+/).length : 0;
+    const countChars = (t) => t.replace(/\s/g, '').length;
+
+    const wordCountNode = el('div', { class: 'word-count-pill' });
+    const updateWordCount = () => {
+      const t = richEditor ? richEditor.innerText : (selected.body || '');
+      const w = countWords(t);
+      const c = countChars(t);
+      const readMins = Math.max(1, Math.round(w / 200));
+      wordCountNode.textContent = `${w.toLocaleString()} words · ${c.toLocaleString()} chars · ~${readMins} min read`;
+    };
+    updateWordCount();
+    richEditor?.addEventListener('input', updateWordCount);
+
+    // ── On-this-day memories banner ──────────────────────────────────────────
+    const todayMd = isoDate().slice(5); // MM-DD
+    const onThisDayPast = (state.vault?.entries || []).filter((e) => {
+      if (!e.date || e.id === selected.id) return false;
+      const entryMd = e.date.slice(5);
+      const entryYear = e.date.slice(0, 4);
+      const thisYear = isoDate().slice(0, 4);
+      return entryMd === todayMd && entryYear !== thisYear;
+    }).sort((a, b) => a.date.localeCompare(b.date));
+
+    const onThisDayBanner = onThisDayPast.length
+      ? el('div', { class: 'on-this-day-banner' }, [
+          el('div', { class: 'otd-header' }, [
+            el('span', { class: 'otd-icon', text: '✨' }),
+            el('span', { class: 'otd-title', text: `On this day in past years` })
+          ]),
+          el('div', { class: 'otd-list' }, onThisDayPast.slice(0, 3).map((e) => {
+            const yearsAgo = Number(isoDate().slice(0, 4)) - Number(e.date.slice(0, 4));
+            return el('div', {
+              class: 'otd-item',
+              onclick: () => { state.selectedId = e.id; render(false); }
+            }, [
+              el('span', { class: 'otd-year', text: `${yearsAgo}yr ago` }),
+              el('span', { class: 'otd-entry-title', text: e.title || 'Untitled' }),
+              el('span', { class: 'otd-preview', text: summarizeBody(e.body) })
+            ]);
+          }))
+        ])
+      : el('div');
+
     const footerSummary = selected.moduleType === 'recipe'
       ? `${selected.recipeCategory || 'Recipe'} • ${selected.prepTime || 'Prep time soon'} • ${formatPrettyDate(selected.date)}`
       : selected.moduleType === 'letter'
@@ -5431,55 +5500,61 @@ export function createApp(mount) {
         ]),
         el('div', { class: 'editor-head-right' }, [delBtn])
       ]),
+      onThisDayBanner,
       el('div', { class: 'detail-grid' }, detailCards),
       plainTextEditor,
       renderVoiceMemoUI(selected),
       renderVideoUI(selected),
       attachmentsEditor,
       el('div', { class: 'editor-foot' }, [
-        el('button', { class: 'btn', type: 'button', onclick: () => saveAllFormChanges() }, [
-          el('span', { class: 'btn-ic', text: '♡' }),
-          el('span', { text: 'Save all changes' })
-        ]),
-        renderDictateButton(selected),
-        el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderShareOverlay(selected) }, [
-          el('span', { class: 'btn-ic', text: '🔗' }),
-          el('span', { text: 'Share' })
-        ]),
-        el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderTemplateOverlay() }, [
-          el('span', { class: 'btn-ic', text: '📋' }),
-          el('span', { text: 'Template' })
-        ]),
-        el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderCommentsOverlay(selected) }, [
-          el('span', { class: 'btn-ic', text: '💬' }),
-          el('span', { text: 'Comments' })
-        ]),
-        el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderFitnessOverlay(selected) }, [
-          el('span', { class: 'btn-ic', text: '🏃' }),
-          el('span', { text: 'Health data' })
-        ]),
-        el('button', {
-          class: 'btn ghost small-btn', type: 'button',
-          onclick: async () => {
-            showToast('Getting location…');
-            const loc = await captureLocationForEntry();
-            if (loc) {
-              updateSelected({ locationLabel: loc.locationLabel, weatherSummary: loc.weatherSummary, temperature: loc.temperature });
-              showToast(`Location: ${loc.locationLabel}`);
-            } else {
-              showToast('Location unavailable.');
+        el('div', { class: 'editor-foot-primary' }, [
+          el('button', { class: 'btn', type: 'button', onclick: () => saveAllFormChanges() }, [
+            el('span', { class: 'btn-ic', text: '♡' }),
+            el('span', { text: 'Save' })
+          ]),
+          renderDictateButton(selected),
+          el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderTemplateOverlay() }, [
+            el('span', { class: 'btn-ic', text: '📋' }),
+            el('span', { text: 'Template' })
+          ]),
+          el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderShareOverlay(selected) }, [
+            el('span', { class: 'btn-ic', text: '🔗' }),
+            el('span', { text: 'Share' })
+          ]),
+          el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderCommentsOverlay(selected) }, [
+            el('span', { class: 'btn-ic', text: '💬' }),
+            el('span', { text: 'Comments' })
+          ]),
+          el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderFitnessOverlay(selected) }, [
+            el('span', { class: 'btn-ic', text: '🏃' }),
+            el('span', { text: 'Health' })
+          ]),
+          el('button', {
+            class: 'btn ghost small-btn', type: 'button',
+            onclick: async () => {
+              showToast('Getting location…');
+              const loc = await captureLocationForEntry();
+              if (loc) {
+                updateSelected({ locationLabel: loc.locationLabel, weatherSummary: loc.weatherSummary, temperature: loc.temperature });
+                showToast(`Location: ${loc.locationLabel}`);
+              } else {
+                showToast('Location unavailable.');
+              }
             }
-          }
-        }, [
-          el('span', { class: 'btn-ic', text: '📍' }),
-          el('span', { text: 'Add location' })
+          }, [
+            el('span', { class: 'btn-ic', text: '📍' }),
+            el('span', { text: 'Location' })
+          ])
         ]),
-        el('div', { class: 'tiny', text: footerSummary }),
-        selected?.locationLabel ? el('div', { class: 'location-weather-chip' }, [
-          el('span', { text: `📍 ${selected.locationLabel}` }),
-          selected.weatherSummary ? el('span', { text: ` • ${selected.weatherSummary}` }) : el('span'),
-          selected.temperature ? el('span', { text: ` ${selected.temperature}` }) : el('span')
-        ]) : el('div')
+        el('div', { class: 'editor-foot-meta' }, [
+          wordCountNode,
+          el('div', { class: 'tiny', text: footerSummary }),
+          selected?.locationLabel ? el('div', { class: 'location-weather-chip' }, [
+            el('span', { text: `📍 ${selected.locationLabel}` }),
+            selected.weatherSummary ? el('span', { text: ` • ${selected.weatherSummary}` }) : el('span'),
+            selected.temperature ? el('span', { text: ` ${selected.temperature}` }) : el('span')
+          ]) : el('div')
+        ])
       ])
     ]);
 
@@ -5652,6 +5727,42 @@ export function createApp(mount) {
       await Promise.all([loadFoldersForUser(), loadVaultsForUser(), loadTagsForUser()]);
     }
     initDailyReminderCheck();
+
+    // ── Global keyboard shortcuts ────────────────────────────────────────────
+    document.addEventListener('keydown', (e) => {
+      const mod = e.ctrlKey || e.metaKey;
+      const inEditor = document.activeElement?.closest('.rich-editor, .title-input, .lock-input, input, textarea, select');
+
+      if (e.key === 'Escape') {
+        // Close any open overlay
+        const overlay = document.querySelector('.overlay-backdrop');
+        if (overlay) { overlay.remove(); return; }
+        // Close mobile sidebar
+        if (root.classList.contains('sidebar-open')) { root.classList.remove('sidebar-open'); return; }
+      }
+
+      if (mod && !inEditor) {
+        if (e.key === 'n') {
+          e.preventDefault();
+          if (state.unlocked) createEntry('journal');
+        }
+        if (e.key === 'k') {
+          e.preventDefault();
+          if (state.unlocked) renderAdvancedSearchOverlay();
+        }
+        if (e.key === ',') {
+          e.preventDefault();
+          if (state.unlocked) { state.showAccountOverlay = true; render(false); }
+        }
+      }
+    });
+
+    // Sync theme toggle icon to initial theme
+    const initIcon = themeToggleBtn.querySelector('.theme-toggle-icon');
+    if (initIcon) initIcon.textContent = (state.ui.themeId === 'dark') ? '☀️' : '🌙';
+
+    // Close mobile sidebar when clicking the main content area
+    main.addEventListener('click', () => root.classList.remove('sidebar-open'));
 
     const urlParams = new URLSearchParams(window.location.search);
     const capturedPrompt = urlParams.get('prompt');
