@@ -26,7 +26,11 @@ import {
   acceptTerms,
   deleteAccount,
   setUsername,
-  changePassword
+  changePassword,
+  adminListUsers,
+  adminSetUserAdmin,
+  adminDeleteUser,
+  adminGetSiteSummary
 } from './api.js';
 
 function el(tag, attrs = {}, children = []) {
@@ -36,6 +40,35 @@ function el(tag, attrs = {}, children = []) {
     else if (k === 'text') node.textContent = v;
     else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2), v);
     else node.setAttribute(k, v);
+  }
+
+  async function ensureAdminUsersLoaded() {
+    if (!state.auth.token) return;
+    if (state.adminUsersLoading) return;
+    state.adminUsersLoading = true;
+    try {
+      const { users } = await adminListUsers(state.auth.token, 200);
+      state.adminUsers = users || [];
+    } catch (e) {
+      showToast(e?.message || 'Failed to load users');
+    } finally {
+      state.adminUsersLoading = false;
+      render(false);
+    }
+  }
+
+  async function ensureSiteSummaryLoaded() {
+    if (!state.auth.token) return;
+    if (state.adminSiteSummaryLoading) return;
+    state.adminSiteSummaryLoading = true;
+    try {
+      state.adminSiteSummary = await adminGetSiteSummary(state.auth.token);
+    } catch (e) {
+      showToast(e?.message || 'Failed to load site summary');
+    } finally {
+      state.adminSiteSummaryLoading = false;
+      render(false);
+    }
   }
 
   function renderAdminPasswordOverlay() {
@@ -194,6 +227,136 @@ function el(tag, attrs = {}, children = []) {
 
     backDrop.append(card);
     return backDrop;
+  }
+
+  function renderUserManagerOverlay() {
+    if (!state.showUserManagerOverlay || !state.auth.user?.isAdmin) return null;
+    const rows = state.adminUsers || [];
+
+    const title = el('div', { class: 'lock-title', text: 'User Manager' });
+    const subtitle = el('div', { class: 'lock-subtle', text: 'See who has access and gently promote or remove admins.' });
+
+    const headerRow = el('div', { class: 'admin-table-row admin-table-header' }, [
+      el('div', { class: 'admin-cell', text: 'Email' }),
+      el('div', { class: 'admin-cell', text: 'Username' }),
+      el('div', { class: 'admin-cell', text: 'Admin' }),
+      el('div', { class: 'admin-cell', text: 'ToS' }),
+      el('div', { class: 'admin-cell', text: 'Actions' })
+    ]);
+
+    const bodyRows = rows.map((u) => {
+      const toggleBtn = el('button', {
+        class: 'admin-menu-item',
+        type: 'button',
+        onclick: async () => {
+          try {
+            await adminSetUserAdmin(state.auth.token, u.id, !u.isAdmin);
+            showToast(!u.isAdmin ? 'User promoted to admin' : 'Admin rights removed');
+            await ensureAdminUsersLoaded();
+          } catch (e) {
+            showToast(e?.message || 'Failed to update admin flag');
+          }
+        }
+      }, [el('span', { text: u.isAdmin ? 'Remove admin' : 'Make admin' })]);
+
+      const deleteBtn = el('button', {
+        class: 'admin-menu-item',
+        type: 'button',
+        onclick: async () => {
+          if (!confirm('Delete this user and their vault data? This cannot be undone.')) return;
+          try {
+            await adminDeleteUser(state.auth.token, u.id);
+            showToast('User deleted');
+            await ensureAdminUsersLoaded();
+          } catch (e) {
+            showToast(e?.message || 'Failed to delete user');
+          }
+        }
+      }, [el('span', { text: 'Delete' })]);
+
+      return el('div', { class: 'admin-table-row' }, [
+        el('div', { class: 'admin-cell', text: u.email }),
+        el('div', { class: 'admin-cell', text: u.username || '—' }),
+        el('div', { class: 'admin-cell', text: u.isAdmin ? 'Yes' : 'No' }),
+        el('div', { class: 'admin-cell', text: u.tosAccepted ? 'Accepted' : 'Pending' }),
+        el('div', { class: 'admin-cell admin-cell-actions' }, [toggleBtn, deleteBtn])
+      ]);
+    });
+
+    const loadingRow = state.adminUsersLoading
+      ? el('div', { class: 'lock-status', text: 'Loading users…' })
+      : el('div');
+
+    const closeBtn = el('button', {
+      class: 'btn ghost small-btn',
+      type: 'button',
+      onclick: () => {
+        state.showUserManagerOverlay = false;
+        render(false);
+      }
+    }, [
+      el('span', { class: 'btn-ic', text: '✕' }),
+      el('span', { text: 'Close' })
+    ]);
+
+    const card = el('div', { class: 'account-card' }, [
+      title,
+      subtitle,
+      headerRow,
+      ...bodyRows,
+      loadingRow,
+      closeBtn
+    ]);
+
+    return el('div', { class: 'account-overlay' }, [card]);
+  }
+
+  function renderSiteManagerOverlay() {
+    if (!state.showSiteManagerOverlay || !state.auth.user?.isAdmin) return null;
+    const summary = state.adminSiteSummary;
+
+    const title = el('div', { class: 'lock-title', text: 'Site Manager' });
+    const subtitle = el('div', { class: 'lock-subtle', text: 'High-level health and usage for this diary installation.' });
+
+    const grid = summary ? el('div', { class: 'admin-summary-grid' }, [
+      el('div', { class: 'summary-card' }, [
+        el('div', { class: 'summary-label', text: 'Total users' }),
+        el('div', { class: 'summary-value', text: String(summary.totalUsers) })
+      ]),
+      el('div', { class: 'summary-card' }, [
+        el('div', { class: 'summary-label', text: 'Admins' }),
+        el('div', { class: 'summary-value', text: String(summary.adminUsers) })
+      ]),
+      el('div', { class: 'summary-card' }, [
+        el('div', { class: 'summary-label', text: 'ToS accepted' }),
+        el('div', { class: 'summary-value', text: String(summary.tosAcceptedUsers) })
+      ]),
+      el('div', { class: 'summary-card' }, [
+        el('div', { class: 'summary-label', text: 'Environment' }),
+        el('div', { class: 'summary-value', text: summary.nodeEnv || 'unknown' })
+      ])
+    ]) : el('div', { class: 'lock-status', text: state.adminSiteSummaryLoading ? 'Loading site summary…' : 'No summary yet.' });
+
+    const closeBtn = el('button', {
+      class: 'btn ghost small-btn',
+      type: 'button',
+      onclick: () => {
+        state.showSiteManagerOverlay = false;
+        render(false);
+      }
+    }, [
+      el('span', { class: 'btn-ic', text: '✕' }),
+      el('span', { text: 'Close' })
+    ]);
+
+    const card = el('div', { class: 'account-card' }, [
+      title,
+      subtitle,
+      grid,
+      closeBtn
+    ]);
+
+    return el('div', { class: 'account-overlay' }, [card]);
   }
 
   function renderPasswordChangeOverlay() {
@@ -1616,7 +1779,13 @@ export function createApp(mount) {
     },
     showAccountOverlay: false,
     showEncryptionKey: false,
-    showAdminMenu: false
+    showAdminMenu: false,
+    showUserManagerOverlay: false,
+    showSiteManagerOverlay: false,
+    adminUsers: [],
+    adminUsersLoading: false,
+    adminSiteSummary: null,
+    adminSiteSummaryLoading: false
   };
 
   // setupActivityListeners(); // Auto-lock completely disabled
@@ -1759,6 +1928,30 @@ export function createApp(mount) {
       if (u.isAdmin && state.showAdminMenu) {
         adminMenu = el('div', { class: 'admin-menu' }, [
           el('div', { class: 'admin-menu-header', text: 'Admin tools' }),
+          el('button', {
+            class: 'admin-menu-item',
+            type: 'button',
+            onclick: () => {
+              state.showAdminMenu = false;
+              state.showUserManagerOverlay = true;
+              ensureAdminUsersLoaded();
+              render(false);
+            }
+          }, [
+            el('span', { text: 'User Manager' })
+          ]),
+          el('button', {
+            class: 'admin-menu-item',
+            type: 'button',
+            onclick: () => {
+              state.showAdminMenu = false;
+              state.showSiteManagerOverlay = true;
+              ensureSiteSummaryLoaded();
+              render(false);
+            }
+          }, [
+            el('span', { text: 'Site Manager' })
+          ]),
           el('button', {
             class: 'admin-menu-item',
             type: 'button',
@@ -3134,6 +3327,16 @@ export function createApp(mount) {
     const accountOverlay = renderAccountOverlay();
     if (accountOverlay) {
       root.append(accountOverlay);
+    }
+
+    const userManagerOverlay = renderUserManagerOverlay();
+    if (userManagerOverlay) {
+      root.append(userManagerOverlay);
+    }
+
+    const siteManagerOverlay = renderSiteManagerOverlay();
+    if (siteManagerOverlay) {
+      root.append(siteManagerOverlay);
     }
 
     if (focusState) restoreFocusState(focusState);

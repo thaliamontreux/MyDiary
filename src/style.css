@@ -685,6 +685,62 @@ body::before {
   background: rgba(148,163,184,0.12);
 }
 
+.admin-table-row {
+  display: grid;
+  grid-template-columns: 2.5fr 1.5fr 0.8fr 1fr 2fr;
+  gap: 6px;
+  font-size: 12px;
+  padding: 4px 4px;
+  align-items: center;
+}
+
+.admin-table-header {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted2);
+  border-bottom: 1px solid rgba(148,163,184,0.3);
+  margin-bottom: 4px;
+}
+
+.admin-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-cell-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.admin-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.summary-card {
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(148,163,184,0.35);
+  background: rgba(15,23,42,0.02);
+}
+
+.summary-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted2);
+}
+
+.summary-value {
+  margin-top: 4px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
 .main {
   position: relative;
   z-index: 2;

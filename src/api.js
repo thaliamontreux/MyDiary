@@ -53,6 +53,45 @@ export async function changePassword(token, currentPassword, newPassword) {
   });
 }
 
+export async function adminListUsers(token, limit = 200) {
+  const params = new URLSearchParams();
+  if (limit) params.set('limit', String(limit));
+  return request(`/api/admin/users?${params.toString()}`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+}
+
+export async function adminSetUserAdmin(token, userId, isAdmin) {
+  return request(`/api/admin/users/${encodeURIComponent(userId)}/admin`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ isAdmin })
+  });
+}
+
+export async function adminDeleteUser(token, userId) {
+  return request(`/api/admin/users/${encodeURIComponent(userId)}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+}
+
+export async function adminGetSiteSummary(token) {
+  return request('/api/admin/site-summary', {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+}
+
 export async function setUsername(token, username) {
   return request('/api/auth/username', {
     method: 'POST',

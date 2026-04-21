@@ -4,7 +4,7 @@ import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
 
-import { createUser, findUserByEmail, findUserByUsername, getVault, initializeDatabase, markUserTosAccepted, pingDatabase, upsertVault, deleteUserById, updateUsername } from './db.js';
+import { createUser, findUserByEmail, findUserByUsername, getVault, initializeDatabase, markUserTosAccepted, pingDatabase, upsertVault, deleteUserById, updateUsername, listUsers, setUserAdminFlag, getSiteSummary } from './db.js';
 import { requireAuth, signAuthToken } from './auth.js';
 import { log, logError, requestLogger } from './logger.js';
 import { createRateLimiter } from './rateLimit.js';
@@ -29,6 +29,14 @@ const authRateLimiter = createRateLimiter({
   maxRequests: authMax,
   prefix: 'auth'
 });
+
+function requireAdmin(req, res, next) {
+  if (!req.user?.isAdmin) {
+    res.status(403).json({ error: 'Admin access required' });
+    return;
+  }
+  next();
+}
 const apiRateLimiter = createRateLimiter({
   windowMs: apiWindowMs,
   maxRequests: apiMax,
@@ -75,6 +83,83 @@ app.get('/api/ready', async (_req, res) => {
     res.json({ ok: true });
   } catch {
     res.status(503).json({ ok: false, error: 'Database unavailable' });
+  }
+});
+
+app.get('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const limit = Number(req.query.limit || '200');
+    const users = await listUsers(limit);
+    res.json({
+      users: users.map((u) => ({
+        id: u.id,
+        email: u.email,
+        firstName: u.first_name || null,
+        middleName: u.middle_name || null,
+        lastName: u.last_name || null,
+        username: u.username || null,
+        addressLine: u.address_line || null,
+        city: u.city || null,
+        stateRegion: u.state_region || null,
+        postalCode: u.postal_code || null,
+        countryCode: u.country_code || null,
+        tosAccepted: Boolean(u.tos_accepted_at),
+        isAdmin: Boolean(u.is_admin),
+        mustChangePassword: Boolean(u.must_change_password),
+        createdAt: u.created_at
+      }))
+    });
+  } catch (error) {
+    logError('admin_users_list_failed', error, { requestId: req.requestId, adminId: req.user?.id });
+    res.status(500).json({ error: 'Failed to load users' });
+  }
+});
+
+app.post('/api/admin/users/:id/admin', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const targetId = Number(req.params.id);
+    const isAdmin = Boolean(req.body?.isAdmin);
+    if (!Number.isFinite(targetId) || targetId <= 0) {
+      res.status(400).json({ error: 'Invalid user id' });
+      return;
+    }
+    await setUserAdminFlag(targetId, isAdmin);
+    res.json({ ok: true });
+  } catch (error) {
+    logError('admin_users_adminflag_failed', error, { requestId: req.requestId, adminId: req.user?.id });
+    res.status(500).json({ error: 'Failed to update admin flag' });
+  }
+});
+
+app.delete('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const targetId = Number(req.params.id);
+    if (!Number.isFinite(targetId) || targetId <= 0) {
+      res.status(400).json({ error: 'Invalid user id' });
+      return;
+    }
+    const ok = await deleteUserById(targetId);
+    if (!ok) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (error) {
+    logError('admin_users_delete_failed', error, { requestId: req.requestId, adminId: req.user?.id });
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
+app.get('/api/admin/site-summary', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const summary = await getSiteSummary();
+    res.json({
+      ...summary,
+      nodeEnv: process.env.NODE_ENV || 'development'
+    });
+  } catch (error) {
+    logError('admin_site_summary_failed', error, { requestId: req.requestId, adminId: req.user?.id });
+    res.status(500).json({ error: 'Failed to load site summary' });
   }
 });
 

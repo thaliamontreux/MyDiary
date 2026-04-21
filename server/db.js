@@ -470,4 +470,49 @@ export async function updateUsername(userId, username) {
   return rows[0] || null;
 }
 
+export async function listUsers(limit = 200) {
+  ensurePool();
+  const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.min(Number(limit), 500) : 200;
+  const [rows] = await pool.query(
+    `SELECT
+       id,
+       email,
+       first_name,
+       middle_name,
+       last_name,
+       username,
+       address_line,
+       city,
+       state_region,
+       postal_code,
+       country_code,
+       tos_accepted_at,
+       is_admin,
+       must_change_password,
+       created_at
+     FROM users
+     ORDER BY created_at DESC
+     LIMIT ?`,
+    [safeLimit]
+  );
+  return rows;
+}
+
+export async function setUserAdminFlag(userId, isAdmin) {
+  ensurePool();
+  await pool.query('UPDATE users SET is_admin = ? WHERE id = ?', [isAdmin ? 1 : 0, userId]);
+}
+
+export async function getSiteSummary() {
+  ensurePool();
+  const [[{ totalUsers }]] = await pool.query('SELECT COUNT(*) AS totalUsers FROM users');
+  const [[{ adminUsers }]] = await pool.query('SELECT COUNT(*) AS adminUsers FROM users WHERE is_admin = 1');
+  const [[{ tosAcceptedUsers }]] = await pool.query('SELECT COUNT(*) AS tosAcceptedUsers FROM users WHERE tos_accepted_at IS NOT NULL');
+  return {
+    totalUsers,
+    adminUsers,
+    tosAcceptedUsers
+  };
+}
+
 export { pool };
