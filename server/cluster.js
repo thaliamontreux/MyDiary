@@ -14,8 +14,10 @@ if (cluster.isPrimary) {
   }
 
   cluster.on('exit', (worker, code, signal) => {
+    const timestamp = new Date().toISOString();
+    const reason = signal ? `signal ${signal}` : `code ${code}`;
     // eslint-disable-next-line no-console
-    console.error(`Worker ${worker.process.pid} exited (code=${code}, signal=${signal}). Restarting...`);
+    console.error(`[${timestamp}] Worker ${worker.process.pid} exited (${reason}). Restarting...`);
     cluster.fork();
   });
 } else {
