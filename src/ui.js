@@ -3137,7 +3137,53 @@ export function createApp(mount) {
     const delightSnapshot = buildDelightSnapshot(state.vault.entries);
     const privacySnapshot = buildPrivacySnapshot(state.vault.entries);
 
-    // Left navigation rail: search + filters
+    // Central feed: entry cards (moved into sidebar below search)
+    const feedList = el('div', { class: 'feed-list' },
+      visibleEntries.length ? visibleEntries.map((e) => {
+        const active = e.id === state.selectedId;
+        return el('button', {
+          class: `entry-card feed-card accent-${e.accentColor || 'rose'} ${active ? 'active' : ''}`,
+          onclick: () => {
+            state.selectedId = e.id;
+            render();
+          }
+        }, [
+          el('div', { class: 'entry-card-top', }, [
+            el('span', { class: 'entry-type-chip', text: moduleLabel(e.moduleType) }),
+            el('span', { class: 'secondary-chip', text: entryContextText(e) })
+          ]),
+          el('div', { class: 'entry-title', text: e.title || 'Untitled' }),
+          el('div', { class: 'entry-meta' }, [
+            el('span', { text: formatPrettyDate(e.date) }),
+            el('span', { class: 'dot', text: '•' }),
+            el('span', { text: e.time || formatEntryTime(e.createdAt) || nowTime() })
+          ]),
+          e.moduleType !== 'recipe' ? el('div', { class: 'entry-mood-line' }, [
+            el('span', { class: 'insight-chip', text: moodLabel(e.mood) }),
+            el('span', { class: 'insight-chip', text: moodIntensityLabel(e.moodIntensity) }),
+            moodBlendText(e)
+              ? el('span', { class: 'insight-chip', text: moodBlendText(e) })
+              : el('span')
+          ]) : el('div', { class: 'entry-mood-line' }, [
+            e.prepTime ? el('span', { class: 'insight-chip', text: e.prepTime }) : el('span'),
+            e.servings ? el('span', { class: 'insight-chip', text: `${e.servings} servings` }) : el('span')
+          ]),
+          el('div', { class: 'entry-preview', text: summarizeEntry(e) }),
+          e.tags?.length
+            ? el('div', { class: 'tag-row' }, e.tags.slice(0, 3).map((tag) => el('span', { class: 'mini-tag', text: `#${tag}` })))
+            : el('div')
+        ]);
+      }) : [
+        el('div', { class: 'empty-list-card' }, [
+          el('div', { class: 'empty-list-title', text: 'No pages match yet' }),
+          el('div', { class: 'empty-list-sub', text: 'Try a different search, or create a new memory.' })
+        ])
+      ]
+    );
+
+    const editor = renderEditor(selected, keepEditorFocus);
+
+    // Left navigation + search + entry feed
     const sidebar = el('div', { class: 'sidebar' }, [
       el('div', { class: 'sidebar-head' }, [
         el('div', { class: 'sidebar-title', text: 'My world' }),
@@ -3246,58 +3292,12 @@ export function createApp(mount) {
           el('span', { class: 'nav-item-ic', text: '⚙️' }),
           el('span', { class: 'nav-item-label', text: 'Account & security' })
         ])
-      ])
+      ]),
+      feedList
     ]);
 
-    // Central feed: entry cards + editor
-    const feedList = el('div', { class: 'feed-list' },
-      visibleEntries.length ? visibleEntries.map((e) => {
-        const active = e.id === state.selectedId;
-        return el('button', {
-          class: `entry-card feed-card accent-${e.accentColor || 'rose'} ${active ? 'active' : ''}`,
-          onclick: () => {
-            state.selectedId = e.id;
-            render();
-          }
-        }, [
-          el('div', { class: 'entry-card-top', }, [
-            el('span', { class: 'entry-type-chip', text: moduleLabel(e.moduleType) }),
-            el('span', { class: 'secondary-chip', text: entryContextText(e) })
-          ]),
-          el('div', { class: 'entry-title', text: e.title || 'Untitled' }),
-          el('div', { class: 'entry-meta' }, [
-            el('span', { text: formatPrettyDate(e.date) }),
-            el('span', { class: 'dot', text: '•' }),
-            el('span', { text: e.time || formatEntryTime(e.createdAt) || nowTime() })
-          ]),
-          e.moduleType !== 'recipe' ? el('div', { class: 'entry-mood-line' }, [
-            el('span', { class: 'insight-chip', text: moodLabel(e.mood) }),
-            el('span', { class: 'insight-chip', text: moodIntensityLabel(e.moodIntensity) }),
-            moodBlendText(e)
-              ? el('span', { class: 'insight-chip', text: moodBlendText(e) })
-              : el('span')
-          ]) : el('div', { class: 'entry-mood-line' }, [
-            e.prepTime ? el('span', { class: 'insight-chip', text: e.prepTime }) : el('span'),
-            e.servings ? el('span', { class: 'insight-chip', text: `${e.servings} servings` }) : el('span')
-          ]),
-          el('div', { class: 'entry-preview', text: summarizeEntry(e) }),
-          e.tags?.length
-            ? el('div', { class: 'tag-row' }, e.tags.slice(0, 3).map((tag) => el('span', { class: 'mini-tag', text: `#${tag}` })))
-            : el('div')
-        ]);
-      }) : [
-        el('div', { class: 'empty-list-card' }, [
-          el('div', { class: 'empty-list-title', text: 'No pages match yet' }),
-          el('div', { class: 'empty-list-sub', text: 'Try a different search, or create a new memory.' })
-        ])
-      ]
-    );
-
-    const editor = renderEditor(selected, keepEditorFocus);
-
     const feedColumn = el('div', { class: 'feed-column' }, [
-      editor,
-      feedList
+      editor
     ]);
     const rightRail = el('div', { class: 'side-rail' }, [
       renderLibraryRail(selected, librarySnapshot),
