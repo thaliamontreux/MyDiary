@@ -86,16 +86,6 @@ app.use((req, res, next) => {
 
 app.use('/api', apiRateLimiter);
 app.use(express.json({ limit: '5mb' }));
-app.use((req, res, next) => {
-  if (req.method === 'PATCH' && req.path && req.path.includes('/admin/users/')) {
-    log('patch_debug', {
-      contentType: req.headers['content-type'],
-      body: req.body,
-      bodyKeys: req.body ? Object.keys(req.body) : null
-    });
-  }
-  next();
-});
 
 app.use((err, _req, res, next) => {
   if (err?.type === 'entity.too.large') {
@@ -321,7 +311,6 @@ app.patch('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) =>
       return;
     }
     const payload = req.body || {};
-    log('admin_user_update_payload', { targetId, payloadKeys: Object.keys(payload), email: payload.email, firstName: payload.firstName });
     const existing = await findUserById(targetId);
     if (!existing) {
       res.status(404).json({ error: 'User not found' });
@@ -342,13 +331,11 @@ app.patch('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) =>
       isAdmin: payload.isAdmin !== undefined ? Boolean(payload.isAdmin) : Boolean(existing.is_admin),
       mustChangePassword: payload.mustChangePassword !== undefined ? Boolean(payload.mustChangePassword) : Boolean(existing.must_change_password)
     };
-    log('admin_user_update_data', updateData);
     const updated = await adminUpdateUserProfile(updateData);
     if (!updated) {
       res.status(404).json({ error: 'User not found' });
       return;
     }
-    log('admin_user_update_success', { id: updated.id, email: updated.email });
     res.json({
       user: {
         id: updated.id,

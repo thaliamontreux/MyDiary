@@ -7,15 +7,13 @@ const API_BASE_URL = apiBasePointsToLocalhost && !browserIsLocalhost ? '' : rawA
 async function request(path, options = {}) {
   const url = `${API_BASE_URL}${path}`;
   const fetchOptions = {
+    ...options,
     headers: {
       'Content-Type': 'application/json',
       ...(options.headers || {})
-    },
-    ...options
+    }
   };
-  console.log('API Request:', { url, method: fetchOptions.method, body: fetchOptions.body });
   const response = await fetch(url, fetchOptions);
-  console.log('API Response:', { status: response.status, ok: response.ok });
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
