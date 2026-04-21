@@ -106,14 +106,12 @@ for svc in mydiary-api mydiary-web; do
   fi
 done
 
-# 6. Install deps + build as service user
-# Use non-login shell (no -l) and force HOME to APP_DIR so npm cache lives there,
-# not in a stale $HOME from an earlier install.
+# 6. Install deps + build as root
 echo "[install] installing npm dependencies"
-sudo -H -u "$SERVICE_USER" env HOME="$APP_DIR" bash -c "cd '$APP_DIR' && npm install --include=dev --no-audit --no-fund"
+env HOME="$APP_DIR" bash -c "cd '$APP_DIR' && npm install --include=dev --no-audit --no-fund"
 
 echo "[install] building frontend"
-sudo -H -u "$SERVICE_USER" env HOME="$APP_DIR" bash -c "cd '$APP_DIR' && npm run build"
+env HOME="$APP_DIR" bash -c "cd '$APP_DIR' && npm run build"
 
 # 7. Make scripts executable
 chmod +x "$APP_DIR/scripts/update.sh" "$APP_DIR/scripts/install-service.sh" 2>/dev/null || true
