@@ -119,7 +119,17 @@ app.get('/api/ready', async (_req, res) => {
 
 app.get('/api/folders', requireAuth, async (req, res) => {
   try {
-    const folders = await listUserFolders(req.user.id);
+    let folders = await listUserFolders(req.user.id);
+    // Ensure every user has a "Default Folder"
+    if (!folders.find((f) => f.path === 'Default Folder')) {
+      try {
+        await createUserFolder(req.user.id, 'Default Folder', null);
+        folders = await listUserFolders(req.user.id);
+      } catch (e) {
+        // If race or unique conflict, re-list and continue
+        folders = await listUserFolders(req.user.id);
+      }
+    }
     res.json({
       folders: folders.map((f) => ({
         id: f.id,
