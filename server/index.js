@@ -311,12 +311,13 @@ app.patch('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) =>
       return;
     }
     const payload = req.body || {};
+    log('admin_user_update_payload', { targetId, payloadKeys: Object.keys(payload), email: payload.email, firstName: payload.firstName });
     const existing = await findUserById(targetId);
     if (!existing) {
       res.status(404).json({ error: 'User not found' });
       return;
     }
-    const updated = await adminUpdateUserProfile({
+    const updateData = {
       id: targetId,
       email: payload.email ? String(payload.email) : existing.email,
       firstName: payload.firstName ? String(payload.firstName) : existing.first_name,
@@ -330,11 +331,14 @@ app.patch('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) =>
       countryCode: payload.countryCode ? String(payload.countryCode) : existing.country_code,
       isAdmin: payload.isAdmin !== undefined ? Boolean(payload.isAdmin) : Boolean(existing.is_admin),
       mustChangePassword: payload.mustChangePassword !== undefined ? Boolean(payload.mustChangePassword) : Boolean(existing.must_change_password)
-    });
+    };
+    log('admin_user_update_data', updateData);
+    const updated = await adminUpdateUserProfile(updateData);
     if (!updated) {
       res.status(404).json({ error: 'User not found' });
       return;
     }
+    log('admin_user_update_success', { id: updated.id, email: updated.email });
     res.json({
       user: {
         id: updated.id,

@@ -1854,11 +1854,14 @@ export function createApp(mount) {
               isAdmin: Boolean(isAdminCheckbox.checked),
               mustChangePassword: Boolean(mcpCheckbox.checked)
             };
-            const { user } = await adminUpdateUser(state.auth.token, detail.id, payload);
-            state.adminSelectedUser = user || null;
+            console.log('Admin save payload:', payload);
+            const result = await adminUpdateUser(state.auth.token, detail.id, payload);
+            console.log('Admin save result:', result);
+            state.adminSelectedUser = result?.user || null;
             await ensureAdminUsersLoaded();
             status.textContent = 'Saved';
           } catch (e) {
+            console.error('Admin save error:', e);
             status.textContent = e?.message || 'Failed to save changes';
           } finally {
             state.adminSelectedUserSaving = false;
