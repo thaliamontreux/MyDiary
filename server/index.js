@@ -86,6 +86,16 @@ app.use((req, res, next) => {
 
 app.use('/api', apiRateLimiter);
 app.use(express.json({ limit: '5mb' }));
+app.use((req, res, next) => {
+  if (req.method === 'PATCH' && req.path && req.path.includes('/admin/users/')) {
+    log('patch_debug', {
+      contentType: req.headers['content-type'],
+      body: req.body,
+      bodyKeys: req.body ? Object.keys(req.body) : null
+    });
+  }
+  next();
+});
 
 app.use((err, _req, res, next) => {
   if (err?.type === 'entity.too.large') {
