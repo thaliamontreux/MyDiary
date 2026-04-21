@@ -142,7 +142,18 @@ export async function initializeDatabase() {
       id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
       email VARCHAR(255) NOT NULL UNIQUE,
       password_hash VARCHAR(255) NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      first_name VARCHAR(100) DEFAULT NULL,
+      middle_name VARCHAR(100) DEFAULT NULL,
+      last_name VARCHAR(100) DEFAULT NULL,
+      username VARCHAR(64) DEFAULT NULL,
+      address_line VARCHAR(255) DEFAULT NULL,
+      city VARCHAR(128) DEFAULT NULL,
+      state_region VARCHAR(128) DEFAULT NULL,
+      postal_code VARCHAR(32) DEFAULT NULL,
+      country_code VARCHAR(2) DEFAULT NULL,
+      tos_accepted_at TIMESTAMP NULL DEFAULT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_users_username (username)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
@@ -166,20 +177,128 @@ export async function initializeDatabase() {
       applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+
+  // One-time migration hook for older installs that created a simpler users table
+  const [existingMigrations] = await pool.query(
+    'SELECT name FROM schema_migrations WHERE name = ? LIMIT 1',
+    ['add_user_profile_fields_v1']
+  );
+  if (existingMigrations.length === 0) {
+    // Add profile columns and username uniqueness if they do not already exist
+    await pool.query(`
+      ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS first_name VARCHAR(100) DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS middle_name VARCHAR(100) DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS last_name VARCHAR(100) DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS username VARCHAR(64) DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS address_line VARCHAR(255) DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS city VARCHAR(128) DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS state_region VARCHAR(128) DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS postal_code VARCHAR(32) DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS country_code VARCHAR(2) DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS tos_accepted_at TIMESTAMP NULL DEFAULT NULL,
+        ADD UNIQUE KEY IF NOT EXISTS uniq_users_username (username)
+    `);
+
+    await pool.query(
+      'INSERT INTO schema_migrations (name) VALUES (?)',
+      ['add_user_profile_fields_v1']
+    );
+  }
 }
 
-export async function createUser(email, passwordHash) {
+export async function createUser({
+  email,
+  passwordHash,
+  firstName,
+  middleName,
+  lastName,
+  username,
+  addressLine,
+  city,
+  stateRegion,
+  postalCode,
+  countryCode
+}) {
   ensurePool();
   const [result] = await pool.query(
-    'INSERT INTO users (email, password_hash) VALUES (?, ?)',
-    [email, passwordHash]
+    `INSERT INTO users (
+       email,
+       password_hash,
+       first_name,
+       middle_name,
+       last_name,
+       username,
+       address_line,
+       city,
+       state_region,
+       postal_code,
+       country_code
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      email,
+      passwordHash,
+      firstName || null,
+      middleName || null,
+      lastName || null,
+      username || null,
+      addressLine || null,
+      city || null,
+      stateRegion || null,
+      postalCode || null,
+      countryCode || null
+    ]
   );
   return result.insertId;
 }
 
 export async function findUserByEmail(email) {
   ensurePool();
-  const [rows] = await pool.query('SELECT id, email, password_hash FROM users WHERE email = ? LIMIT 1', [email]);
+  const [rows] = await pool.query(
+    `SELECT
+       id,
+       email,
+       password_hash,
+       first_name,
+       middle_name,
+       last_name,
+       username,
+       address_line,
+       city,
+       state_region,
+       postal_code,
+       country_code,
+       tos_accepted_at
+     FROM users
+     WHERE email = ?
+     LIMIT 1`,
+    [email]
+  );
+  return rows[0] || null;
+}
+
+export async function findUserByUsername(username) {
+  ensurePool();
+  const [rows] = await pool.query(
+    `SELECT
+       id,
+       email,
+       password_hash,
+       first_name,
+       middle_name,
+       last_name,
+       username,
+       address_line,
+       city,
+       state_region,
+       postal_code,
+       country_code,
+       tos_accepted_at
+     FROM users
+     WHERE username = ?
+     LIMIT 1`,
+    [username]
+  );
   return rows[0] || null;
 }
 
@@ -209,6 +328,31 @@ export async function pingDatabase() {
   ensurePool();
   await pool.query('SELECT 1');
   return true;
+}
+
+export async function markUserTosAccepted(userId) {
+  ensurePool();
+  await pool.query('UPDATE users SET tos_accepted_at = CURRENT_TIMESTAMP WHERE id = ?', [userId]);
+  const [rows] = await pool.query(
+    `SELECT
+       id,
+       email,
+       first_name,
+       middle_name,
+       last_name,
+       username,
+       address_line,
+       city,
+       state_region,
+       postal_code,
+       country_code,
+       tos_accepted_at
+     FROM users
+     WHERE id = ?
+     LIMIT 1`,
+    [userId]
+  );
+  return rows[0] || null;
 }
 
 export { pool };

@@ -4,7 +4,7 @@ import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
 
-import { createUser, findUserByEmail, getVault, initializeDatabase, pingDatabase, upsertVault } from './db.js';
+import { createUser, findUserByEmail, findUserByUsername, getVault, initializeDatabase, markUserTosAccepted, pingDatabase, upsertVault } from './db.js';
 import { requireAuth, signAuthToken } from './auth.js';
 import { log, logError, requestLogger } from './logger.js';
 import { createRateLimiter } from './rateLimit.js';
@@ -78,10 +78,44 @@ app.get('/api/ready', async (_req, res) => {
   }
 });
 
+app.post('/api/auth/accept-tos', requireAuth, async (req, res) => {
+  try {
+    const updated = await markUserTosAccepted(req.user.id);
+    res.json({
+      user: {
+        id: updated.id,
+        email: updated.email,
+        firstName: updated.first_name || null,
+        middleName: updated.middle_name || null,
+        lastName: updated.last_name || null,
+        username: updated.username || null,
+        addressLine: updated.address_line || null,
+        city: updated.city || null,
+        stateRegion: updated.state_region || null,
+        postalCode: updated.postal_code || null,
+        countryCode: updated.country_code || null,
+        tosAccepted: Boolean(updated.tos_accepted_at)
+      }
+    });
+  } catch (error) {
+    logError('accept_tos_failed', error, { requestId: req.requestId, userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to record agreement' });
+  }
+});
+
 app.post('/api/auth/register', authRateLimiter, async (req, res) => {
   try {
     const email = String(req.body?.email || '').trim().toLowerCase();
     const password = String(req.body?.password || '');
+    const firstName = String(req.body?.firstName || '').trim();
+    const middleName = String(req.body?.middleName || '').trim() || null;
+    const lastName = String(req.body?.lastName || '').trim();
+    const username = String(req.body?.username || '').trim();
+    const addressLine = String(req.body?.addressLine || '').trim();
+    const city = String(req.body?.city || '').trim();
+    const stateRegion = String(req.body?.stateRegion || '').trim();
+    const postalCode = String(req.body?.postalCode || '').trim();
+    const countryCode = String(req.body?.countryCode || '').trim().toUpperCase();
 
     if (!email || !email.includes('@')) {
       res.status(400).json({ error: 'Valid email is required' });
@@ -91,18 +125,64 @@ app.post('/api/auth/register', authRateLimiter, async (req, res) => {
       res.status(400).json({ error: 'Password must be at least 10 characters' });
       return;
     }
+    if (!firstName || !lastName) {
+      res.status(400).json({ error: 'First and last name are required' });
+      return;
+    }
+    if (!username || username.length < 3) {
+      res.status(400).json({ error: 'Username must be at least 3 characters' });
+      return;
+    }
+    if (!addressLine || !city || !stateRegion || !postalCode || !countryCode) {
+      res.status(400).json({ error: 'Please complete your address and country' });
+      return;
+    }
 
     const existing = await findUserByEmail(email);
     if (existing) {
-      res.status(409).json({ error: 'Account already exists' });
+      res.status(409).json({ error: 'An account with this email already exists' });
+      return;
+    }
+
+    const existingUsername = await findUserByUsername(username);
+    if (existingUsername) {
+      res.status(409).json({ error: 'That username is already taken' });
       return;
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
-    const userId = await createUser(email, passwordHash);
+    const userId = await createUser({
+      email,
+      passwordHash,
+      firstName,
+      middleName,
+      lastName,
+      username,
+      addressLine,
+      city,
+      stateRegion,
+      postalCode,
+      countryCode
+    });
 
-    const token = signAuthToken({ id: userId, email });
-    res.status(201).json({ token, user: { id: userId, email } });
+    const token = signAuthToken({ id: userId, email, username });
+    res.status(201).json({
+      token,
+      user: {
+        id: userId,
+        email,
+        firstName,
+        middleName,
+        lastName,
+        username,
+        addressLine,
+        city,
+        stateRegion,
+        postalCode,
+        countryCode,
+        tosAccepted: false
+      }
+    });
   } catch (error) {
     logError('register_failed', error, { requestId: req.requestId });
     res.status(500).json({ error: 'Failed to create account' });
@@ -126,8 +206,24 @@ app.post('/api/auth/login', authRateLimiter, async (req, res) => {
       return;
     }
 
-    const token = signAuthToken({ id: user.id, email: user.email });
-    res.json({ token, user: { id: user.id, email: user.email } });
+    const token = signAuthToken({ id: user.id, email: user.email, username: user.username || undefined });
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.first_name || null,
+        middleName: user.middle_name || null,
+        lastName: user.last_name || null,
+        username: user.username || null,
+        addressLine: user.address_line || null,
+        city: user.city || null,
+        stateRegion: user.state_region || null,
+        postalCode: user.postal_code || null,
+        countryCode: user.country_code || null,
+        tosAccepted: Boolean(user.tos_accepted_at)
+      }
+    });
   } catch (error) {
     logError('login_failed', error, { requestId: req.requestId });
     res.status(500).json({ error: 'Failed to login' });

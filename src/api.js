@@ -20,10 +20,10 @@ async function request(path, options = {}) {
   return data;
 }
 
-export async function registerUser(email, password) {
+export async function registerUser(payload) {
   return request('/api/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify(payload)
   });
 }
 
@@ -50,5 +50,14 @@ export async function saveVaultToServer(token, slot = 'primary', payload) {
       Authorization: `Bearer ${token}`
     },
     body: JSON.stringify(payload)
+  });
+}
+
+export async function acceptTerms(token) {
+  return request('/api/auth/accept-tos', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
   });
 }

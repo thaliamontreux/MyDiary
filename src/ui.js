@@ -22,7 +22,8 @@ import {
   loadVaultFromServer,
   loginUser,
   registerUser,
-  saveVaultToServer
+  saveVaultToServer,
+  acceptTerms
 } from './api.js';
 
 function el(tag, attrs = {}, children = []) {
@@ -32,6 +33,101 @@ function el(tag, attrs = {}, children = []) {
     else if (k === 'text') node.textContent = v;
     else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2), v);
     else node.setAttribute(k, v);
+  }
+
+  function renderSignupOverlay(presetEmail = '', presetPassword = '') {
+    const backDrop = el('div', { class: 'signup-overlay' });
+
+    const firstName = el('input', { class: 'lock-input', placeholder: 'First name' });
+    const middleName = el('input', { class: 'lock-input', placeholder: 'Middle name (optional)' });
+    const lastName = el('input', { class: 'lock-input', placeholder: 'Last name' });
+    const username = el('input', { class: 'lock-input', placeholder: 'Username' });
+    const emailInput = el('input', { class: 'lock-input', type: 'email', placeholder: 'Email address', value: presetEmail });
+    const addressLine = el('input', { class: 'lock-input', placeholder: 'Street address' });
+    const city = el('input', { class: 'lock-input', placeholder: 'City' });
+    const stateRegion = el('input', { class: 'lock-input', placeholder: 'State / Region' });
+    const postalCode = el('input', { class: 'lock-input', placeholder: 'ZIP / Postal code' });
+
+    const country = el('select', { class: 'lock-input' }, [
+      el('option', { value: '', text: 'Select your country' }),
+      el('option', { value: 'US', text: 'United States' }),
+      el('option', { value: 'CA', text: 'Canada' }),
+      el('option', { value: 'GB', text: 'United Kingdom' }),
+      el('option', { value: 'AU', text: 'Australia' }),
+      el('option', { value: 'NZ', text: 'New Zealand' }),
+      el('option', { value: 'IE', text: 'Ireland' }),
+      el('option', { value: 'DE', text: 'Germany' }),
+      el('option', { value: 'FR', text: 'France' }),
+      el('option', { value: 'BR', text: 'Brazil' }),
+      el('option', { value: 'IN', text: 'India' }),
+      el('option', { value: 'ZA', text: 'South Africa' })
+    ]);
+
+    const pwd1 = el('input', { class: 'lock-input', type: 'password', placeholder: 'Create a password', value: presetPassword });
+    const pwd2 = el('input', { class: 'lock-input', type: 'password', placeholder: 'Confirm password' });
+
+    const status = el('div', { class: 'lock-status', text: '' });
+
+    const submitBtn = el('button', {
+      class: 'btn big',
+      onclick: async () => {
+        status.textContent = 'Creating your account…';
+        try {
+          if (pwd1.value.length < 10) throw new Error('Use at least 10 characters');
+          if (pwd1.value !== pwd2.value) throw new Error('Passwords do not match');
+
+          await unlockWithServer(emailInput.value, pwd1.value, 'register', {
+            firstName: firstName.value,
+            middleName: middleName.value,
+            lastName: lastName.value,
+            username: username.value,
+            addressLine: addressLine.value,
+            city: city.value,
+            stateRegion: stateRegion.value,
+            postalCode: postalCode.value,
+            countryCode: country.value
+          });
+
+          showToast('Welcome to your diary');
+          backDrop.remove();
+        } catch (e) {
+          status.textContent = e?.message || 'Failed to sign up';
+        }
+      }
+    }, [
+      el('span', { class: 'btn-ic', text: '♡' }),
+      el('span', { text: 'Create my account' })
+    ]);
+
+    const cancelBtn = el('button', {
+      class: 'btn ghost',
+      onclick: () => backDrop.remove()
+    }, [
+      el('span', { class: 'btn-ic', text: '✕' }),
+      el('span', { text: 'Cancel' })
+    ]);
+
+    const card = el('div', { class: 'signup-card' }, [
+      el('div', { class: 'lock-title', text: 'Sign up for your private diary' }),
+      firstName,
+      middleName,
+      lastName,
+      username,
+      emailInput,
+      addressLine,
+      city,
+      stateRegion,
+      postalCode,
+      country,
+      pwd1,
+      pwd2,
+      submitBtn,
+      cancelBtn,
+      status
+    ]);
+
+    backDrop.append(card);
+    return backDrop;
   }
   for (const c of children) node.append(c);
   return node;
@@ -1374,7 +1470,8 @@ export function createApp(mount) {
     },
     auth: {
       token: null,
-      email: ''
+      email: '',
+      user: null
     },
     ui: {
       themeId: storedUi.themeId || 'light',
@@ -1388,7 +1485,9 @@ export function createApp(mount) {
       kidMode: storedUi.kidMode ?? false,
       panicVaultSlot: storedUi.panicVaultSlot || 'decoy',
       lastVaultSlot: storedUi.lastVaultSlot || 'primary'
-    }
+    },
+    showAccountOverlay: false,
+    showEncryptionKey: false
   };
 
   // setupActivityListeners(); // Auto-lock completely disabled
@@ -1495,7 +1594,26 @@ export function createApp(mount) {
   }
 
   function setTopActions(nodes) {
-    topbar.querySelector('.top-actions').replaceChildren(...nodes);
+    const actions = [...nodes];
+    if (state.auth.user) {
+      const u = state.auth.user;
+      const label = u.username || [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email;
+      const chip = el('button', {
+        class: 'user-chip',
+        type: 'button',
+        title: 'View account & encryption details',
+        onclick: () => {
+          state.showAccountOverlay = true;
+          state.showEncryptionKey = false;
+          render(false);
+        }
+      }, [
+        el('span', { class: 'user-chip-avatar', text: (label || '?').slice(0, 1).toUpperCase() }),
+        el('span', { class: 'user-chip-label', text: `Signed in as ${label}` })
+      ]);
+      actions.push(chip);
+    }
+    topbar.querySelector('.top-actions').replaceChildren(...actions);
   }
 
   function captureFocusState() {
@@ -1570,7 +1688,156 @@ export function createApp(mount) {
     state.meta = loadVaultMeta(state.activeVaultSlot) || null;
     state.auth.token = null;
     state.auth.email = '';
+    state.auth.user = null;
     render();
+  }
+
+  function renderAgreementOverlay() {
+    if (!state.auth.user || state.auth.user.tosAccepted) return null;
+
+    const heading = el('div', { class: 'agreement-title', text: 'One gentle promise before you begin' });
+    const body = el('div', {
+      class: 'agreement-body',
+      text: 'By continuing, you agree that you will not use this diary for any harmful or abusive intent. Your pages are encrypted uniquely for your account, so even if someone steals a copy of the data, it is designed to remain unreadable to them. The person hosting this diary cannot see inside your private entries and is not responsible for how you choose to use the app.'
+    });
+
+    const agreeBtn = el('button', {
+      class: 'btn',
+      onclick: async () => {
+        try {
+          await acceptTerms(state.auth.token);
+          state.auth.user = { ...(state.auth.user || {}), tosAccepted: true };
+          render();
+        } catch (e) {
+          // Best-effort; surface a toast if something fails
+          showToast(e?.message || 'Could not save your agreement right now');
+        }
+      }
+    }, [
+      el('span', { class: 'btn-ic', text: '✓' }),
+      el('span', { text: 'I understand and agree' })
+    ]);
+
+    const card = el('div', { class: 'agreement-card' }, [heading, body, agreeBtn]);
+    return el('div', { class: 'agreement-overlay' }, [card]);
+  }
+
+  function renderAccountOverlay() {
+    if (!state.showAccountOverlay || !state.auth.user) return null;
+    if (!state.key) return null;
+
+    const user = state.auth.user;
+    const displayName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.username || user.email;
+
+    let keyString = '';
+    if (state.key && typeof Uint8Array !== 'undefined') {
+      try {
+        const bytes = state.key instanceof Uint8Array ? state.key : new Uint8Array(state.key);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
+        keyString = btoa(binary);
+      } catch {
+        keyString = '';
+      }
+    }
+
+    const nameRow = el('div', { class: 'account-row' }, [
+      el('div', { class: 'account-label', text: 'Name' }),
+      el('div', { class: 'account-value', text: displayName })
+    ]);
+
+    const emailRow = el('div', { class: 'account-row' }, [
+      el('div', { class: 'account-label', text: 'Email' }),
+      el('div', { class: 'account-value', text: user.email })
+    ]);
+
+    const usernameRow = el('div', { class: 'account-row' }, [
+      el('div', { class: 'account-label', text: 'Username' }),
+      el('div', { class: 'account-value', text: user.username || 'Not set' })
+    ]);
+
+    const locationBits = [user.city, user.stateRegion, user.countryCode].filter(Boolean).join(', ');
+    const locationRow = el('div', { class: 'account-row' }, [
+      el('div', { class: 'account-label', text: 'Location' }),
+      el('div', { class: 'account-value', text: locationBits || '—' })
+    ]);
+
+    const keyLabel = el('div', { class: 'account-label', text: 'Diary encryption key' });
+    const keyHelper = el('div', {
+      class: 'account-helper',
+      text: 'This key is what protects your diary. Click reveal to see it, then copy and paste it somewhere safe. Never share it with anyone you do not fully trust.'
+    });
+
+    const keyField = el('input', {
+      class: 'key-display',
+      type: 'text',
+      readonly: 'readonly',
+      value: state.showEncryptionKey && keyString ? keyString : '••••••••••••••••••••••••••••••••'
+    });
+
+    const revealBtn = el('button', {
+      class: 'btn ghost small-btn',
+      type: 'button',
+      onclick: () => {
+        state.showEncryptionKey = !state.showEncryptionKey;
+        render(false);
+      }
+    }, [
+      el('span', { class: 'btn-ic', text: state.showEncryptionKey ? '🙈' : '👁' }),
+      el('span', { text: state.showEncryptionKey ? 'Hide key' : 'Reveal key' })
+    ]);
+
+    const closeBtn = el('button', {
+      class: 'btn ghost small-btn',
+      type: 'button',
+      onclick: () => {
+        state.showAccountOverlay = false;
+        state.showEncryptionKey = false;
+        render(false);
+      }
+    }, [
+      el('span', { class: 'btn-ic', text: '✕' }),
+      el('span', { text: 'Close' })
+    ]);
+
+    const copyBtn = el('button', {
+      class: 'btn ghost small-btn',
+      type: 'button',
+      onclick: async () => {
+        try {
+          if (!keyString) throw new Error('Key not available yet');
+          if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(keyString);
+            showToast('Key copied. Paste it somewhere safe you control.');
+          } else {
+            keyField.select();
+            document.execCommand('copy');
+            showToast('Key copied. Paste it somewhere safe you control.');
+          }
+        } catch (e) {
+          showToast(e?.message || 'Could not copy key right now');
+        }
+      }
+    }, [
+      el('span', { class: 'btn-ic', text: '⧉' }),
+      el('span', { text: 'Copy key' })
+    ]);
+
+    const keyRow = el('div', { class: 'account-key-row' }, [keyField, copyBtn, revealBtn]);
+
+    const card = el('div', { class: 'account-card' }, [
+      el('div', { class: 'lock-title', text: 'Your account & security' }),
+      nameRow,
+      emailRow,
+      usernameRow,
+      locationRow,
+      keyLabel,
+      keyHelper,
+      keyRow,
+      closeBtn
+    ]);
+
+    return el('div', { class: 'account-overlay' }, [card]);
   }
 
   function ensureMetaExists() {
@@ -1615,7 +1882,7 @@ export function createApp(mount) {
     render();
   }
 
-  async function unlockWithServer(email, password, mode = 'login') {
+  async function unlockWithServer(email, password, mode = 'login', profile = null) {
     await ensureSodiumReady();
 
     const normalizedEmail = String(email || '').trim().toLowerCase();
@@ -1627,11 +1894,12 @@ export function createApp(mount) {
     }
 
     const auth = mode === 'register'
-      ? await registerUser(normalizedEmail, password)
+      ? await registerUser({ ...profile, email: normalizedEmail, password })
       : await loginUser(normalizedEmail, password);
 
     state.auth.token = auth.token;
     state.auth.email = normalizedEmail;
+    state.auth.user = auth.user || null;
 
     const remoteVault = await loadVaultFromServer(state.auth.token, state.activeVaultSlot);
     const remoteMeta = remoteVault?.meta;
@@ -2482,6 +2750,18 @@ export function createApp(mount) {
         }, [
           el('span', { class: 'nav-item-ic', text: '🍲' }),
           el('span', { class: 'nav-item-label', text: 'Recipes' })
+        ]),
+        el('button', {
+          class: 'nav-item',
+          type: 'button',
+          onclick: () => {
+            state.showAccountOverlay = true;
+            state.showEncryptionKey = false;
+            render(false);
+          }
+        }, [
+          el('span', { class: 'nav-item-ic', text: '⚙️' }),
+          el('span', { class: 'nav-item-label', text: 'Account & security' })
         ])
       ])
     ]);
@@ -2547,6 +2827,16 @@ export function createApp(mount) {
     main.replaceChildren(
       el('div', { class: 'layout layout-wide' }, [sidebar, feedColumn, rightRail])
     );
+
+    const tosOverlay = renderAgreementOverlay();
+    if (tosOverlay) {
+      root.append(tosOverlay);
+    }
+
+    const accountOverlay = renderAccountOverlay();
+    if (accountOverlay) {
+      root.append(accountOverlay);
+    }
 
     if (focusState) restoreFocusState(focusState);
   }
@@ -3161,13 +3451,6 @@ export function createApp(mount) {
       autocomplete: 'current-password'
     });
 
-    const pwd2 = el('input', {
-      class: 'lock-input',
-      type: 'password',
-      placeholder: 'Confirm password (for new account)',
-      autocomplete: 'new-password'
-    });
-
     const status = el('div', { class: 'lock-status', text: '' });
 
     const signInBtn = el('button', {
@@ -3186,22 +3469,17 @@ export function createApp(mount) {
       el('span', { text: 'Sign in' })
     ]);
 
+    const openSignup = () => {
+      const overlay = renderSignupOverlay(email.value || '', pwd.value || '');
+      document.body.appendChild(overlay);
+    };
+
     const createAccountBtn = el('button', {
       class: 'btn big ghost',
-      onclick: async () => {
-        status.textContent = 'Creating account…';
-        try {
-          if (pwd.value.length < 10) throw new Error('Use at least 10 characters');
-          if (pwd.value !== pwd2.value) throw new Error('Passwords do not match');
-          await unlockWithServer(email.value, pwd.value, 'register');
-          showToast('Account created');
-        } catch (e) {
-          status.textContent = e?.message || 'Failed';
-        }
-      }
+      onclick: openSignup
     }, [
       el('span', { class: 'btn-ic', text: '✧' }),
-      el('span', { text: 'Create account' })
+      el('span', { text: 'Sign up' })
     ]);
 
     const dangerRow = el('div', { class: 'danger-row' }, [
@@ -3226,7 +3504,6 @@ export function createApp(mount) {
       shouldConcealChoices ? el('div', { class: 'lock-subtle', text: 'Vault choices can stay hidden until you need them.' }) : el('div'),
       email,
       pwd,
-      pwd2,
       signInBtn,
       createAccountBtn,
       status,
