@@ -87,8 +87,8 @@ case "$APP_DIR" in
     fi
     ;;
 esac
-echo "[install] setting ownership to $SERVICE_USER"
-chown -R "$SERVICE_USER:$SERVICE_USER" "$APP_DIR"
+echo "[install] setting ownership to root"
+chown -R root:root "$APP_DIR"
 
 # 4. Ensure Node.js is available
 if ! command -v node >/dev/null 2>&1; then
