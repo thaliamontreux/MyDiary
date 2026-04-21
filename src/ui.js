@@ -53,7 +53,12 @@ import {
   getEntryTags,
   addTagToEntry,
   removeTagFromEntry,
-  getEntriesByTag
+  getEntriesByTag,
+  getAuditLogs,
+  get2faStatus,
+  setup2fa,
+  saveRecoveryCodes,
+  getRecoveryStatus
 } from './api.js';
 
 function el(tag, attrs = {}, children = []) {
@@ -1225,7 +1230,15 @@ function normalizeEntry(entry = {}) {
     lockNote: entry.lockNote || '',
     habitWins: Array.isArray(entry.habitWins) ? entry.habitWins.slice(0, 6) : [],
     selfCareChecklist: Array.isArray(entry.selfCareChecklist) ? entry.selfCareChecklist.slice(0, 6) : [],
-    attachments: Array.isArray(entry.attachments) ? entry.attachments.slice(0, 24) : []
+    attachments: Array.isArray(entry.attachments) ? entry.attachments.slice(0, 24) : [],
+    voiceMemos: Array.isArray(entry.voiceMemos) ? entry.voiceMemos.slice(0, 8) : [],
+    videoClips: Array.isArray(entry.videoClips) ? entry.videoClips.slice(0, 4) : [],
+    locationLabel: entry.locationLabel || '',
+    weatherSummary: entry.weatherSummary || '',
+    temperature: entry.temperature || '',
+    steps: typeof entry.steps === 'number' ? entry.steps : (entry.steps || ''),
+    heartRate: entry.heartRate || '',
+    goalIds: Array.isArray(entry.goalIds) ? entry.goalIds : []
   };
 }
 
@@ -1520,7 +1533,13 @@ export function createApp(mount) {
     unlockedFolderIds: new Set(),
     availableVaults: [],
     vaultsLoading: false,
-    unlockedVaultSlots: new Set()
+    unlockedVaultSlots: new Set(),
+    tags: [],
+    showCalendar: false,
+    calendarMonth: null,
+    showAdvancedSearch: false,
+    searchFilters: {},
+    integrationConfig: null
   };
 
   // setupActivityListeners(); // Auto-lock completely disabled
@@ -2873,11 +2892,17 @@ export function createApp(mount) {
   }
 
   function getVisibleEntries() {
+    const f = state.searchFilters || {};
     return sortEntriesDesc(state.vault.entries)
       .map(normalizeEntry)
       .filter((entry) => {
         if (state.activeFolderPath && entry.folder !== state.activeFolderPath) return false;
-        return matchesEntry(entry, state.searchQuery, state.activeModule, state.activeType);
+        if (!matchesEntry(entry, state.searchQuery, state.activeModule, state.activeType)) return false;
+        if (f.mood && entry.mood !== f.mood) return false;
+        if (f.fromDate && entry.date && entry.date < f.fromDate) return false;
+        if (f.toDate && entry.date && entry.date > f.toDate) return false;
+        if (f.tagId && !(entry.tags || []).some((t) => String(t.id || t) === String(f.tagId))) return false;
+        return true;
       });
   }
 
@@ -3138,6 +3163,31 @@ export function createApp(mount) {
       changePasswordBtn
     ]);
 
+    const securitySection = el('div', { class: 'account-section' }, [
+      el('div', { class: 'account-section-title', text: 'Security & Privacy' }),
+      el('div', { class: 'account-row' }, [
+        el('div', { class: 'account-label', text: 'Two-factor auth (2FA)' }),
+        el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderTwoFactorOverlay() }, [
+          el('span', { class: 'btn-ic', text: '🔐' }),
+          el('span', { text: 'Manage 2FA' })
+        ])
+      ]),
+      el('div', { class: 'account-row' }, [
+        el('div', { class: 'account-label', text: 'Account recovery codes' }),
+        el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderRecoveryCodesOverlay() }, [
+          el('span', { class: 'btn-ic', text: '🔑' }),
+          el('span', { text: 'Recovery codes' })
+        ])
+      ]),
+      el('div', { class: 'account-row' }, [
+        el('div', { class: 'account-label', text: 'Security audit log' }),
+        el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderAuditLogOverlay() }, [
+          el('span', { class: 'btn-ic', text: '📋' }),
+          el('span', { text: 'View activity' })
+        ])
+      ])
+    ]);
+
     const card = el('div', { class: 'account-card' }, [
       el('div', { class: 'lock-title', text: 'Your account & security' }),
       nameRow,
@@ -3148,6 +3198,7 @@ export function createApp(mount) {
       keyLabel,
       keyHelper,
       keyRow,
+      securitySection,
       renderAccountVaultsSection(),
       renderAccountFoldersSection(),
       closeBtn
@@ -3249,7 +3300,7 @@ export function createApp(mount) {
       state.selectedId = sortEntriesDesc(state.vault.entries)[0].id;
     }
 
-    await Promise.all([loadFoldersForUser(), loadVaultsForUser()]);
+    await Promise.all([loadFoldersForUser(), loadVaultsForUser(), loadTagsForUser()]);
     render();
   }
 
@@ -4188,6 +4239,62 @@ export function createApp(mount) {
         el('button', {
           class: 'nav-item',
           type: 'button',
+          onclick: () => { state.showCalendar = !state.showCalendar; render(false); }
+        }, [
+          el('span', { class: 'nav-item-ic', text: '📅' }),
+          el('span', { class: 'nav-item-label', text: 'Calendar view' })
+        ]),
+        el('button', {
+          class: `nav-item ${state.showAdvancedSearch ? 'active' : ''}`,
+          type: 'button',
+          onclick: () => { state.showAdvancedSearch = !state.showAdvancedSearch; render(false); }
+        }, [
+          el('span', { class: 'nav-item-ic', text: '🔍' }),
+          el('span', { class: 'nav-item-label', text: 'Advanced search' })
+        ]),
+        el('button', {
+          class: 'nav-item',
+          type: 'button',
+          onclick: () => renderTemplateOverlay()
+        }, [
+          el('span', { class: 'nav-item-ic', text: '📋' }),
+          el('span', { class: 'nav-item-label', text: 'Templates' })
+        ]),
+        el('button', {
+          class: 'nav-item',
+          type: 'button',
+          onclick: () => renderWritingStatsOverlay()
+        }, [
+          el('span', { class: 'nav-item-ic', text: '📊' }),
+          el('span', { class: 'nav-item-label', text: 'Writing stats' })
+        ]),
+        el('button', {
+          class: 'nav-item',
+          type: 'button',
+          onclick: () => renderExportOverlay()
+        }, [
+          el('span', { class: 'nav-item-ic', text: '⬇️' }),
+          el('span', { class: 'nav-item-label', text: 'Export diary' })
+        ]),
+        el('button', {
+          class: 'nav-item',
+          type: 'button',
+          onclick: () => renderGoalsOverlay()
+        }, [
+          el('span', { class: 'nav-item-ic', text: '🎯' }),
+          el('span', { class: 'nav-item-label', text: 'Goals & milestones' })
+        ]),
+        el('button', {
+          class: 'nav-item',
+          type: 'button',
+          onclick: () => renderReminderSettings()
+        }, [
+          el('span', { class: 'nav-item-ic', text: '🔔' }),
+          el('span', { class: 'nav-item-label', text: 'Reminders' })
+        ]),
+        el('button', {
+          class: 'nav-item',
+          type: 'button',
           onclick: () => {
             state.showAccountOverlay = true;
             state.showEncryptionKey = false;
@@ -4198,6 +4305,12 @@ export function createApp(mount) {
           el('span', { class: 'nav-item-label', text: 'Account & security' })
         ])
       ]),
+      renderCalendarView(),
+      renderAdvancedSearch(),
+      state.unlocked ? el('div', { class: 'daily-prompt' }, [
+        el('span', { class: 'tiny', text: '✦ Today\'s prompt' }),
+        el('div', { class: 'prompt-text', text: getTodaysPrompt() })
+      ]) : el('div'),
       feedList
     ]);
 
@@ -4476,16 +4589,19 @@ export function createApp(mount) {
 
   function renderMoodRail(selected, snapshot) {
     const moodEntry = selected ? normalizeEntry(selected) : null;
+    const sentiment = moodEntry?.body ? analyzeSentiment(moodEntry.body) : null;
+    const sentimentColors = { positive: '#22c55e', negative: '#ef4444', mixed: '#f59e0b', neutral: '#9ca3af' };
 
     return el('div', { class: 'mood-rail' }, [
       el('div', { class: 'sidebar-head' }, [
-        el('div', { class: 'sidebar-title', text: 'Mood' }),
-        el('div', { class: 'sidebar-sub', text: 'Simple emotional snapshot' })
+        el('div', { class: 'sidebar-title', text: 'Mood & Analytics' }),
+        el('div', { class: 'sidebar-sub', text: 'Emotional snapshot + activity' })
       ]),
       el('div', { class: 'mood-rail-body' }, [
         el('div', { class: 'mood-card' }, moodEntry ? [
           el('div', { class: 'mood-card-title', text: `${moodLabel(moodEntry.mood)} • ${moodIntensityLabel(moodEntry.moodIntensity)}` }),
-          el('div', { class: 'mood-card-sub', text: moodSupport(moodEntry.mood) })
+          el('div', { class: 'mood-card-sub', text: moodSupport(moodEntry.mood) }),
+          sentiment ? el('div', { class: 'sentiment-chip', style: `background:${sentimentColors[sentiment]}22; color:${sentimentColors[sentiment]}`, text: `Tone: ${sentiment}` }) : el('div')
         ] : [
           el('div', { class: 'mood-card-title', text: 'No entry selected' }),
           el('div', { class: 'mood-card-sub', text: 'Pick a page to view mood context.' })
@@ -4494,6 +4610,14 @@ export function createApp(mount) {
           el('div', { class: 'mood-card-title', text: 'Recent pattern' }),
           el('div', { class: 'mood-stat-row' }, [el('span', { class: 'detail-label', text: 'Top mood' }), el('span', { class: 'mood-stat-value', text: snapshot.topMood })]),
           el('div', { class: 'mood-stat-row' }, [el('span', { class: 'detail-label', text: 'Avg intensity' }), el('span', { class: 'mood-stat-value', text: snapshot.averageIntensity })])
+        ]),
+        el('div', { class: 'mood-card' }, [
+          el('div', { class: 'mood-card-title', text: 'Mood trend' }),
+          renderMoodChart()
+        ]),
+        el('div', { class: 'mood-card' }, [
+          el('div', { class: 'mood-card-title', text: 'Writing activity' }),
+          renderActivityHeatmap()
         ])
       ])
     ]);
@@ -5012,12 +5136,44 @@ export function createApp(mount) {
       el('div', { class: 'detail-grid' }, detailCards),
       editorToolbar,
       plainTextEditor,
+      renderVoiceMemoUI(selected),
+      renderVideoUI(selected),
+      attachmentsEditor,
       el('div', { class: 'editor-foot' }, [
         el('button', { class: 'btn', type: 'button', onclick: () => saveAllFormChanges() }, [
           el('span', { class: 'btn-ic', text: '♡' }),
           el('span', { text: 'Save all changes' })
         ]),
-        el('div', { class: 'tiny', text: footerSummary })
+        el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderShareOverlay(selected) }, [
+          el('span', { class: 'btn-ic', text: '🔗' }),
+          el('span', { text: 'Share' })
+        ]),
+        el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderTemplateOverlay() }, [
+          el('span', { class: 'btn-ic', text: '📋' }),
+          el('span', { text: 'Template' })
+        ]),
+        el('button', {
+          class: 'btn ghost small-btn', type: 'button',
+          onclick: async () => {
+            showToast('Getting location…');
+            const loc = await captureLocationForEntry();
+            if (loc) {
+              updateSelected({ locationLabel: loc.locationLabel, weatherSummary: loc.weatherSummary, temperature: loc.temperature });
+              showToast(`Location: ${loc.locationLabel}`);
+            } else {
+              showToast('Location unavailable.');
+            }
+          }
+        }, [
+          el('span', { class: 'btn-ic', text: '📍' }),
+          el('span', { text: 'Add location' })
+        ]),
+        el('div', { class: 'tiny', text: footerSummary }),
+        selected?.locationLabel ? el('div', { class: 'location-weather-chip' }, [
+          el('span', { text: `📍 ${selected.locationLabel}` }),
+          selected.weatherSummary ? el('span', { text: ` • ${selected.weatherSummary}` }) : el('span'),
+          selected.temperature ? el('span', { text: ` ${selected.temperature}` }) : el('span')
+        ]) : el('div')
       ])
     ]);
 
@@ -5178,6 +5334,7 @@ export function createApp(mount) {
     if (state.auth.token) {
       await Promise.all([loadFoldersForUser(), loadVaultsForUser(), loadTagsForUser()]);
     }
+    initDailyReminderCheck();
     render();
   })();
 
@@ -5285,5 +5442,937 @@ export function createApp(mount) {
         text: tag.name
       })
     ));
+  }
+
+  // ── Voice Memos ──────────────────────────────────────────────────────────────
+  const voiceRecorderState = { mediaRecorder: null, chunks: [], recording: false };
+
+  function renderVoiceMemoUI(entry) {
+    const memos = Array.isArray(entry.voiceMemos) ? entry.voiceMemos : [];
+    const statusText = el('span', { class: 'tiny', text: voiceRecorderState.recording ? 'Recording…' : '' });
+
+    const recordBtn = el('button', {
+      class: `btn ghost small-btn ${voiceRecorderState.recording ? 'active' : ''}`,
+      type: 'button',
+      onclick: async () => {
+        if (voiceRecorderState.recording) {
+          voiceRecorderState.mediaRecorder?.stop();
+          return;
+        }
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          voiceRecorderState.chunks = [];
+          voiceRecorderState.recording = true;
+          statusText.textContent = 'Recording…';
+          const mr = new MediaRecorder(stream);
+          voiceRecorderState.mediaRecorder = mr;
+          mr.ondataavailable = (e) => { if (e.data.size > 0) voiceRecorderState.chunks.push(e.data); };
+          mr.onstop = async () => {
+            voiceRecorderState.recording = false;
+            statusText.textContent = '';
+            stream.getTracks().forEach((t) => t.stop());
+            const blob = new Blob(voiceRecorderState.chunks, { type: 'audio/webm' });
+            if (blob.size > 10 * 1024 * 1024) { showToast('Recording too large (max 10MB).'); return; }
+            const dataUrl = await new Promise((res, rej) => {
+              const reader = new FileReader();
+              reader.onload = () => res(reader.result);
+              reader.onerror = rej;
+              reader.readAsDataURL(blob);
+            });
+            const cur = getSelectedEntry();
+            if (!cur) return;
+            const next = [...(cur.voiceMemos || []), {
+              id: `vm-${Date.now()}`,
+              dataUrl,
+              duration: null,
+              createdAt: new Date().toISOString()
+            }].slice(-8);
+            updateSelected({ voiceMemos: next });
+          };
+          mr.start();
+          recordBtn.textContent = '⏹ Stop';
+        } catch (err) {
+          showToast('Microphone access denied or not available.');
+        }
+      }
+    }, [el('span', { text: voiceRecorderState.recording ? '⏹ Stop' : '🎙 Record voice' })]);
+
+    const memoList = el('div', { class: 'voice-memo-list' }, memos.map((memo, i) => {
+      const audio = el('audio', { controls: 'controls', src: memo.dataUrl, class: 'voice-audio' });
+      const removeBtn = el('button', {
+        class: 'btn mini ghost',
+        type: 'button',
+        onclick: () => {
+          const cur = getSelectedEntry();
+          if (!cur) return;
+          updateSelected({ voiceMemos: (cur.voiceMemos || []).filter((m) => m.id !== memo.id) });
+        }
+      }, [el('span', { text: 'Remove' })]);
+      return el('div', { class: 'voice-memo-item' }, [
+        el('span', { class: 'tiny', text: `Voice memo ${i + 1}` }),
+        audio,
+        removeBtn
+      ]);
+    }));
+
+    return el('div', { class: 'detail-grid' }, [
+      el('div', { class: 'detail-card detail-card-wide' }, [
+        el('span', { class: 'detail-label', text: 'Voice memos' }),
+        el('div', { class: 'voice-memo-controls' }, [recordBtn, statusText]),
+        memoList
+      ])
+    ]);
+  }
+
+  // ── Video Recordings ─────────────────────────────────────────────────────────
+  const videoRecorderState = { mediaRecorder: null, chunks: [], recording: false, stream: null };
+
+  function renderVideoUI(entry) {
+    const clips = Array.isArray(entry.videoClips) ? entry.videoClips : [];
+    const preview = el('video', { class: 'video-preview', muted: 'muted', playsinline: 'playsinline' });
+    const statusText = el('span', { class: 'tiny', text: '' });
+
+    const recordBtn = el('button', {
+      class: 'btn ghost small-btn',
+      type: 'button',
+      onclick: async () => {
+        if (videoRecorderState.recording) {
+          videoRecorderState.mediaRecorder?.stop();
+          return;
+        }
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          videoRecorderState.stream = stream;
+          videoRecorderState.chunks = [];
+          videoRecorderState.recording = true;
+          preview.srcObject = stream;
+          preview.play();
+          statusText.textContent = 'Recording video…';
+          recordBtn.querySelector('span').textContent = '⏹ Stop';
+          const mr = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm' });
+          videoRecorderState.mediaRecorder = mr;
+          mr.ondataavailable = (e) => { if (e.data.size > 0) videoRecorderState.chunks.push(e.data); };
+          mr.onstop = async () => {
+            videoRecorderState.recording = false;
+            statusText.textContent = '';
+            recordBtn.querySelector('span').textContent = '📹 Record video';
+            stream.getTracks().forEach((t) => t.stop());
+            preview.srcObject = null;
+            const blob = new Blob(videoRecorderState.chunks, { type: 'video/webm' });
+            if (blob.size > 50 * 1024 * 1024) { showToast('Video too large (max 50MB).'); return; }
+            const dataUrl = await new Promise((res, rej) => {
+              const reader = new FileReader();
+              reader.onload = () => res(reader.result);
+              reader.onerror = rej;
+              reader.readAsDataURL(blob);
+            });
+            const cur = getSelectedEntry();
+            if (!cur) return;
+            const next = [...(cur.videoClips || []), {
+              id: `vc-${Date.now()}`,
+              dataUrl,
+              createdAt: new Date().toISOString()
+            }].slice(-4);
+            updateSelected({ videoClips: next });
+          };
+          mr.start();
+        } catch (err) {
+          showToast('Camera/microphone access denied or unavailable.');
+        }
+      }
+    }, [el('span', { text: '📹 Record video' })]);
+
+    const clipList = el('div', { class: 'video-clip-list' }, clips.map((clip, i) => {
+      const video = el('video', { controls: 'controls', src: clip.dataUrl, class: 'video-clip', playsinline: 'playsinline' });
+      const removeBtn = el('button', {
+        class: 'btn mini ghost',
+        type: 'button',
+        onclick: () => {
+          const cur = getSelectedEntry();
+          if (!cur) return;
+          updateSelected({ videoClips: (cur.videoClips || []).filter((c) => c.id !== clip.id) });
+        }
+      }, [el('span', { text: 'Remove' })]);
+      return el('div', { class: 'video-clip-item' }, [
+        el('span', { class: 'tiny', text: `Clip ${i + 1}` }),
+        video,
+        removeBtn
+      ]);
+    }));
+
+    return el('div', { class: 'detail-grid' }, [
+      el('div', { class: 'detail-card detail-card-wide' }, [
+        el('span', { class: 'detail-label', text: 'Video recordings' }),
+        preview,
+        el('div', { class: 'voice-memo-controls' }, [recordBtn, statusText]),
+        clipList
+      ])
+    ]);
+  }
+
+  // ── Advanced Search Panel ────────────────────────────────────────────────────
+  function renderAdvancedSearch() {
+    if (!state.showAdvancedSearch) return el('div');
+    const allMoods = ['sparkly', 'cozy', 'melancholy', 'anxious', 'grateful', 'hopeful', 'angry', 'peaceful', 'excited', 'numb'];
+    const moodSel = el('select', { class: 'mood-select' }, [
+      el('option', { value: '', text: 'Any mood' }),
+      ...allMoods.map((m) => el('option', { value: m, text: moodLabel(m) }))
+    ]);
+    moodSel.value = state.searchFilters?.mood || '';
+
+    const fromDate = el('input', { type: 'date', class: 'date-input', value: state.searchFilters?.fromDate || '' });
+    const toDate = el('input', { type: 'date', class: 'date-input', value: state.searchFilters?.toDate || '' });
+
+    const tagSel = el('select', { class: 'mood-select' }, [
+      el('option', { value: '', text: 'Any tag' }),
+      ...(state.tags || []).map((t) => el('option', { value: String(t.id), text: t.name }))
+    ]);
+    tagSel.value = state.searchFilters?.tagId || '';
+
+    const applyBtn = el('button', {
+      class: 'btn small-btn',
+      type: 'button',
+      onclick: () => {
+        state.searchFilters = {
+          mood: moodSel.value,
+          fromDate: fromDate.value,
+          toDate: toDate.value,
+          tagId: tagSel.value
+        };
+        render(false);
+      }
+    }, [el('span', { text: 'Apply filters' })]);
+
+    const clearBtn = el('button', {
+      class: 'btn ghost small-btn',
+      type: 'button',
+      onclick: () => {
+        state.searchFilters = {};
+        render(false);
+      }
+    }, [el('span', { text: 'Clear' })]);
+
+    return el('div', { class: 'advanced-search-panel' }, [
+      el('div', { class: 'adv-search-row' }, [
+        el('label', { class: 'adv-search-label', text: 'Mood' }),
+        moodSel
+      ]),
+      el('div', { class: 'adv-search-row' }, [
+        el('label', { class: 'adv-search-label', text: 'From' }),
+        fromDate,
+        el('label', { class: 'adv-search-label', text: 'To' }),
+        toDate
+      ]),
+      el('div', { class: 'adv-search-row' }, [
+        el('label', { class: 'adv-search-label', text: 'Tag' }),
+        tagSel
+      ]),
+      el('div', { class: 'adv-search-row' }, [applyBtn, clearBtn])
+    ]);
+  }
+
+  // ── Calendar View ────────────────────────────────────────────────────────────
+  function renderCalendarView() {
+    if (!state.showCalendar) return el('div');
+    const now = state.calendarMonth ? new Date(state.calendarMonth + '-01') : new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const monthLabel = now.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+
+    const entryMap = {};
+    for (const entry of (state.vault?.entries || [])) {
+      const d = entry.date;
+      if (d) {
+        if (!entryMap[d]) entryMap[d] = [];
+        entryMap[d].push(entry);
+      }
+    }
+
+    const cells = [];
+    for (let i = 0; i < firstDay; i++) cells.push(el('div', { class: 'cal-cell empty' }));
+    for (let d = 1; d <= daysInMonth; d++) {
+      const iso = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dayEntries = entryMap[iso] || [];
+      const dot = dayEntries.length > 0 ? el('span', { class: 'cal-dot' }) : null;
+      const preview = dayEntries[0]
+        ? el('div', { class: 'cal-preview', text: (dayEntries[0].title || dayEntries[0].body || '').slice(0, 22) })
+        : null;
+      const cell = el('div', {
+        class: `cal-cell ${dayEntries.length ? 'has-entries' : ''} ${iso === isoDate() ? 'today' : ''}`,
+        onclick: () => {
+          if (dayEntries.length) {
+            state.selectedId = dayEntries[0].id;
+            state.showCalendar = false;
+            render(false);
+          }
+        }
+      }, [
+        el('span', { class: 'cal-day-num', text: String(d) }),
+        ...(dot ? [dot] : []),
+        ...(preview ? [preview] : [])
+      ]);
+      cells.push(cell);
+    }
+
+    const prevMonth = new Date(year, month - 1, 1);
+    const nextMonth = new Date(year, month + 1, 1);
+    const fmtMon = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+    return el('div', { class: 'calendar-view' }, [
+      el('div', { class: 'cal-header' }, [
+        el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => { state.calendarMonth = fmtMon(prevMonth); render(false); } }, [el('span', { text: '←' })]),
+        el('span', { class: 'cal-month-label', text: monthLabel }),
+        el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => { state.calendarMonth = fmtMon(nextMonth); render(false); } }, [el('span', { text: '→' })])
+      ]),
+      el('div', { class: 'cal-weekdays' }, ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => el('div', { class: 'cal-wday', text: d }))),
+      el('div', { class: 'cal-grid' }, cells),
+      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => { state.showCalendar = false; render(false); } }, [el('span', { text: 'Close calendar' })])
+    ]);
+  }
+
+  // ── Entry Templates ──────────────────────────────────────────────────────────
+  const ENTRY_TEMPLATES = [
+    { id: 'daily', label: 'Daily Journal', body: '## Morning thoughts\n\n\n## What happened today\n\n\n## Grateful for\n\n\n## Tomorrow I want to\n\n' },
+    { id: 'gratitude', label: 'Gratitude', body: '## Three things I\'m grateful for\n1. \n2. \n3. \n\n## Why I\'m grateful\n\n' },
+    { id: 'travel', label: 'Travel Log', body: '## Where I am\n\n## What I saw\n\n## Food I tried\n\n## Moments to remember\n\n' },
+    { id: 'dream', label: 'Dream Log', body: '## The dream\n\n## How it felt\n\n## Symbols or themes\n\n' },
+    { id: 'weekly', label: 'Weekly Review', body: '## Wins this week\n\n## Challenges\n\n## Lessons learned\n\n## Next week goals\n\n' },
+    { id: 'mood', label: 'Mood Check-in', body: '## Current mood\n\n## Why I feel this way\n\n## What I need\n\n## One thing I can do\n\n' }
+  ];
+
+  function renderTemplateOverlay() {
+    const overlay = el('div', { class: 'overlay-backdrop' });
+    const closeOverlay = () => overlay.remove();
+
+    const cards = ENTRY_TEMPLATES.map((tmpl) =>
+      el('div', {
+        class: 'template-card',
+        onclick: () => {
+          const entry = getSelectedEntry();
+          if (entry) {
+            if (entry.body && entry.body.trim() && !confirm('Replace the current content with this template?')) return;
+            updateSelected({ body: tmpl.body });
+          }
+          closeOverlay();
+        }
+      }, [
+        el('div', { class: 'template-name', text: tmpl.label }),
+        el('div', { class: 'template-preview', text: tmpl.body.replace(/^#+\s*/gm, '').slice(0, 80) })
+      ])
+    );
+
+    const modal = el('div', { class: 'overlay-modal' }, [
+      el('div', { class: 'overlay-title', text: 'Choose a template' }),
+      el('div', { class: 'template-grid' }, cards),
+      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: closeOverlay }, [el('span', { text: 'Cancel' })])
+    ]);
+    overlay.append(modal);
+    document.body.append(overlay);
+    return overlay;
+  }
+
+  // ── Analytics: Writing Stats ─────────────────────────────────────────────────
+  function computeWritingStats() {
+    const entries = state.vault?.entries || [];
+    const total = entries.length;
+    const wordCounts = entries.map((e) => (e.body || '').split(/\s+/).filter(Boolean).length);
+    const totalWords = wordCounts.reduce((a, b) => a + b, 0);
+    const avgWords = total ? Math.round(totalWords / total) : 0;
+
+    const dates = [...new Set(entries.map((e) => e.date).filter(Boolean))].sort();
+    let streak = 0;
+    let maxStreak = 0;
+    let cur = 0;
+    const today = isoDate();
+    const yesterday = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().slice(0, 10); })();
+    for (let i = dates.length - 1; i >= 0; i--) {
+      const d = dates[i];
+      if (i === dates.length - 1) {
+        cur = (d === today || d === yesterday) ? 1 : 0;
+      } else {
+        const prev = new Date(dates[i + 1]);
+        const curr = new Date(d);
+        const diff = Math.round((prev - curr) / 86400000);
+        if (diff === 1) cur++;
+        else cur = 1;
+      }
+      if (cur > maxStreak) maxStreak = cur;
+    }
+    streak = (dates[dates.length - 1] === today || dates[dates.length - 1] === yesterday) ? cur : 0;
+
+    const monthCounts = {};
+    for (const e of entries) {
+      if (!e.date) continue;
+      const mon = e.date.slice(0, 7);
+      monthCounts[mon] = (monthCounts[mon] || 0) + 1;
+    }
+
+    return { total, totalWords, avgWords, streak, maxStreak, monthCounts };
+  }
+
+  function renderWritingStatsOverlay() {
+    const overlay = el('div', { class: 'overlay-backdrop' });
+    const stats = computeWritingStats();
+    const months = Object.entries(stats.monthCounts).sort((a, b) => a[0].localeCompare(b[0])).slice(-12);
+    const maxVal = Math.max(1, ...months.map(([, v]) => v));
+
+    const bars = months.map(([mon, count]) =>
+      el('div', { class: 'stat-bar-col' }, [
+        el('div', { class: 'stat-bar', style: `height:${Math.round((count / maxVal) * 80)}px` }),
+        el('div', { class: 'stat-bar-label', text: mon.slice(5) })
+      ])
+    );
+
+    const modal = el('div', { class: 'overlay-modal' }, [
+      el('div', { class: 'overlay-title', text: 'Writing Statistics' }),
+      el('div', { class: 'stats-grid' }, [
+        el('div', { class: 'stat-card' }, [el('div', { class: 'stat-val', text: String(stats.total) }), el('div', { class: 'stat-label', text: 'Total entries' })]),
+        el('div', { class: 'stat-card' }, [el('div', { class: 'stat-val', text: String(stats.totalWords) }), el('div', { class: 'stat-label', text: 'Total words' })]),
+        el('div', { class: 'stat-card' }, [el('div', { class: 'stat-val', text: String(stats.avgWords) }), el('div', { class: 'stat-label', text: 'Avg words/entry' })]),
+        el('div', { class: 'stat-card' }, [el('div', { class: 'stat-val', text: String(stats.streak) }), el('div', { class: 'stat-label', text: 'Current streak (days)' })]),
+        el('div', { class: 'stat-card' }, [el('div', { class: 'stat-val', text: String(stats.maxStreak) }), el('div', { class: 'stat-label', text: 'Longest streak (days)' })])
+      ]),
+      el('div', { class: 'stat-chart', title: 'Entries per month (last 12 months)' }, bars),
+      el('div', { class: 'stat-chart-label', text: 'Entries per month' }),
+      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Close' })])
+    ]);
+    overlay.append(modal);
+    document.body.append(overlay);
+    return overlay;
+  }
+
+  // ── Analytics: Activity Heatmap ──────────────────────────────────────────────
+  function renderActivityHeatmap() {
+    const entries = state.vault?.entries || [];
+    const dateCounts = {};
+    for (const e of entries) {
+      if (e.date) dateCounts[e.date] = (dateCounts[e.date] || 0) + 1;
+    }
+    const maxVal = Math.max(1, ...Object.values(dateCounts));
+
+    const today = new Date();
+    const cells = [];
+    for (let i = 364; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const iso = d.toISOString().slice(0, 10);
+      const count = dateCounts[iso] || 0;
+      const intensity = count === 0 ? 0 : Math.ceil((count / maxVal) * 4);
+      cells.push(el('div', {
+        class: `heatmap-cell intensity-${intensity}`,
+        title: `${iso}: ${count} entr${count === 1 ? 'y' : 'ies'}`
+      }));
+    }
+
+    return el('div', { class: 'heatmap-wrap' }, [
+      el('div', { class: 'heatmap-grid' }, cells),
+      el('div', { class: 'heatmap-legend' }, [
+        el('span', { class: 'tiny', text: 'Less' }),
+        ...[0,1,2,3,4].map((i) => el('div', { class: `heatmap-cell intensity-${i}` })),
+        el('span', { class: 'tiny', text: 'More' })
+      ])
+    ]);
+  }
+
+  // ── Mood Chart ───────────────────────────────────────────────────────────────
+  function renderMoodChart() {
+    const entries = sortEntriesDesc(state.vault?.entries || []).slice(0, 30).reverse();
+    if (!entries.length) return el('div', { class: 'tiny', text: 'No entries yet.' });
+    const moodColors = {
+      sparkly: '#f59e0b', cozy: '#f97316', melancholy: '#6366f1',
+      anxious: '#ef4444', grateful: '#22c55e', hopeful: '#3b82f6',
+      angry: '#dc2626', peaceful: '#10b981', excited: '#a855f7', numb: '#9ca3af'
+    };
+    const max = 5;
+    const bars = entries.map((e) => {
+      const intensity = e.moodIntensity || 3;
+      const color = moodColors[e.mood] || '#6366f1';
+      return el('div', { class: 'mood-bar-col' }, [
+        el('div', {
+          class: 'mood-bar',
+          style: `height:${Math.round((intensity / max) * 60)}px; background:${color}`,
+          title: `${e.date}: ${moodLabel(e.mood)} (${intensity})`
+        }),
+        el('div', { class: 'mood-bar-dot', style: `background:${color}` })
+      ]);
+    });
+    return el('div', { class: 'mood-chart-wrap' }, [
+      el('div', { class: 'mood-chart', title: 'Mood over last 30 entries' }, bars),
+      el('div', { class: 'mood-chart-label', text: 'Mood over recent entries' })
+    ]);
+  }
+
+  // ── Sentiment Analysis ───────────────────────────────────────────────────────
+  const POSITIVE_WORDS = new Set(['happy','love','great','amazing','wonderful','joy','grateful','excited','peaceful','beautiful','hope','inspired','proud','calm','content','blessed','thankful','kind','gentle','warm','bright','fun','laugh','smile']);
+  const NEGATIVE_WORDS = new Set(['sad','angry','hate','terrible','awful','anxious','worried','fear','hurt','pain','tired','exhausted','frustrated','lonely','lost','dark','heavy','hard','cry','stress','bad','wrong','fail']);
+
+  function analyzeSentiment(text = '') {
+    const words = text.toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/).filter(Boolean);
+    let pos = 0, neg = 0;
+    for (const w of words) {
+      if (POSITIVE_WORDS.has(w)) pos++;
+      else if (NEGATIVE_WORDS.has(w)) neg++;
+    }
+    const total = pos + neg;
+    if (!total) return 'neutral';
+    const ratio = pos / total;
+    if (ratio >= 0.7) return 'positive';
+    if (ratio <= 0.3) return 'negative';
+    return 'mixed';
+  }
+
+  // ── Export ───────────────────────────────────────────────────────────────────
+  function exportToJson() {
+    const data = JSON.stringify(state.vault?.entries || [], null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `mydiary-export-${isoDate()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Exported as JSON');
+  }
+
+  function exportToMarkdown() {
+    const entries = sortEntriesDesc(state.vault?.entries || []);
+    const md = entries.map((e) => {
+      const lines = [`# ${e.title || 'Untitled'} — ${e.date || ''}`, ''];
+      if (e.mood) lines.push(`**Mood:** ${moodLabel(e.mood)}  `);
+      if (e.tags?.length) lines.push(`**Tags:** ${e.tags.join(', ')}  `);
+      lines.push('');
+      if (e.body) lines.push(e.body);
+      lines.push('\n---\n');
+      return lines.join('\n');
+    }).join('\n');
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `mydiary-export-${isoDate()}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Exported as Markdown');
+  }
+
+  function exportToPdf() {
+    const entries = sortEntriesDesc(state.vault?.entries || []);
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>My Diary Export</title>
+    <style>body{font-family:Georgia,serif;max-width:700px;margin:40px auto;color:#111}h1{font-size:1.4em;margin-top:2em}
+    .meta{font-size:.85em;color:#555;margin-bottom:.5em}.body{white-space:pre-wrap;line-height:1.7}hr{border:none;border-top:1px solid #ddd;margin:2em 0}</style>
+    </head><body>` +
+      entries.map((e) => `<h1>${e.title || 'Untitled'}</h1><div class="meta">${e.date || ''} ${e.mood ? '• ' + moodLabel(e.mood) : ''}</div><div class="body">${e.body || ''}</div><hr>`).join('') +
+      '</body></html>';
+    const win = window.open('', '_blank');
+    if (!win) { showToast('Allow pop-ups to export PDF'); return; }
+    win.document.write(html);
+    win.document.close();
+    setTimeout(() => { win.print(); win.close(); }, 500);
+    showToast('Print dialog opened — save as PDF');
+  }
+
+  function renderExportOverlay() {
+    const overlay = el('div', { class: 'overlay-backdrop' });
+    const modal = el('div', { class: 'overlay-modal' }, [
+      el('div', { class: 'overlay-title', text: 'Export your diary' }),
+      el('div', { class: 'export-options' }, [
+        el('button', { class: 'btn ghost', type: 'button', onclick: () => { exportToJson(); overlay.remove(); } }, [
+          el('span', { class: 'btn-ic', text: '{}' }),
+          el('span', { text: 'Export as JSON' })
+        ]),
+        el('button', { class: 'btn ghost', type: 'button', onclick: () => { exportToMarkdown(); overlay.remove(); } }, [
+          el('span', { class: 'btn-ic', text: 'MD' }),
+          el('span', { text: 'Export as Markdown' })
+        ]),
+        el('button', { class: 'btn ghost', type: 'button', onclick: () => { exportToPdf(); overlay.remove(); } }, [
+          el('span', { class: 'btn-ic', text: '📄' }),
+          el('span', { text: 'Export / Print as PDF' })
+        ])
+      ]),
+      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Cancel' })])
+    ]);
+    overlay.append(modal);
+    document.body.append(overlay);
+    return overlay;
+  }
+
+  // ── Reminders & Notifications ─────────────────────────────────────────────────
+  function initDailyReminderCheck() {
+    const prefs = loadUiPrefs() || {};
+    if (!prefs.reminderEnabled) return;
+    const now = new Date();
+    const [rh, rm] = (prefs.reminderTime || '20:00').split(':').map(Number);
+    const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), rh, rm, 0, 0);
+    let delay = target - now;
+    if (delay < 0) delay += 86400000;
+    setTimeout(() => {
+      if (document.visibilityState === 'visible') {
+        showToast('🔔 Time to write in your diary!');
+      } else if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('MyDiary reminder', { body: 'Time to write in your diary!', icon: '/favicon.ico' });
+      }
+      setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          showToast('🔔 Time to write in your diary!');
+        } else if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('MyDiary reminder', { body: 'Time to write in your diary!', icon: '/favicon.ico' });
+        }
+      }, 86400000);
+    }, delay);
+  }
+
+  function renderReminderSettings() {
+    const overlay = el('div', { class: 'overlay-backdrop' });
+    const prefs = loadUiPrefs() || {};
+
+    const enabledToggle = el('input', { type: 'checkbox', id: 'reminder-toggle' });
+    enabledToggle.checked = Boolean(prefs.reminderEnabled);
+
+    const timeInput = el('input', { type: 'time', class: 'date-input', value: prefs.reminderTime || '20:00' });
+
+    const saveBtn = el('button', {
+      class: 'btn',
+      type: 'button',
+      onclick: async () => {
+        const updPrefs = { ...(loadUiPrefs() || {}), reminderEnabled: enabledToggle.checked, reminderTime: timeInput.value };
+        saveUiPrefs(updPrefs);
+        if (enabledToggle.checked && 'Notification' in window && Notification.permission === 'default') {
+          await Notification.requestPermission();
+        }
+        overlay.remove();
+        showToast('Reminder settings saved');
+        if (enabledToggle.checked) initDailyReminderCheck();
+      }
+    }, [el('span', { text: 'Save reminder' })]);
+
+    const modal = el('div', { class: 'overlay-modal' }, [
+      el('div', { class: 'overlay-title', text: 'Daily reminder' }),
+      el('label', { class: 'account-row' }, [
+        el('input', { type: 'checkbox', id: 'reminder-toggle-chk' }),
+        el('span', { class: 'account-label', text: 'Enable daily reminder' })
+      ]),
+      el('div', { class: 'account-row' }, [
+        el('span', { class: 'account-label', text: 'Remind me at' }),
+        timeInput
+      ]),
+      saveBtn,
+      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Cancel' })])
+    ]);
+
+    const chk = modal.querySelector('#reminder-toggle-chk');
+    if (chk) chk.checked = Boolean(prefs.reminderEnabled);
+
+    overlay.append(modal);
+    document.body.append(overlay);
+    return overlay;
+  }
+
+  // ── Goals & Milestones ────────────────────────────────────────────────────────
+  function loadGoals() {
+    try { return JSON.parse(localStorage.getItem('diary.goals') || '[]'); } catch { return []; }
+  }
+  function saveGoals(goals) {
+    localStorage.setItem('diary.goals', JSON.stringify(goals));
+  }
+
+  function renderGoalsOverlay() {
+    const overlay = el('div', { class: 'overlay-backdrop' });
+    let goals = loadGoals();
+
+    const refreshList = () => {
+      list.replaceChildren(...goals.map((g) => {
+        const progress = el('div', {
+          class: 'goal-progress-bar',
+          style: `width:${Math.min(100, Math.round((g.current / Math.max(1, g.target)) * 100))}%`
+        });
+        const pct = el('span', { class: 'tiny', text: `${g.current}/${g.target} entries` });
+        const doneBtn = el('button', {
+          class: 'btn mini ghost',
+          type: 'button',
+          onclick: () => {
+            g.current = Math.min(g.target, g.current + 1);
+            saveGoals(goals);
+            refreshList();
+          }
+        }, [el('span', { text: '+1' })]);
+        const delBtn = el('button', {
+          class: 'btn mini ghost',
+          type: 'button',
+          onclick: () => {
+            goals = goals.filter((x) => x.id !== g.id);
+            saveGoals(goals);
+            refreshList();
+          }
+        }, [el('span', { text: '✕' })]);
+        return el('div', { class: 'goal-item' }, [
+          el('div', { class: 'goal-name', text: g.name }),
+          el('div', { class: 'goal-progress-track' }, [progress]),
+          el('div', { class: 'goal-row' }, [pct, doneBtn, delBtn])
+        ]);
+      }));
+    };
+
+    const list = el('div', { class: 'goals-list' });
+    refreshList();
+
+    const nameInput = el('input', { type: 'text', class: 'lock-input', placeholder: 'Goal name', style: 'font-size:13px' });
+    const targetInput = el('input', { type: 'number', class: 'date-input', placeholder: 'Target (entries)', value: '30' });
+
+    const addBtn = el('button', {
+      class: 'btn small-btn',
+      type: 'button',
+      onclick: () => {
+        const name = nameInput.value.trim();
+        if (!name) return;
+        goals.push({ id: `goal-${Date.now()}`, name, target: Number(targetInput.value) || 30, current: 0, createdAt: new Date().toISOString() });
+        saveGoals(goals);
+        nameInput.value = '';
+        refreshList();
+      }
+    }, [el('span', { text: 'Add goal' })]);
+
+    const modal = el('div', { class: 'overlay-modal' }, [
+      el('div', { class: 'overlay-title', text: 'Goals & Milestones' }),
+      list,
+      el('div', { class: 'goal-add-row' }, [nameInput, targetInput, addBtn]),
+      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Close' })])
+    ]);
+    overlay.append(modal);
+    document.body.append(overlay);
+    return overlay;
+  }
+
+  // ── Share Entry ───────────────────────────────────────────────────────────────
+  function renderShareOverlay(entry) {
+    if (!entry) return;
+    const overlay = el('div', { class: 'overlay-backdrop' });
+    const shareId = btoa(entry.id).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16);
+    const shareUrl = `${window.location.origin}/share/${shareId}`;
+    const urlInput = el('input', { type: 'text', class: 'lock-input', value: shareUrl, readonly: 'readonly', style: 'font-size:12px' });
+    const copyBtn = el('button', {
+      class: 'btn ghost small-btn',
+      type: 'button',
+      onclick: () => {
+        navigator.clipboard?.writeText(shareUrl).then(() => showToast('Link copied!')).catch(() => {
+          urlInput.select();
+          document.execCommand('copy');
+          showToast('Link copied!');
+        });
+      }
+    }, [el('span', { text: 'Copy link' })]);
+    const modal = el('div', { class: 'overlay-modal' }, [
+      el('div', { class: 'overlay-title', text: 'Share this entry' }),
+      el('div', { class: 'share-notice', text: 'Note: sharing requires the shared link feature to be enabled on your server. For now this generates a shareable ID for your records.' }),
+      el('div', { class: 'share-url-row' }, [urlInput, copyBtn]),
+      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Close' })])
+    ]);
+    overlay.append(modal);
+    document.body.append(overlay);
+    return overlay;
+  }
+
+  // ── Location & Weather ─────────────────────────────────────────────────────────
+  async function captureLocationForEntry() {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) { resolve(null); return; }
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const { latitude, longitude } = pos.coords;
+          let label = `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`;
+          let weatherSummary = '';
+          let temperature = '';
+          try {
+            const key = state.integrationConfig?.openweather_api_key || '';
+            if (key) {
+              const r = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${key}&units=metric`);
+              const d = await r.json();
+              label = `${d.name || label}, ${d.sys?.country || ''}`.trim().replace(/,\s*$/, '');
+              weatherSummary = d.weather?.[0]?.description || '';
+              temperature = d.main?.temp != null ? `${Math.round(d.main.temp)}°C` : '';
+            }
+          } catch { /* graceful */ }
+          resolve({ locationLabel: label, weatherSummary, temperature, lat: latitude, lon: longitude });
+        },
+        () => resolve(null)
+      );
+    });
+  }
+
+  // ── Audit Log Viewer ──────────────────────────────────────────────────────────
+  function renderAuditLogOverlay() {
+    const overlay = el('div', { class: 'overlay-backdrop' });
+    const list = el('div', { class: 'audit-log-list' });
+    const statusText = el('div', { class: 'tiny', text: 'Loading…' });
+
+    (async () => {
+      try {
+        const data = await getAuditLogs(state.auth.token, 100);
+        const logs = data.logs || [];
+        if (!logs.length) {
+          list.append(el('div', { class: 'tiny', text: 'No activity recorded yet.' }));
+        } else {
+          list.replaceChildren(...logs.map((log) => {
+            const dt = new Date(log.created_at);
+            return el('div', { class: 'audit-row' }, [
+              el('span', { class: 'audit-action', text: log.action }),
+              el('span', { class: 'audit-detail', text: log.detail || '' }),
+              el('span', { class: 'audit-time', text: dt.toLocaleString() }),
+              log.ip_address ? el('span', { class: 'audit-ip', text: log.ip_address }) : el('span')
+            ]);
+          }));
+        }
+        statusText.textContent = `${logs.length} events`;
+      } catch {
+        statusText.textContent = 'Failed to load audit logs.';
+      }
+    })();
+
+    const modal = el('div', { class: 'overlay-modal' }, [
+      el('div', { class: 'overlay-title', text: 'Security audit log' }),
+      statusText,
+      list,
+      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Close' })])
+    ]);
+    overlay.append(modal);
+    document.body.append(overlay);
+    return overlay;
+  }
+
+  // ── 2FA Setup Overlay ─────────────────────────────────────────────────────────
+  function renderTwoFactorOverlay() {
+    const overlay = el('div', { class: 'overlay-backdrop' });
+    const statusDiv = el('div', { class: 'tiny', text: '' });
+
+    const secretInput = el('input', { type: 'text', class: 'lock-input', placeholder: 'TOTP secret key (e.g. from authenticator app)', style: 'font-size:12px' });
+
+    const enableChk = el('input', { type: 'checkbox', id: 'totp-enable-chk' });
+
+    const saveBtn = el('button', {
+      class: 'btn',
+      type: 'button',
+      onclick: async () => {
+        const secret = secretInput.value.trim();
+        if (!secret) { statusDiv.textContent = 'Secret is required.'; return; }
+        try {
+          await setup2fa(state.auth.token, { secret, enabled: enableChk.checked });
+          statusDiv.textContent = '2FA settings saved.';
+          showToast('2FA settings saved');
+          setTimeout(() => overlay.remove(), 1200);
+        } catch (err) {
+          statusDiv.textContent = err?.message || 'Failed to save.';
+        }
+      }
+    }, [el('span', { text: 'Save 2FA settings' })]);
+
+    (async () => {
+      try {
+        const status = await get2faStatus(state.auth.token);
+        statusDiv.textContent = status.enabled ? '2FA is currently ENABLED.' : '2FA is currently disabled.';
+        enableChk.checked = Boolean(status.enabled);
+      } catch { statusDiv.textContent = 'Could not load current status.'; }
+    })();
+
+    const modal = el('div', { class: 'overlay-modal' }, [
+      el('div', { class: 'overlay-title', text: 'Two-factor authentication (2FA)' }),
+      el('div', { class: 'tiny', text: 'Enter the TOTP secret from your authenticator app (e.g. Google Authenticator, Authy). Toggle to enable.' }),
+      secretInput,
+      el('label', { class: 'account-row' }, [
+        enableChk,
+        el('span', { class: 'account-label', text: 'Enable 2FA' })
+      ]),
+      saveBtn,
+      statusDiv,
+      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Cancel' })])
+    ]);
+    overlay.append(modal);
+    document.body.append(overlay);
+    return overlay;
+  }
+
+  // ── Recovery Codes Overlay ────────────────────────────────────────────────────
+  function renderRecoveryCodesOverlay() {
+    const overlay = el('div', { class: 'overlay-backdrop' });
+    const statusDiv = el('div', { class: 'tiny', text: '' });
+    const codeList = el('div', { class: 'recovery-codes-list' });
+
+    const generateCodes = () => {
+      const codes = Array.from({ length: 8 }, () =>
+        Array.from({ length: 4 }, () => Math.random().toString(36).slice(2, 4)).join('-')
+      );
+      codeList.replaceChildren(
+        el('div', { class: 'tiny', text: 'Save these codes securely. Each can be used once.' }),
+        ...codes.map((c) => el('div', { class: 'recovery-code', text: c }))
+      );
+      return codes;
+    };
+
+    let codes = generateCodes();
+
+    const saveBtn = el('button', {
+      class: 'btn',
+      type: 'button',
+      onclick: async () => {
+        const codesHash = btoa(codes.join('|'));
+        try {
+          await saveRecoveryCodes(state.auth.token, codesHash);
+          statusDiv.textContent = 'Recovery codes saved.';
+          showToast('Recovery codes saved');
+          setTimeout(() => overlay.remove(), 1500);
+        } catch (err) {
+          statusDiv.textContent = err?.message || 'Failed to save.';
+        }
+      }
+    }, [el('span', { text: 'Save recovery codes' })]);
+
+    const regenBtn = el('button', {
+      class: 'btn ghost small-btn',
+      type: 'button',
+      onclick: () => { codes = generateCodes(); }
+    }, [el('span', { text: 'Regenerate' })]);
+
+    (async () => {
+      try {
+        const status = await getRecoveryStatus(state.auth.token);
+        statusDiv.textContent = status.hasRecoveryCodes
+          ? `Recovery codes last saved: ${status.createdAt ? new Date(status.createdAt).toLocaleDateString() : 'unknown'}`
+          : 'No recovery codes saved yet.';
+      } catch { /* silent */ }
+    })();
+
+    const modal = el('div', { class: 'overlay-modal' }, [
+      el('div', { class: 'overlay-title', text: 'Account recovery codes' }),
+      statusDiv,
+      codeList,
+      el('div', { class: 'recovery-actions' }, [saveBtn, regenBtn]),
+      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Close' })])
+    ]);
+    overlay.append(modal);
+    document.body.append(overlay);
+    return overlay;
+  }
+
+  // ── Daily Writing Prompts ─────────────────────────────────────────────────────
+  function getTodaysPrompt() {
+    const prompts = [
+      'What made you smile today?',
+      'Describe a moment you want to remember forever.',
+      'What is something you are grateful for right now?',
+      'Write about a challenge you overcame recently.',
+      'What would your future self thank you for today?',
+      'Describe the most interesting person you know.',
+      'What is something you want to learn or try?',
+      'Write about a place that brings you peace.',
+      'What emotions are you carrying today?',
+      'If today were a chapter in your life story, what would it be called?',
+      'What small thing brought unexpected joy recently?',
+      'Describe your perfect day from morning to night.',
+      'What is something you want to let go of?',
+      'Write a letter to someone who shaped who you are.',
+      'What are three things that went well today?'
+    ];
+    const idx = new Date().getDate() % prompts.length;
+    return prompts[idx];
   }
 }

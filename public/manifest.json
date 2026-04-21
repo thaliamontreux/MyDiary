@@ -1,0 +1,13 @@
+{
+  "name": "My Secret Diary",
+  "short_name": "MyDiary",
+  "description": "Your private, encrypted personal diary",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fdf4ff",
+  "theme_color": "#6366f1",
+  "icons": [
+    { "src": "/favicon.ico", "sizes": "64x64", "type": "image/x-icon" },
+    { "src": "/girly-bg.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

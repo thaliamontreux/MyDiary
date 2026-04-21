@@ -39,7 +39,13 @@ import {
   addTagToEntry,
   removeTagFromEntry,
   getEntryTags,
-  getEntriesByTag
+  getEntriesByTag,
+  createAuditLog,
+  listAuditLogs,
+  setUserTotp,
+  getUserTotp,
+  setUserRecoveryCodes,
+  getUserRecoveryCodes
 } from './db.js';
 import { requireAuth, signAuthToken } from './auth.js';
 import { log, logError, requestLogger } from './logger.js';
@@ -1016,6 +1022,62 @@ app.get('/api/tags/:id/entries', requireAuth, async (req, res) => {
   } catch (error) {
     logError('tag_entries_list_failed', error, { requestId: req.requestId, userId: req.user?.id });
     res.status(500).json({ error: 'Failed to load entries for tag' });
+  }
+});
+
+// ── Audit Logs ────────────────────────────────────────────────────────────────
+app.get('/api/audit-logs', requireAuth, async (req, res) => {
+  try {
+    const limit = Math.min(200, Number(req.query.limit) || 50);
+    const logs = await listAuditLogs(req.user.id, limit);
+    res.json({ logs });
+  } catch (err) {
+    logError('audit_logs_list_failed', err, { userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to load audit logs' });
+  }
+});
+
+// ── TOTP 2FA ──────────────────────────────────────────────────────────────────
+app.get('/api/2fa/status', requireAuth, async (req, res) => {
+  try {
+    const totp = await getUserTotp(req.user.id);
+    res.json({ enabled: totp?.enabled === 1, hasSecret: Boolean(totp?.secret) });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to get 2FA status' });
+  }
+});
+
+app.post('/api/2fa/setup', requireAuth, async (req, res) => {
+  try {
+    const { secret, enabled } = req.body || {};
+    if (!secret) return res.status(400).json({ error: 'Secret is required' });
+    await setUserTotp(req.user.id, secret, Boolean(enabled));
+    await createAuditLog(req.user.id, enabled ? '2fa_enabled' : '2fa_secret_saved', null, req.ip);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save 2FA settings' });
+  }
+});
+
+// ── Account Recovery Codes ────────────────────────────────────────────────────
+app.post('/api/recovery/save', requireAuth, async (req, res) => {
+  try {
+    const { codesHash } = req.body || {};
+    if (!codesHash) return res.status(400).json({ error: 'codesHash required' });
+    await setUserRecoveryCodes(req.user.id, codesHash);
+    await createAuditLog(req.user.id, 'recovery_codes_regenerated', null, req.ip);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save recovery codes' });
+  }
+});
+
+app.get('/api/recovery/status', requireAuth, async (req, res) => {
+  try {
+    const record = await getUserRecoveryCodes(req.user.id);
+    res.json({ hasRecoveryCodes: Boolean(record), createdAt: record?.created_at || null });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to check recovery status' });
   }
 });
 

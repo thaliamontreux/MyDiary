@@ -212,6 +212,39 @@ export async function initializeDatabase() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+      user_id BIGINT UNSIGNED NOT NULL,
+      action VARCHAR(128) NOT NULL,
+      detail TEXT,
+      ip_address VARCHAR(64),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT fk_audit_logs_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_recovery_codes (
+      id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+      user_id BIGINT UNSIGNED NOT NULL UNIQUE,
+      codes_hash TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT fk_recovery_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_totp (
+      id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+      user_id BIGINT UNSIGNED NOT NULL UNIQUE,
+      secret VARCHAR(128) NOT NULL,
+      enabled TINYINT(1) DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT fk_totp_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
       name VARCHAR(128) NOT NULL UNIQUE,
@@ -895,6 +928,60 @@ export async function getEntriesByTag(userId, tagId) {
     [userId, tagId]
   );
   return rows.map(row => row.vault_slot);
+}
+
+// ── Audit Logs ────────────────────────────────────────────────────────────────
+export async function createAuditLog(userId, action, detail = null, ipAddress = null) {
+  ensurePool();
+  await pool.query(
+    'INSERT INTO audit_logs (user_id, action, detail, ip_address) VALUES (?, ?, ?, ?)',
+    [userId, action, detail, ipAddress]
+  );
+}
+
+export async function listAuditLogs(userId, limit = 50) {
+  ensurePool();
+  const [rows] = await pool.query(
+    'SELECT id, action, detail, ip_address, created_at FROM audit_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
+    [userId, limit]
+  );
+  return rows;
+}
+
+// ── TOTP (2FA) ────────────────────────────────────────────────────────────────
+export async function setUserTotp(userId, secret, enabled) {
+  ensurePool();
+  await pool.query(
+    'INSERT INTO user_totp (user_id, secret, enabled) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE secret = VALUES(secret), enabled = VALUES(enabled)',
+    [userId, secret, enabled ? 1 : 0]
+  );
+}
+
+export async function getUserTotp(userId) {
+  ensurePool();
+  const [rows] = await pool.query(
+    'SELECT secret, enabled FROM user_totp WHERE user_id = ? LIMIT 1',
+    [userId]
+  );
+  return rows[0] || null;
+}
+
+// ── Recovery Codes ─────────────────────────────────────────────────────────────
+export async function setUserRecoveryCodes(userId, codesHash) {
+  ensurePool();
+  await pool.query(
+    'INSERT INTO user_recovery_codes (user_id, codes_hash) VALUES (?, ?) ON DUPLICATE KEY UPDATE codes_hash = VALUES(codes_hash), created_at = CURRENT_TIMESTAMP',
+    [userId, codesHash]
+  );
+}
+
+export async function getUserRecoveryCodes(userId) {
+  ensurePool();
+  const [rows] = await pool.query(
+    'SELECT codes_hash, created_at FROM user_recovery_codes WHERE user_id = ? LIMIT 1',
+    [userId]
+  );
+  return rows[0] || null;
 }
 
 export { pool };

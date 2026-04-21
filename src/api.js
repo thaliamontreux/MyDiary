@@ -313,3 +313,40 @@ export async function deleteAccount(token) {
     }
   });
 }
+
+export async function getAuditLogs(token, limit = 50) {
+  return request(`/api/audit-logs?limit=${limit}`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export async function get2faStatus(token) {
+  return request('/api/2fa/status', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export async function setup2fa(token, payload) {
+  return request('/api/2fa/setup', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function saveRecoveryCodes(token, codesHash) {
+  return request('/api/recovery/save', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ codesHash })
+  });
+}
+
+export async function getRecoveryStatus(token) {
+  return request('/api/recovery/status', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
