@@ -12,9 +12,51 @@ MyDiary is an encrypted diary app with multi-user authentication and MySQL-backe
    - `npm run dev`
 4. Open the URL printed by Vite (usually `http://localhost:5173`).
 
-## Production (single box, Cloudflare)
+## Install as a systemd service (with auto-update from git)
 
-Use the one-command setup script to make deployment simpler:
+Install MyDiary as persistent systemd services on a Linux box. The installer sets
+up three units:
+
+- `mydiary-api.service` — the Node API (clustered)
+- `mydiary-web.service` — the frontend served by `vite preview` on port `4173`
+- `mydiary-updater.timer` — periodically runs `scripts/update.sh`, which does a
+  `git fetch`, pulls if new commits exist on `main`, re-runs `npm install`,
+  rebuilds the frontend, and restarts the API + web services
+
+### Steps
+
+1. Clone the repo to your target box, e.g.:
+   - `sudo git clone https://github.com/thaliamontreux/MyDiary /opt/mydiary`
+2. Copy `.env.example` → `.env` and fill in required values (`JWT_SECRET`, MySQL settings).
+3. Install Node.js 18+ (if not already installed).
+4. Run the installer (as root):
+   - `sudo APP_DIR=/opt/mydiary SERVICE_USER=mydiary UPDATE_INTERVAL=5min ./scripts/install-service.sh`
+
+The installer is idempotent — safe to re-run.
+
+### What it does
+
+- Creates the `mydiary` system user if missing.
+- `chown`s the project to the service user.
+- Runs `npm install` and `npm run build` as that user.
+- Installs systemd unit files from `deploy/systemd/*.template`.
+- Grants the service user passwordless `systemctl restart` for its own units.
+- Enables and starts the API, web, and updater timer.
+
+### Operate
+
+- Force an immediate update/rebuild:
+  - `sudo systemctl start mydiary-updater.service`
+- View logs:
+  - `journalctl -u mydiary-api.service -f`
+  - `journalctl -u mydiary-web.service -f`
+  - `journalctl -u mydiary-updater.service -f`
+- Track a different branch:
+  - `sudo MYDIARY_BRANCH=staging systemctl edit mydiary-updater.service` and add `Environment=MYDIARY_BRANCH=staging` under `[Service]`.
+
+## Production (single box, Cloudflare — legacy one-shot)
+
+Use the older one-command setup script to make deployment simpler:
 
 1. Copy your `.env` from `.env.example` and fill required values (`JWT_SECRET`, MySQL settings).
 2. Run:

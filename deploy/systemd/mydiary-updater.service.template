@@ -1,0 +1,12 @@
+[Unit]
+Description=MyDiary Auto-Updater (git pull + rebuild + restart if new commits)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User={{SERVICE_USER}}
+Group={{SERVICE_USER}}
+WorkingDirectory={{APP_DIR}}
+Environment=NODE_ENV=production
+ExecStart={{APP_DIR}}/scripts/update.sh

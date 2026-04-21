@@ -1,0 +1,11 @@
+[Unit]
+Description=Run MyDiary Auto-Updater periodically
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec={{UPDATE_INTERVAL}}
+Unit=mydiary-updater.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target
