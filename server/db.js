@@ -2,6 +2,7 @@ import mysql from 'mysql2/promise';
 import fs from 'node:fs/promises';
 import crypto from 'node:crypto';
 import path from 'node:path';
+import bcrypt from 'bcryptjs';
 
 let pool = null;
 
