@@ -39,6 +39,15 @@ fi
 git checkout "$BRANCH"
 git reset --hard "origin/$BRANCH"
 
+# Stop services before clean install to prevent crashes when node_modules is deleted
+log "stopping services"
+for svc in mydiary-api mydiary-web; do
+  if systemctl list-unit-files | grep -q "^${svc}.service"; then
+    log "stopping ${svc}.service"
+    sudo -n systemctl stop "${svc}.service" || systemctl --user stop "${svc}.service" || true
+  fi
+done
+
 # Clean install: remove node_modules and package-lock.json to fix broken state
 log "cleaning node_modules and package-lock.json"
 rm -rf "$APP_DIR/node_modules" "$APP_DIR/package-lock.json"
