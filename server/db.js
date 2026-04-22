@@ -177,11 +177,12 @@ export async function initializeDatabase() {
     CREATE TABLE IF NOT EXISTS user_folders (
       id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
       user_id BIGINT UNSIGNED NOT NULL,
+      vault_slot VARCHAR(32) NOT NULL DEFAULT 'primary',
       path VARCHAR(255) NOT NULL,
       password_hash VARCHAR(255) DEFAULT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      UNIQUE KEY uniq_user_folder_path (user_id, path),
+      UNIQUE KEY uniq_user_vault_folder_path (user_id, vault_slot, path),
       CONSTRAINT fk_user_folders_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
@@ -359,6 +360,50 @@ export async function initializeDatabase() {
     await pool.query(
       'INSERT INTO schema_migrations (name) VALUES (?)',
       ['add_user_vault_label_password_v1']
+    );
+  }
+
+  // Add vault_slot to user_folders if missing (vault-scoped folders)
+  const [folderVaultSlotMigrations] = await pool.query(
+    'SELECT name FROM schema_migrations WHERE name = ? LIMIT 1',
+    ['add_folder_vault_slot_v1']
+  );
+  if (folderVaultSlotMigrations.length === 0) {
+    const databaseName = bootstrap.databaseName;
+    async function ensureColumnSimple(tableName, columnName, definitionSql) {
+      const [rows] = await pool.query(
+        `SELECT COUNT(*) AS count
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+        [databaseName, tableName, columnName]
+      );
+      if (!rows[0].count) {
+        await pool.query(`ALTER TABLE ${tableName} ADD COLUMN ${definitionSql}`);
+      }
+    }
+    async function ensureIndex(tableName, indexName, indexSql) {
+      const [rows] = await pool.query(
+        `SELECT COUNT(*) AS count
+         FROM INFORMATION_SCHEMA.STATISTICS
+         WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = ?`,
+        [databaseName, tableName, indexName]
+      );
+      if (!rows[0].count) {
+        await pool.query(`ALTER TABLE ${tableName} ADD UNIQUE KEY ${indexSql}`);
+      }
+    }
+    await ensureColumnSimple('user_folders', 'vault_slot', "vault_slot VARCHAR(32) NOT NULL DEFAULT 'primary'");
+    // Update any null vault_slots to 'primary'
+    await pool.query("UPDATE user_folders SET vault_slot = 'primary' WHERE vault_slot IS NULL OR vault_slot = ''");
+    // Add new unique index and drop old one
+    try {
+      await ensureIndex('user_folders', 'uniq_user_vault_folder_path', 'uniq_user_vault_folder_path (user_id, vault_slot, path)');
+    } catch (e) {
+      // Index may already exist or old index may conflict
+    }
+    await pool.query(
+      'INSERT INTO schema_migrations (name) VALUES (?)',
+      ['add_folder_vault_slot_v1']
     );
   }
 
@@ -807,40 +852,40 @@ export async function getSiteSummary() {
   };
 }
 
-export async function listUserFolders(userId) {
+export async function listUserFolders(userId, vaultSlot = 'primary') {
   ensurePool();
   const [rows] = await pool.query(
-    'SELECT id, path, password_hash, created_at, updated_at FROM user_folders WHERE user_id = ? ORDER BY path ASC',
-    [userId]
+    'SELECT id, vault_slot, path, password_hash, created_at, updated_at FROM user_folders WHERE user_id = ? AND vault_slot = ? ORDER BY path ASC',
+    [userId, vaultSlot]
   );
   return rows;
 }
 
-export async function getUserFolderById(userId, folderId) {
+export async function getUserFolderById(userId, folderId, vaultSlot = 'primary') {
   ensurePool();
   const [rows] = await pool.query(
-    'SELECT id, path, password_hash, created_at, updated_at FROM user_folders WHERE user_id = ? AND id = ? LIMIT 1',
-    [userId, folderId]
+    'SELECT id, vault_slot, path, password_hash, created_at, updated_at FROM user_folders WHERE user_id = ? AND id = ? AND vault_slot = ? LIMIT 1',
+    [userId, folderId, vaultSlot]
   );
   return rows[0] || null;
 }
 
-export async function getUserFolderByPath(userId, pathValue) {
+export async function getUserFolderByPath(userId, pathValue, vaultSlot = 'primary') {
   ensurePool();
   const [rows] = await pool.query(
-    'SELECT id, path, password_hash, created_at, updated_at FROM user_folders WHERE user_id = ? AND path = ? LIMIT 1',
-    [userId, pathValue]
+    'SELECT id, vault_slot, path, password_hash, created_at, updated_at FROM user_folders WHERE user_id = ? AND path = ? AND vault_slot = ? LIMIT 1',
+    [userId, pathValue, vaultSlot]
   );
   return rows[0] || null;
 }
 
-export async function createUserFolder(userId, pathValue, passwordHash = null) {
+export async function createUserFolder(userId, pathValue, passwordHash = null, vaultSlot = 'primary') {
   ensurePool();
   const [result] = await pool.query(
-    'INSERT INTO user_folders (user_id, path, password_hash) VALUES (?, ?, ?)',
-    [userId, pathValue, passwordHash]
+    'INSERT INTO user_folders (user_id, vault_slot, path, password_hash) VALUES (?, ?, ?, ?)',
+    [userId, vaultSlot, pathValue, passwordHash]
   );
-  return getUserFolderById(userId, result.insertId);
+  return getUserFolderById(userId, result.insertId, vaultSlot);
 }
 
 export async function updateUserFolder(userId, folderId, { path: nextPath, passwordHash, clearPassword }) {

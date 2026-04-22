@@ -1859,22 +1859,114 @@ export function createApp(mount) {
     }
   }
 
-  async function handleCreateFolderFromManager() {
-    const name = window.prompt('New folder name:');
-    if (name == null) return;
-    const trimmed = String(name).trim();
-    if (!trimmed) return;
-    const pw = window.prompt(`Optional password for "${trimmed}" (leave empty for no password):`);
-    if (pw == null) return;
-    try {
-      const { folder } = await createFolder(state.auth.token, { path: trimmed, password: String(pw) });
-      state.folders.push(folder);
-      if (folder.hasPassword) state.unlockedFolderIds.add(folder.id);
-      showToast(`Folder "${folder.path}" created`);
-      render(false);
-    } catch (e) {
-      showToast(e?.message || 'Failed to create folder');
-    }
+  function renderCreateFolderOverlay() {
+    const backDrop = el('div', { class: 'overlay-backdrop' });
+
+    // Get available vaults for selector
+    const vaultOptions = (state.availableVaults.length
+      ? state.availableVaults.map((v) => [v.slotName, v.label || v.slotName])
+      : [['primary', 'Main Diary']]
+    );
+
+    const vaultSelect = el('select', { class: 'lock-input' },
+      vaultOptions.map(([slot, label]) => el('option', { value: slot, text: label }))
+    );
+    vaultSelect.value = state.activeVaultSlot;
+
+    const nameInput = el('input', {
+      class: 'lock-input',
+      placeholder: 'Folder name (e.g., "Work", "Personal")',
+      value: ''
+    });
+
+    // Password toggle slider
+    const passwordToggle = el('input', {
+      type: 'checkbox',
+      class: 'toggle-slider'
+    });
+
+    const passwordInput = el('input', {
+      class: 'lock-input',
+      type: 'password',
+      placeholder: 'Enter password to protect folder contents',
+      disabled: true,
+      style: 'opacity: 0.5;'
+    });
+
+    // Enable/disable password input based on toggle
+    passwordToggle.addEventListener('change', (e) => {
+      passwordInput.disabled = !e.target.checked;
+      passwordInput.style.opacity = e.target.checked ? '1' : '0.5';
+      if (e.target.checked) passwordInput.focus();
+    });
+
+    const status = el('div', { class: 'lock-status', text: '' });
+
+    const submitBtn = el('button', {
+      class: 'btn big',
+      onclick: async () => {
+        const name = nameInput.value.trim();
+        if (!name) {
+          status.textContent = 'Please enter a folder name';
+          return;
+        }
+
+        const vaultSlot = vaultSelect.value;
+        const password = passwordToggle.checked ? passwordInput.value : '';
+
+        if (passwordToggle.checked && password.length < 4) {
+          status.textContent = 'Password must be at least 4 characters';
+          return;
+        }
+
+        status.textContent = 'Creating folder…';
+        try {
+          const { folder } = await createFolder(state.auth.token, {
+            path: name,
+            password: passwordToggle.checked ? password : '',
+            vaultSlot
+          });
+          state.folders.push(folder);
+          if (folder.hasPassword) state.unlockedFolderIds.add(folder.id);
+          showToast(`Folder "${folder.path}" created`);
+          backDrop.remove();
+          render(false);
+        } catch (e) {
+          status.textContent = e?.message || 'Failed to create folder';
+        }
+      }
+    }, [el('span', { class: 'btn-ic', text: '♡' }), el('span', { text: 'Create Folder' })]);
+
+    const cancelBtn = el('button', {
+      class: 'btn ghost',
+      onclick: () => backDrop.remove()
+    }, [el('span', { class: 'btn-ic', text: '✕' }), el('span', { text: 'Cancel' })]);
+
+    const card = el('div', { class: 'signup-card' }, [
+      el('div', { class: 'lock-title', text: 'Create New Folder' }),
+      el('div', { class: 'lock-sub', text: 'Choose which vault and add an optional password to protect viewing entries.' }),
+      el('label', { class: 'profile-label', text: 'Vault' }),
+      vaultSelect,
+      el('label', { class: 'profile-label', text: 'Folder Name' }),
+      nameInput,
+      el('div', { class: 'toggle-row' }, [
+        el('label', { class: 'toggle-label', text: 'Password protect folder contents' }),
+        passwordToggle
+      ]),
+      passwordInput,
+      el('div', { class: 'tiny', text: 'Note: You can save entries without the password, but you\'ll need the password to view them.' }),
+      submitBtn,
+      cancelBtn,
+      status
+    ]);
+
+    backDrop.append(card);
+    return backDrop;
+  }
+
+  function handleCreateFolderFromManager() {
+    const overlay = renderCreateFolderOverlay();
+    document.body.appendChild(overlay);
   }
 
   function renderAccountFoldersSection() {
@@ -1943,26 +2035,105 @@ export function createApp(mount) {
     ]);
   }
 
-  async function handleCreateVault() {
-    const label = window.prompt('Name for the new vault (e.g. "Travel journal"):');
-    if (label == null) return;
-    const trimmedLabel = String(label).trim();
-    if (!trimmedLabel) return;
-    const slotName = trimmedLabel.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32);
-    if (!slotName) {
-      showToast('Please use letters or numbers in the name');
-      return;
-    }
-    const pw = window.prompt(`Optional password to lock "${trimmedLabel}" (leave empty for no password):`);
-    if (pw == null) return;
-    try {
-      const { vault } = await createVault(state.auth.token, { slotName, label: trimmedLabel, password: String(pw) });
-      state.availableVaults = [...state.availableVaults.filter((v) => v.slotName !== vault.slotName), vault];
-      showToast(`Vault "${vault.label}" created`);
-      render(false);
-    } catch (e) {
-      showToast(e?.message || 'Failed to create vault');
-    }
+  function renderCreateVaultOverlay() {
+    const backDrop = el('div', { class: 'overlay-backdrop' });
+
+    const nameInput = el('input', {
+      class: 'lock-input',
+      placeholder: 'Vault name (e.g., "Travel Journal", "Work Notes")',
+      value: ''
+    });
+
+    // Password toggle slider
+    const passwordToggle = el('input', {
+      type: 'checkbox',
+      class: 'toggle-slider'
+    });
+
+    const passwordInput = el('input', {
+      class: 'lock-input',
+      type: 'password',
+      placeholder: 'Enter password to access this vault',
+      disabled: true,
+      style: 'opacity: 0.5;'
+    });
+
+    // Enable/disable password input based on toggle
+    passwordToggle.addEventListener('change', (e) => {
+      passwordInput.disabled = !e.target.checked;
+      passwordInput.style.opacity = e.target.checked ? '1' : '0.5';
+      if (e.target.checked) passwordInput.focus();
+    });
+
+    const status = el('div', { class: 'lock-status', text: '' });
+
+    const submitBtn = el('button', {
+      class: 'btn big',
+      onclick: async () => {
+        const label = nameInput.value.trim();
+        if (!label) {
+          status.textContent = 'Please enter a vault name';
+          return;
+        }
+
+        const slotName = label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32);
+        if (!slotName) {
+          status.textContent = 'Please use letters or numbers in the name';
+          return;
+        }
+
+        const password = passwordToggle.checked ? passwordInput.value : '';
+        if (passwordToggle.checked && password.length < 4) {
+          status.textContent = 'Password must be at least 4 characters';
+          return;
+        }
+
+        status.textContent = 'Creating vault…';
+        try {
+          const { vault } = await createVault(state.auth.token, {
+            slotName,
+            label,
+            password: passwordToggle.checked ? password : ''
+          });
+          state.availableVaults = [...state.availableVaults.filter((v) => v.slotName !== vault.slotName), vault];
+          if (passwordToggle.checked) state.unlockedVaultSlots.add(vault.slotName);
+          showToast(`Vault "${vault.label}" created`);
+          backDrop.remove();
+          render(false);
+        } catch (e) {
+          status.textContent = e?.message || 'Failed to create vault';
+        }
+      }
+    }, [el('span', { class: 'btn-ic', text: '♡' }), el('span', { text: 'Create Vault' })]);
+
+    const cancelBtn = el('button', {
+      class: 'btn ghost',
+      onclick: () => backDrop.remove()
+    }, [el('span', { class: 'btn-ic', text: '✕' }), el('span', { text: 'Cancel' })]);
+
+    const card = el('div', { class: 'signup-card' }, [
+      el('div', { class: 'lock-title', text: 'Create New Vault' }),
+      el('div', { class: 'lock-sub', text: 'Create a separate vault for different parts of your life. You can protect it with a password for extra security.' }),
+      el('label', { class: 'profile-label', text: 'Vault Name' }),
+      nameInput,
+      el('div', { class: 'toggle-row' }, [
+        el('label', { class: 'toggle-label', text: 'Password protect this vault' }),
+        passwordToggle
+      ]),
+      passwordInput,
+      el('div', { class: 'tiny', text: 'Note: You\'ll need this password to access the vault after signing in.' }),
+      submitBtn,
+      cancelBtn,
+      status
+    ]);
+
+    backDrop.append(card);
+    return backDrop;
+  }
+
+  function handleCreateVault() {
+    const overlay = renderCreateVaultOverlay();
+    document.body.appendChild(overlay);
   }
 
   async function handleRenameVault(vault) {
@@ -2263,7 +2434,7 @@ export function createApp(mount) {
         }
         status.textContent = 'Creating folder…';
         try {
-          const { folder } = await createFolder(state.auth.token, { path: name, password });
+          const { folder } = await createFolder(state.auth.token, { path: name, password, vaultSlot: state.activeVaultSlot });
           state.folders.push(folder);
           const entry = getSelectedEntry();
           if (entry) {
@@ -2322,7 +2493,7 @@ export function createApp(mount) {
     if (!state.auth.token) return;
     state.foldersLoading = true;
     try {
-      const { folders } = await listFolders(state.auth.token);
+      const { folders } = await listFolders(state.auth.token, state.activeVaultSlot);
       state.folders = folders || [];
     } catch (e) {
       /* silent */
@@ -3996,7 +4167,40 @@ export function createApp(mount) {
     }
   }
 
-  function createEntry(entryType = 'journal') {
+  // Check if entry's folder requires password to view
+  async function checkFolderPasswordForEntry(entry) {
+    if (!entry || !entry.folder) return true; // No folder, no protection
+    const folder = state.folders.find((f) => f.path === entry.folder);
+    if (!folder || !folder.hasPassword) return true; // Folder not found or no password
+    if (state.unlockedFolderIds.has(folder.id)) return true; // Already unlocked
+
+    const password = window.prompt(`Enter password to view entries in "${folder.path}":`);
+    if (password == null) return false; // Cancelled
+
+    try {
+      await verifyFolderPassword(state.auth.token, folder.id, password, state.activeVaultSlot);
+      state.unlockedFolderIds.add(folder.id);
+      return true;
+    } catch (e) {
+      showToast('Incorrect folder password');
+      return false;
+    }
+  }
+
+  // Wrapper to select entry with folder password check
+  async function selectEntry(entryId) {
+    const entry = state.vault.entries.find((e) => e.id === entryId);
+    if (!entry) return;
+
+    // Check folder password before viewing
+    const canView = await checkFolderPasswordForEntry(entry);
+    if (!canView) return; // Password failed or cancelled, don't select
+
+    state.selectedId = entryId;
+    render();
+  }
+
+  async function createEntry(entryType = 'journal') {
     const id = createNewEntryId();
     const date = isoDate();
     const now = new Date().toISOString();
@@ -4029,13 +4233,12 @@ export function createApp(mount) {
       updatedAt: now
     });
     state.vault.entries.push(entry);
-    state.selectedId = id;
+    await selectEntry(id);
     persistVault();
-    render();
     showToast(entryType === 'quick' ? 'Quick thought added' : 'New page added');
   }
 
-  function createNote() {
+  async function createNote() {
     const id = createNewEntryId();
     const date = isoDate();
     const now = new Date().toISOString();
@@ -4057,13 +4260,12 @@ export function createApp(mount) {
       updatedAt: now
     });
     state.vault.entries.push(entry);
-    state.selectedId = id;
+    await selectEntry(id);
     persistVault();
-    render();
     showToast('Note added');
   }
 
-  function createLetter() {
+  async function createLetter() {
     const id = createNewEntryId();
     const date = isoDate();
     const now = new Date().toISOString();
@@ -4086,13 +4288,12 @@ export function createApp(mount) {
       updatedAt: now
     });
     state.vault.entries.push(entry);
-    state.selectedId = id;
+    await selectEntry(id);
     persistVault();
-    render();
     showToast('Letter added');
   }
 
-  function createRecipe() {
+  async function createRecipe() {
     const id = createNewEntryId();
     const date = isoDate();
     const now = new Date().toISOString();
@@ -4116,9 +4317,8 @@ export function createApp(mount) {
       updatedAt: now
     });
     state.vault.entries.push(entry);
-    state.selectedId = id;
+    await selectEntry(id);
     persistVault();
-    render();
     showToast('Recipe saved');
   }
 
@@ -4276,8 +4476,7 @@ export function createApp(mount) {
         const card = el('button', {
           class: `entry-card feed-card accent-${e.accentColor || 'rose'} ${active ? 'active' : ''}`,
           onclick: () => {
-            state.selectedId = e.id;
-            render();
+            selectEntry(e.id);
           }
         }, [
           el('div', { class: 'entry-card-top', }, [
@@ -4678,7 +4877,7 @@ export function createApp(mount) {
             const password = window.prompt(`Enter password for folder "${folder.path}"`);
             if (password == null) return;
             try {
-              await verifyFolderPassword(state.auth.token, folder.id, password);
+              await verifyFolderPassword(state.auth.token, folder.id, password, state.activeVaultSlot);
               state.unlockedFolderIds.add(folder.id);
             } catch (e) {
               showToast(e?.message || 'Incorrect folder password');
@@ -4815,8 +5014,7 @@ export function createApp(mount) {
               class: 'memory-item',
               type: 'button',
               onclick: () => {
-                state.selectedId = item.id;
-                render();
+                selectEntry(item.id);
               }
             }, [
               el('div', { class: 'memory-item-title', text: item.title || 'Untitled memory' }),
@@ -5583,7 +5781,7 @@ export function createApp(mount) {
             const yearsAgo = Number(isoDate().slice(0, 4)) - Number(e.date.slice(0, 4));
             return el('div', {
               class: 'otd-item',
-              onclick: () => { state.selectedId = e.id; render(false); }
+              onclick: () => selectEntry(e.id)
             }, [
               el('span', { class: 'otd-year', text: `${yearsAgo}yr ago` }),
               el('span', { class: 'otd-entry-title', text: e.title || 'Untitled' }),
@@ -6458,11 +6656,10 @@ export function createApp(mount) {
         const words = (e.body || '').split(/\s+/).filter(Boolean).length;
         return el('div', {
           class: 'search-result-item',
-          onclick: () => {
-            state.selectedId = e.id;
+          onclick: async () => {
+            await selectEntry(e.id);
             state.searchFilters = { mood, fromDate: from, toDate: to, tagId };
             overlay.remove();
-            render(false);
           }
         }, [
           el('div', { class: 'sr-title', text: e.title || 'Untitled' }),
@@ -6528,11 +6725,10 @@ export function createApp(mount) {
           : el('div', { class: 'cal-day-entry-list' }, dayEntries.map((e) =>
               el('div', {
                 class: 'cal-day-entry-item',
-                onclick: () => {
-                  state.selectedId = e.id;
+                onclick: async () => {
+                  await selectEntry(e.id);
                   state.calendarMonth = currentMonth;
                   overlay.remove();
-                  render(false);
                 }
               }, [
                 el('div', { class: 'cal-day-entry-title', text: e.title || 'Untitled' }),
@@ -6646,12 +6842,12 @@ export function createApp(mount) {
       closeOverlay();
     };
 
-    const createWithTemplate = (tmpl) => {
+    const createWithTemplate = async (tmpl) => {
       const newId = `entry-${Date.now()}`;
       const entry = normalizeEntry({ id: newId, date: isoDate(), title: tmpl.label, body: tmpl.body, moduleType: 'diary' });
       if (!state.vault) return;
       state.vault.entries = [entry, ...(state.vault.entries || [])];
-      state.selectedId = newId;
+      await selectEntry(newId);
       persistVault();
       showToast(`New entry from "${tmpl.label}" template`);
       closeOverlay();
@@ -7471,7 +7667,7 @@ export function createApp(mount) {
       el('div', { class: 'overlay-title', text: 'Public / Shared Feed' }),
       el('div', { class: 'share-notice', text: 'Entries marked as "shared" privacy appear here as your personal public feed.' }),
       el('div', { class: 'social-feed-list' }, publicEntries.length
-        ? publicEntries.map((e) => el('div', { class: 'social-feed-item', onclick: () => { state.selectedId = e.id; overlay.remove(); render(false); } }, [
+        ? publicEntries.map((e) => el('div', { class: 'social-feed-item', onclick: async () => { await selectEntry(e.id); overlay.remove(); } }, [
           el('div', { class: 'feed-item-title', text: e.title || 'Untitled' }),
           el('div', { class: 'feed-item-preview', text: summarizeBody(e.body) }),
           el('div', { class: 'feed-item-meta', text: e.date || '' })

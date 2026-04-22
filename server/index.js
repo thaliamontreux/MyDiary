@@ -142,20 +142,22 @@ app.get('/api/ready', async (_req, res) => {
 
 app.get('/api/folders', requireAuth, async (req, res) => {
   try {
-    let folders = await listUserFolders(req.user.id);
-    // Ensure every user has a "Default Folder"
-    if (!folders.find((f) => f.path === 'Default Folder')) {
+    const vaultSlot = String(req.query?.vaultSlot || 'primary');
+    let folders = await listUserFolders(req.user.id, vaultSlot);
+    // Ensure every vault has a "General" folder
+    if (!folders.find((f) => f.path === 'General')) {
       try {
-        await createUserFolder(req.user.id, 'Default Folder', null);
-        folders = await listUserFolders(req.user.id);
+        await createUserFolder(req.user.id, 'General', null, vaultSlot);
+        folders = await listUserFolders(req.user.id, vaultSlot);
       } catch (e) {
         // If race or unique conflict, re-list and continue
-        folders = await listUserFolders(req.user.id);
+        folders = await listUserFolders(req.user.id, vaultSlot);
       }
     }
     res.json({
       folders: folders.map((f) => ({
         id: f.id,
+        vaultSlot: f.vault_slot,
         path: f.path,
         hasPassword: Boolean(f.password_hash),
         createdAt: f.created_at,
@@ -172,24 +174,26 @@ app.post('/api/folders', requireAuth, async (req, res) => {
   try {
     const rawPath = String(req.body?.path || '').trim();
     const password = String(req.body?.password || '');
+    const vaultSlot = String(req.body?.vaultSlot || 'primary');
 
     if (!rawPath) {
       res.status(400).json({ error: 'Folder name is required' });
       return;
     }
 
-    const existing = await getUserFolderByPath(req.user.id, rawPath);
+    const existing = await getUserFolderByPath(req.user.id, rawPath, vaultSlot);
     if (existing) {
       res.status(409).json({ error: 'A folder with this name already exists' });
       return;
     }
 
     const passwordHash = password ? await bcrypt.hash(password, 12) : null;
-    const created = await createUserFolder(req.user.id, rawPath, passwordHash);
+    const created = await createUserFolder(req.user.id, rawPath, passwordHash, vaultSlot);
 
     res.status(201).json({
       folder: {
         id: created.id,
+        vaultSlot: created.vault_slot,
         path: created.path,
         hasPassword: Boolean(created.password_hash),
         createdAt: created.created_at,
@@ -205,12 +209,13 @@ app.post('/api/folders', requireAuth, async (req, res) => {
 app.patch('/api/folders/:id', requireAuth, async (req, res) => {
   try {
     const folderId = Number(req.params.id);
+    const vaultSlot = String(req.body?.vaultSlot || 'primary');
     if (!Number.isFinite(folderId) || folderId <= 0) {
       res.status(400).json({ error: 'Invalid folder id' });
       return;
     }
 
-    const current = await getUserFolderById(req.user.id, folderId);
+    const current = await getUserFolderById(req.user.id, folderId, vaultSlot);
     if (!current) {
       res.status(404).json({ error: 'Folder not found' });
       return;
@@ -226,7 +231,7 @@ app.patch('/api/folders/:id', requireAuth, async (req, res) => {
     }
 
     if (rawPath && rawPath !== current.path) {
-      const existing = await getUserFolderByPath(req.user.id, rawPath);
+      const existing = await getUserFolderByPath(req.user.id, rawPath, vaultSlot);
       if (existing && existing.id !== folderId) {
         res.status(409).json({ error: 'Another folder already uses this name' });
         return;
@@ -244,6 +249,7 @@ app.patch('/api/folders/:id', requireAuth, async (req, res) => {
     res.json({
       folder: {
         id: updated.id,
+        vaultSlot: updated.vault_slot,
         path: updated.path,
         hasPassword: Boolean(updated.password_hash),
         createdAt: updated.created_at,
@@ -278,12 +284,13 @@ app.delete('/api/folders/:id', requireAuth, async (req, res) => {
 app.post('/api/folders/:id/verify', requireAuth, async (req, res) => {
   try {
     const folderId = Number(req.params.id);
+    const vaultSlot = String(req.body?.vaultSlot || 'primary');
     if (!Number.isFinite(folderId) || folderId <= 0) {
       res.status(400).json({ error: 'Invalid folder id' });
       return;
     }
 
-    const folder = await getUserFolderById(req.user.id, folderId);
+    const folder = await getUserFolderById(req.user.id, folderId, vaultSlot);
     if (!folder) {
       res.status(404).json({ error: 'Folder not found' });
       return;

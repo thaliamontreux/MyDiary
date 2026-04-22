@@ -29,8 +29,8 @@ export async function registerUser(payload) {
   });
 }
 
-export async function listFolders(token) {
-  return request('/api/folders', {
+export async function listFolders(token, vaultSlot = 'primary') {
+  return request(`/api/folders?vaultSlot=${encodeURIComponent(vaultSlot)}`, {
     method: 'GET',
     headers: {
       Authorization: `Bearer ${token}`
@@ -67,13 +67,13 @@ export async function deleteFolder(token, folderId) {
   });
 }
 
-export async function verifyFolderPassword(token, folderId, password) {
+export async function verifyFolderPassword(token, folderId, password, vaultSlot = 'primary') {
   return request(`/api/folders/${encodeURIComponent(folderId)}/verify`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`
     },
-    body: JSON.stringify({ password })
+    body: JSON.stringify({ password, vaultSlot })
   });
 }
 
