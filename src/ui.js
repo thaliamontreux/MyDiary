@@ -6194,6 +6194,8 @@ export function createApp(mount) {
       type: 'button',
       onclick: async () => {
         if (videoRecorderState.recording) {
+          // requestData flushes any buffered chunk before stop fires onstop
+          videoRecorderState.mediaRecorder?.requestData();
           videoRecorderState.mediaRecorder?.stop();
           return;
         }
@@ -6222,13 +6224,22 @@ export function createApp(mount) {
             preview.srcObject = null;
             preview.classList.remove('active');
             const blob = new Blob(videoRecorderState.chunks, { type: 'video/webm' });
+            if (blob.size === 0) { showToast('Recording was empty — try again.'); return; }
             if (blob.size > 50 * 1024 * 1024) { showToast('Video too large (max 50MB).'); return; }
-            const dataUrl = await new Promise((res, rej) => {
-              const reader = new FileReader();
-              reader.onload = () => res(reader.result);
-              reader.onerror = rej;
-              reader.readAsDataURL(blob);
-            });
+            showToast('Saving video…');
+            let dataUrl;
+            try {
+              dataUrl = await new Promise((res, rej) => {
+                const reader = new FileReader();
+                reader.onload = () => res(reader.result);
+                reader.onerror = (e) => rej(e);
+                reader.readAsDataURL(blob);
+              });
+            } catch (e) {
+              showToast('Failed to save video.');
+              console.error('[VideoRecord save]', e);
+              return;
+            }
             const cur = getSelectedEntry();
             if (!cur) return;
             const next = [...(cur.videoClips || []), {
@@ -6237,10 +6248,12 @@ export function createApp(mount) {
               createdAt: new Date().toISOString()
             }].slice(-4);
             updateSelected({ videoClips: next });
+            showToast('Video saved!');
           };
-          mr.start();
+          mr.start(1000); // collect chunks every 1s so nothing is lost on stop
         } catch (err) {
           showToast('Camera/microphone access denied or unavailable.');
+          console.error('[VideoRecord]', err);
         }
       }
     }, [el('span', { text: '📹 Record video' })]);
