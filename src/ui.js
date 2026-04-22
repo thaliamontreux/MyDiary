@@ -6181,7 +6181,7 @@ export function createApp(mount) {
   }
 
   // ── Video Recordings ─────────────────────────────────────────────────────────
-  const videoRecorderState = { mediaRecorder: null, chunks: [], recording: false, stream: null };
+  const videoRecorderState = { mediaRecorder: null, chunks: [], recording: false, stream: null, previewStream: null };
 
   function renderVideoUI(entry) {
     const clips = Array.isArray(entry.videoClips) ? entry.videoClips : [];
@@ -6189,74 +6189,132 @@ export function createApp(mount) {
     preview.muted = true; // must set as property, not attribute, to actually mute
     const statusText = el('span', { class: 'tiny', text: '' });
 
-    const recordBtn = el('button', {
-      class: 'btn ghost small-btn',
-      type: 'button',
-      onclick: async () => {
-        if (videoRecorderState.recording) {
-          // requestData flushes any buffered chunk before stop fires onstop
-          videoRecorderState.mediaRecorder?.requestData();
-          videoRecorderState.mediaRecorder?.stop();
+    // Stop everything and clean up
+    const stopCamera = () => {
+      videoRecorderState.stream?.getTracks().forEach((t) => t.stop());
+      videoRecorderState.previewStream?.getTracks().forEach((t) => t.stop());
+      videoRecorderState.stream = null;
+      videoRecorderState.previewStream = null;
+      videoRecorderState.recording = false;
+      videoRecorderState.mediaRecorder = null;
+      videoRecorderState.chunks = [];
+      preview.srcObject = null;
+      preview.classList.remove('active');
+    };
+
+    // Start camera for preview only (no recording yet)
+    const startCamera = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        videoRecorderState.stream = stream;
+        // Use cloned stream for preview so original stays intact for recording
+        videoRecorderState.previewStream = stream.clone();
+        preview.srcObject = videoRecorderState.previewStream;
+        preview.muted = true;
+        preview.classList.add('active');
+        preview.play();
+        statusText.textContent = 'Camera ready — position yourself, then press Record';
+        updateButtons();
+      } catch (err) {
+        showToast('Camera/microphone access denied or unavailable.');
+        console.error('[VideoRecord]', err);
+      }
+    };
+
+    // Start actual recording
+    const startRecording = () => {
+      if (!videoRecorderState.stream) return;
+      videoRecorderState.chunks = [];
+      videoRecorderState.recording = true;
+      statusText.textContent = '🔴 Recording…';
+      updateButtons();
+
+      const mr = new MediaRecorder(videoRecorderState.stream, {
+        mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm'
+      });
+      videoRecorderState.mediaRecorder = mr;
+
+      mr.ondataavailable = (e) => { if (e.data.size > 0) videoRecorderState.chunks.push(e.data); };
+
+      mr.onstop = async () => {
+        videoRecorderState.recording = false;
+        statusText.textContent = 'Processing video…';
+
+        const blob = new Blob(videoRecorderState.chunks, { type: 'video/webm' });
+        stopCamera();
+
+        if (blob.size === 0) { showToast('Recording was empty — try again.'); statusText.textContent = ''; updateButtons(); return; }
+        if (blob.size > 50 * 1024 * 1024) { showToast('Video too large (max 50MB).'); statusText.textContent = ''; updateButtons(); return; }
+
+        showToast('Saving video…');
+        let dataUrl;
+        try {
+          dataUrl = await new Promise((res, rej) => {
+            const reader = new FileReader();
+            reader.onload = () => res(reader.result);
+            reader.onerror = (e) => rej(e);
+            reader.readAsDataURL(blob);
+          });
+        } catch (e) {
+          showToast('Failed to save video.');
+          console.error('[VideoRecord save]', e);
+          statusText.textContent = '';
+          updateButtons();
           return;
         }
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-          videoRecorderState.stream = stream;
-          videoRecorderState.chunks = [];
-          videoRecorderState.recording = true;
-          // Show camera feed muted — use a video-only stream on the preview
-          // so the captured audio track never routes back through the speakers.
-          const videoOnlyStream = new MediaStream(stream.getVideoTracks());
-          preview.srcObject = videoOnlyStream;
-          preview.muted = true;
-          preview.classList.add('active');
-          preview.play();
-          statusText.textContent = 'Recording video…';
-          recordBtn.querySelector('span').textContent = '⏹ Stop';
-          const mr = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm' });
-          videoRecorderState.mediaRecorder = mr;
-          mr.ondataavailable = (e) => { if (e.data.size > 0) videoRecorderState.chunks.push(e.data); };
-          mr.onstop = async () => {
-            videoRecorderState.recording = false;
-            statusText.textContent = '';
-            recordBtn.querySelector('span').textContent = '📹 Record video';
-            stream.getTracks().forEach((t) => t.stop());
-            preview.srcObject = null;
-            preview.classList.remove('active');
-            const blob = new Blob(videoRecorderState.chunks, { type: 'video/webm' });
-            if (blob.size === 0) { showToast('Recording was empty — try again.'); return; }
-            if (blob.size > 50 * 1024 * 1024) { showToast('Video too large (max 50MB).'); return; }
-            showToast('Saving video…');
-            let dataUrl;
-            try {
-              dataUrl = await new Promise((res, rej) => {
-                const reader = new FileReader();
-                reader.onload = () => res(reader.result);
-                reader.onerror = (e) => rej(e);
-                reader.readAsDataURL(blob);
-              });
-            } catch (e) {
-              showToast('Failed to save video.');
-              console.error('[VideoRecord save]', e);
-              return;
-            }
-            const cur = getSelectedEntry();
-            if (!cur) return;
-            const next = [...(cur.videoClips || []), {
-              id: `vc-${Date.now()}`,
-              dataUrl,
-              createdAt: new Date().toISOString()
-            }].slice(-4);
-            updateSelected({ videoClips: next });
-            showToast('Video saved!');
-          };
-          mr.start(1000); // collect chunks every 1s so nothing is lost on stop
-        } catch (err) {
-          showToast('Camera/microphone access denied or unavailable.');
-          console.error('[VideoRecord]', err);
-        }
+
+        const cur = getSelectedEntry();
+        if (!cur) { statusText.textContent = ''; updateButtons(); return; }
+
+        const next = [...(cur.videoClips || []), {
+          id: `vc-${Date.now()}`,
+          dataUrl,
+          createdAt: new Date().toISOString()
+        }].slice(-4);
+        updateSelected({ videoClips: next });
+        statusText.textContent = '';
+        updateButtons();
+        showToast('Video saved!');
+      };
+
+      mr.start(1000); // collect chunks every 1s
+    };
+
+    // Stop recording and save
+    const stopRecording = () => {
+      if (videoRecorderState.mediaRecorder && videoRecorderState.mediaRecorder.state !== 'inactive') {
+        videoRecorderState.mediaRecorder.requestData();
+        videoRecorderState.mediaRecorder.stop();
       }
-    }, [el('span', { text: '📹 Record video' })]);
+    };
+
+    // Button states based on current mode
+    const controlsWrap = el('div', { class: 'voice-memo-controls' });
+    const updateButtons = () => {
+      controlsWrap.replaceChildren();
+      const hasCamera = !!videoRecorderState.stream;
+      const isRecording = videoRecorderState.recording;
+
+      if (!hasCamera) {
+        // Step 1: Start camera
+        controlsWrap.append(el('button', {
+          class: 'btn', type: 'button',
+          onclick: startCamera
+        }, [el('span', { text: '📹 Start Camera' })]));
+      } else if (!isRecording) {
+        // Step 2: Camera ready, can record or cancel
+        controlsWrap.append(
+          el('button', { class: 'btn', type: 'button', onclick: startRecording }, [el('span', { text: '🔴 Start Recording' })]),
+          el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => { stopCamera(); statusText.textContent = ''; updateButtons(); } }, [el('span', { text: 'Cancel' })])
+        );
+      } else {
+        // Step 3: Recording — stop button
+        controlsWrap.append(el('button', { class: 'btn danger', type: 'button', onclick: stopRecording }, [el('span', { text: '⏹ Stop Recording' })]));
+      }
+      controlsWrap.append(statusText);
+    };
+
+    updateButtons();
 
     const clipList = el('div', { class: 'video-clip-list' }, clips.map((clip, i) => {
       const video = el('video', { controls: 'controls', src: clip.dataUrl, class: 'video-clip', playsinline: 'playsinline' });
@@ -6280,7 +6338,7 @@ export function createApp(mount) {
       el('div', { class: 'detail-card detail-card-wide' }, [
         el('span', { class: 'detail-label', text: 'Video recordings' }),
         preview,
-        el('div', { class: 'voice-memo-controls' }, [recordBtn, statusText]),
+        controlsWrap,
         clipList
       ])
     ]);
