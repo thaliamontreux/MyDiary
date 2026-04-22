@@ -4374,8 +4374,8 @@ export function createApp(mount) {
     const tagsInput = document.querySelector('[data-focus-key*="tags"]');
     if (tagsInput) patch.tags = normalizeTags(tagsInput.value);
 
-    const folderInput = document.querySelector('[data-focus-key*="folder"]');
-    if (folderInput) patch.folder = folderInput.value;
+    const folderSelect = document.querySelector('[data-focus-key*="folder"]');
+    if (folderSelect) patch.folder = folderSelect.value;
 
     const recipientInput = document.querySelector('[data-focus-key*="recipient"]');
     if (recipientInput) patch.recipient = recipientInput.value;
@@ -5267,24 +5267,37 @@ export function createApp(mount) {
       placeholder: 'Tags, separated by commas'
     });
 
-    const folderInput = el('input', {
-      class: 'meta-textarea',
-      type: 'text',
+    // Get folders from current vault for dropdown
+    const currentFolders = state.folders.filter((f) => f.vaultSlot === state.activeVaultSlot);
+    const folderSelect = el('select', {
+      class: 'mood-select',
       'data-focus-key': `entry:${selected.id}:folder`,
-      value: selected.folder || '',
-      placeholder: 'Folder name'
-    });
+      onchange: (e) => {
+        // Update entry folder when selection changes
+        const entry = getSelectedEntry();
+        if (entry) {
+          entry.folder = e.target.value;
+          persistVault();
+        }
+      }
+    }, [
+      el('option', { value: 'General', text: 'General' }),
+      ...currentFolders
+        .filter((f) => f.path !== 'General')
+        .map((f) => el('option', { value: f.path, text: f.path }))
+    ]);
+    folderSelect.value = selected.folder || 'General';
 
     const addFolderBtn = el('button', {
       class: 'btn ghost small-btn',
       type: 'button',
+      title: 'Create new folder',
       onclick: () => {
-        const overlay = renderFolderOverlay();
-        document.body.append(overlay);
+        const overlay = renderCreateFolderOverlay();
+        document.body.appendChild(overlay);
       }
     }, [
-      el('span', { class: 'btn-ic', text: '+' }),
-      el('span', { text: 'Add folder' })
+      el('span', { class: 'btn-ic', text: '+' })
     ]);
 
     const recipientInput = el('input', {
@@ -5671,7 +5684,7 @@ export function createApp(mount) {
       detailCards.push(
         el('label', { class: 'detail-card' }, [
           el('span', { class: 'detail-label', text: 'Folder' }),
-          el('div', { class: 'detail-inline' }, [folderInput, addFolderBtn])
+          el('div', { class: 'detail-inline' }, [folderSelect, addFolderBtn])
         ]),
         el('label', { class: 'detail-card' }, [
           el('span', { class: 'detail-label', text: 'What this note is about' }),
