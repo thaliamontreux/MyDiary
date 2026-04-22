@@ -2896,6 +2896,19 @@ body::before {
 .export-option-title { font-size: 13px; font-weight: 700; color: var(--text); }
 .export-option-desc { font-size: 11px; color: var(--muted); }
 
+/* ── Drag-to-reorder entry cards ─────────────────────────────────────────── */
+.entry-card[draggable="true"] { cursor: grab; }
+.entry-card[draggable="true"]:active { cursor: grabbing; }
+.entry-card.drag-dragging {
+  opacity: 0.4;
+  transform: scale(0.97);
+}
+.entry-card.drag-over {
+  outline: 2px dashed var(--accent);
+  outline-offset: 2px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--card));
+}
+
 /* ── Editor footer compact layout ────────────────────────────────────────── */
 .editor-foot-primary {
   display: flex;

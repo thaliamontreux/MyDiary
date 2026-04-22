@@ -1599,7 +1599,7 @@ export function createApp(mount) {
     integrationConfig: null
   };
 
-  // setupActivityListeners(); // Auto-lock completely disabled
+  setupActivityListeners();
 
   const root = el('div', { class: 'app-shell' });
 
@@ -2809,7 +2809,14 @@ export function createApp(mount) {
 
   function scheduleAutoLock() {
     clearLockTimer();
-    return; // Auto-lock completely disabled
+    const minutes = state.ui.autoLockMinutes;
+    if (!minutes || !state.unlocked) return;
+    state.lockTimer = setTimeout(() => {
+      if (state.unlocked) {
+        showToast('Auto-locked after inactivity');
+        lock();
+      }
+    }, minutes * 60 * 1000);
   }
 
   function setupActivityListeners() {
@@ -4255,10 +4262,11 @@ export function createApp(mount) {
     const privacySnapshot = buildPrivacySnapshot(state.vault.entries);
 
     // Central feed: entry cards (moved into sidebar below search)
+    let _dragSrcId = null;
     const feedList = el('div', { class: 'feed-list' },
       visibleEntries.length ? visibleEntries.map((e) => {
         const active = e.id === state.selectedId;
-        return el('button', {
+        const card = el('button', {
           class: `entry-card feed-card accent-${e.accentColor || 'rose'} ${active ? 'active' : ''}`,
           onclick: () => {
             state.selectedId = e.id;
@@ -4293,6 +4301,40 @@ export function createApp(mount) {
             ? el('img', { class: 'entry-card-cover', src: e.coverImage, alt: 'Cover' })
             : el('div')
         ]);
+
+        // ── Drag-to-reorder ──────────────────────────────────────────────
+        card.setAttribute('draggable', 'true');
+        card.addEventListener('dragstart', (ev) => {
+          _dragSrcId = e.id;
+          card.classList.add('drag-dragging');
+          ev.dataTransfer.effectAllowed = 'move';
+        });
+        card.addEventListener('dragend', () => {
+          card.classList.remove('drag-dragging');
+          document.querySelectorAll('.drag-over').forEach((n) => n.classList.remove('drag-over'));
+        });
+        card.addEventListener('dragover', (ev) => {
+          ev.preventDefault();
+          ev.dataTransfer.dropEffect = 'move';
+          card.classList.add('drag-over');
+        });
+        card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+        card.addEventListener('drop', (ev) => {
+          ev.preventDefault();
+          card.classList.remove('drag-over');
+          if (!_dragSrcId || _dragSrcId === e.id) return;
+          // Reorder in the vault's entry array (visible order reflects sort; we pin by inserting)
+          const arr = state.vault.entries;
+          const srcIdx = arr.findIndex((x) => x.id === _dragSrcId);
+          const dstIdx = arr.findIndex((x) => x.id === e.id);
+          if (srcIdx === -1 || dstIdx === -1) return;
+          const [moved] = arr.splice(srcIdx, 1);
+          arr.splice(dstIdx, 0, moved);
+          persistVault();
+          render(true);
+        });
+
+        return card;
       }) : [
         el('div', { class: 'empty-list-card' }, [
           el('div', { class: 'empty-list-title', text: 'No pages match yet' }),
@@ -5859,6 +5901,53 @@ export function createApp(mount) {
     const initIcon = themeToggleBtn.querySelector('.theme-toggle-icon');
     if (initIcon) initIcon.textContent = (state.ui.themeId === 'dark') ? '☀️' : '🌙';
 
+    // Lightweight canvas confetti burst (no external dependency)
+    function launchConfetti(message) {
+      const canvas = el('canvas', {});
+      Object.assign(canvas.style, {
+        position: 'fixed', top: '0', left: '0',
+        width: '100vw', height: '100vh',
+        pointerEvents: 'none', zIndex: '9999'
+      });
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      document.body.append(canvas);
+      const ctx = canvas.getContext('2d');
+      const pieces = Array.from({ length: 120 }, () => ({
+        x: Math.random() * canvas.width,
+        y: -10 - Math.random() * 60,
+        r: 5 + Math.random() * 6,
+        d: 2 + Math.random() * 3,
+        color: `hsl(${Math.random() * 360},80%,55%)`,
+        angle: Math.random() * Math.PI * 2,
+        spin: (Math.random() - 0.5) * 0.2,
+        drift: (Math.random() - 0.5) * 2
+      }));
+      let frame = 0;
+      const animate = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        pieces.forEach((p) => {
+          p.y += p.d;
+          p.x += p.drift;
+          p.angle += p.spin;
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.angle);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.r / 2, -p.r / 2, p.r, p.r * 0.5);
+          ctx.restore();
+        });
+        frame++;
+        if (frame < 130) requestAnimationFrame(animate);
+        else canvas.remove();
+      };
+      animate();
+      if (message) showToast(message);
+    }
+
+    const STREAK_MILESTONES = new Set([7, 14, 30, 60, 100, 365]);
+    let _lastCelebratedStreak = 0;
+
     // Update streak pill every render
     updateStreakPill = () => {
       const pill = document.getElementById('topbar-streak');
@@ -5876,6 +5965,10 @@ export function createApp(mount) {
       if (streak > 0) {
         pill.textContent = `🔥 ${streak} day streak`;
         pill.style.display = 'flex';
+        if (STREAK_MILESTONES.has(streak) && streak !== _lastCelebratedStreak) {
+          _lastCelebratedStreak = streak;
+          launchConfetti(`🔥 ${streak}-day streak! Amazing!`);
+        }
       } else {
         pill.style.display = 'none';
       }
