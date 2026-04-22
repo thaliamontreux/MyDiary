@@ -5865,6 +5865,7 @@ export function createApp(mount) {
   }
 
   (async () => {
+    try {
     ['pointerdown', 'mousemove', 'keydown', 'touchstart'].forEach((eventName) => {
       window.addEventListener(eventName, resetInactivityTimer);
     });
@@ -5999,6 +6000,10 @@ export function createApp(mount) {
 
     mount.replaceChildren(root);
     render();
+    } catch (initError) {
+      console.error('[DiaryApp init error]', initError);
+      mount.innerHTML = `<pre style="color:red;padding:20px;font-size:13px;white-space:pre-wrap">[DiaryApp init error] ${initError?.stack || initError?.message || initError}</pre>`;
+    }
   })();
 
   // Tag management functions
