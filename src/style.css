@@ -1733,6 +1733,42 @@ body::before {
   box-shadow: 0 0 0 4px rgba(138,91,255,0.12);
 }
 
+/* Dark mode styling for lock-input selects (country dropdown, etc) */
+:root[data-theme='dark'] select.lock-input,
+.app-shell[data-theme='dark'] select.lock-input,
+:root[data-theme='dark'] .lock-input.profile-field,
+.app-shell[data-theme='dark'] .lock-input.profile-field {
+  background: #0a0f1c;
+  color: #e5e7eb;
+  border-color: rgba(148, 163, 184, 0.3);
+}
+
+:root[data-theme='dark'] select.lock-input option,
+.app-shell[data-theme='dark'] select.lock-input option,
+:root[data-theme='dark'] .lock-input.profile-field option,
+.app-shell[data-theme='dark'] .lock-input.profile-field option {
+  background: #0a0f1c;
+  color: #e5e7eb;
+}
+
+/* Light mode styling for lock-input selects */
+:root[data-theme='light'] select.lock-input,
+.app-shell[data-theme='light'] select.lock-input,
+:root[data-theme='light'] .lock-input.profile-field,
+.app-shell[data-theme='light'] .lock-input.profile-field {
+  background: #ffffff;
+  color: #1f2937;
+  border-color: rgba(0, 0, 0, 0.2);
+}
+
+:root[data-theme='light'] select.lock-input option,
+.app-shell[data-theme='light'] select.lock-input option,
+:root[data-theme='light'] .lock-input.profile-field option,
+.app-shell[data-theme='light'] .lock-input.profile-field option {
+  background: #ffffff;
+  color: #1f2937;
+}
+
 .lock-status {
   margin-top: 10px;
   font-size: 12px;
