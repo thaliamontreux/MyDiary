@@ -2599,8 +2599,8 @@ body::before {
 .voice-audio { flex: 1; min-width: 180px; height: 36px; border-radius: 999px; }
 
 /* ── Video Recordings ────────────────────────────────────────────────────── */
-.video-preview { width: 100%; max-height: 180px; border-radius: 10px; background: #000; display: block; margin-bottom: 8px; }
-.video-preview:not([src]):not([srcObject]) { display: none; }
+.video-preview { width: 100%; max-height: 240px; border-radius: 10px; background: #000; display: none; margin-bottom: 8px; object-fit: cover; }
+.video-preview.active { display: block; }
 .video-clip-list { display: flex; flex-direction: column; gap: 10px; }
 .video-clip-item { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
 .video-clip { width: 100%; max-width: 360px; border-radius: 10px; background: #000; }

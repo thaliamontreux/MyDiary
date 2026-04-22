@@ -6114,6 +6114,7 @@ export function createApp(mount) {
           const videoOnlyStream = new MediaStream(stream.getVideoTracks());
           preview.srcObject = videoOnlyStream;
           preview.muted = true;
+          preview.classList.add('active');
           preview.play();
           statusText.textContent = 'Recording video…';
           recordBtn.querySelector('span').textContent = '⏹ Stop';
@@ -6126,6 +6127,7 @@ export function createApp(mount) {
             recordBtn.querySelector('span').textContent = '📹 Record video';
             stream.getTracks().forEach((t) => t.stop());
             preview.srcObject = null;
+            preview.classList.remove('active');
             const blob = new Blob(videoRecorderState.chunks, { type: 'video/webm' });
             if (blob.size > 50 * 1024 * 1024) { showToast('Video too large (max 50MB).'); return; }
             const dataUrl = await new Promise((res, rej) => {
