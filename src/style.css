@@ -2038,8 +2038,47 @@ body::before {
 }
 
 .mini-color-select option {
-  background: #333;
+  background: #1a1a2e;
   color: #fff;
+}
+
+/* ── Dark mode dropdown/select styling ────────────────────────────────────── */
+:root[data-theme='dark'] select,
+.app-shell[data-theme='dark'] select,
+:root[data-theme='dark'] .mood-select,
+.app-shell[data-theme='dark'] .mood-select,
+:root[data-theme='dark'] .mini-color-select,
+.app-shell[data-theme='dark'] .mini-color-select {
+  background: #0f172a;
+  color: #e5e7eb;
+  border-color: rgba(148, 163, 184, 0.25);
+}
+
+:root[data-theme='dark'] select option,
+.app-shell[data-theme='dark'] select option,
+:root[data-theme='dark'] .mood-select option,
+.app-shell[data-theme='dark'] .mood-select option,
+:root[data-theme='dark'] .mini-color-select option,
+.app-shell[data-theme='dark'] .mini-color-select option {
+  background: #0f172a;
+  color: #e5e7eb;
+}
+
+/* Ensure all select dropdowns in dark mode have dark backgrounds */
+:root[data-theme='dark'] .date-input,
+.app-shell[data-theme='dark'] .date-input {
+  background: #0f172a;
+  color: #e5e7eb;
+  border-color: rgba(148, 163, 184, 0.25);
+}
+
+/* Focus states for dark mode selects */
+:root[data-theme='dark'] select:focus,
+.app-shell[data-theme='dark'] select:focus,
+:root[data-theme='dark'] .mood-select:focus,
+.app-shell[data-theme='dark'] .mood-select:focus {
+  border-color: rgba(56, 189, 248, 0.5);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
 }
 
 .mini-color-input {
