@@ -2314,20 +2314,21 @@ export function createApp(mount) {
         disabled: isActive ? true : undefined,
         onclick: async () => {
           if (isActive) return;
-          if (vault.hasPassword && !state.unlockedVaultSlots.has(vault.slotName)) {
-            const pw = window.prompt(`Enter password for "${vault.label}":`);
-            if (pw == null) return;
-            try {
+          try {
+            if (vault.hasPassword && !state.unlockedVaultSlots.has(vault.slotName)) {
+              const pw = window.prompt(`Enter password for "${vault.label}":`);
+              if (pw == null) return;
               await verifyVaultPassword(state.auth.token, vault.slotName, String(pw));
               state.unlockedVaultSlots.add(vault.slotName);
-            } catch (e) {
-              showToast(e?.message || 'Incorrect vault password');
-              return;
             }
+            // Switch to the new vault and lock
+            switchVaultAndLock(vault.slotName, `Unlock ${vault.label} to continue.`);
+            state.showAccountOverlay = false;
+            render();
+          } catch (e) {
+            console.error('Vault switch failed:', e);
+            showToast(e?.message || 'Failed to switch vault');
           }
-          switchVaultAndLock(vault.slotName, `Unlock ${vault.label} to continue.`);
-          state.showAccountOverlay = false;
-          render();
         }
       }, [el('span', { class: 'btn-ic', text: '⇆' }), el('span', { text: isActive ? 'Current' : 'Switch' })]);
 
