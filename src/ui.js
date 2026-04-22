@@ -17,6 +17,13 @@ import {
   saveVaultMeta,
   safeMemzeroKey,
   wipeAllData,
+  saveVideoBlob,
+  getVideoBlob,
+  deleteVideoBlob,
+  saveVoiceBlob,
+  getVoiceBlob,
+  deleteVoiceBlob,
+  migrateInlineBlobsToIndexedDB,
   loadAuthSession,
   saveAuthSession,
   clearAuthSession
@@ -2075,7 +2082,7 @@ export function createApp(mount) {
       let targetVault = { entries: [], trash: [] };
       if (targetPayload) {
         try {
-          targetVault = decryptVaultOrThrow(targetPayload, targetKey);
+          targetVault = await decryptVaultOrThrow(targetPayload, targetKey);
         } catch {
           safeMemzeroKey(targetKey);
           showToast('Wrong account password for target vault');
@@ -3439,7 +3446,7 @@ export function createApp(mount) {
     const encryptedPayload = loadEncryptedVault(state.activeVaultSlot);
     let vault;
     try {
-      vault = decryptVaultOrThrow(encryptedPayload, key);
+      vault = await decryptVaultOrThrow(encryptedPayload, key);
     } catch {
       safeMemzeroKey(key);
       throw new Error('Wrong password');
@@ -3513,7 +3520,7 @@ export function createApp(mount) {
     const key = await deriveVaultKey(password, state.meta.salt);
     let vault;
     try {
-      vault = decryptVaultOrThrow(chosenPayload, key);
+      vault = await decryptVaultOrThrow(chosenPayload, key);
     } catch {
       safeMemzeroKey(key);
       throw new Error('Wrong password for this vault');
@@ -6183,7 +6190,11 @@ export function createApp(mount) {
   // ── Video Recordings ─────────────────────────────────────────────────────────
   const videoRecorderState = { mediaRecorder: null, chunks: [], recording: false, stream: null, previewStream: null };
 
+  // In-memory cache for video blob URLs (loaded from IndexedDB)
+  const videoBlobCache = new Map();
+
   function renderVideoUI(entry) {
+    // clips now only contain metadata with blobId references
     const clips = Array.isArray(entry.videoClips) ? entry.videoClips : [];
     const preview = el('video', { class: 'video-preview', playsinline: 'playsinline' });
     preview.muted = true; // must set as property, not attribute, to actually mute
@@ -6266,9 +6277,24 @@ export function createApp(mount) {
         const cur = getSelectedEntry();
         if (!cur) { statusText.textContent = ''; updateButtons(); return; }
 
+        const blobId = `vc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+        // Save large blob to IndexedDB (not in the vault to avoid localStorage limit)
+        try {
+          await saveVideoBlob(blobId, dataUrl);
+          videoBlobCache.set(blobId, dataUrl);
+        } catch (e) {
+          showToast('Failed to store video blob.');
+          console.error('[VideoRecord IDB]', e);
+          statusText.textContent = '';
+          updateButtons();
+          return;
+        }
+
+        // Only save metadata (id reference) to the vault
         const next = [...(cur.videoClips || []), {
-          id: `vc-${Date.now()}`,
-          dataUrl,
+          id: blobId,
+          blobId, // reference to IndexedDB
           createdAt: new Date().toISOString()
         }].slice(-4);
         updateSelected({ videoClips: next });
@@ -6316,23 +6342,54 @@ export function createApp(mount) {
 
     updateButtons();
 
-    const clipList = el('div', { class: 'video-clip-list' }, clips.map((clip, i) => {
-      const video = el('video', { controls: 'controls', src: clip.dataUrl, class: 'video-clip', playsinline: 'playsinline' });
-      const removeBtn = el('button', {
-        class: 'btn mini ghost',
-        type: 'button',
-        onclick: () => {
-          const cur = getSelectedEntry();
-          if (!cur) return;
-          updateSelected({ videoClips: (cur.videoClips || []).filter((c) => c.id !== clip.id) });
+    // Render clip list with lazy-loaded video data from IndexedDB
+    const clipList = el('div', { class: 'video-clip-list' });
+
+    const loadAndRenderClips = async () => {
+      clipList.replaceChildren();
+      for (let i = 0; i < clips.length; i++) {
+        const clip = clips[i];
+        const clipId = clip.blobId || clip.id;
+
+        // Load from cache or IndexedDB
+        let dataUrl = videoBlobCache.get(clipId);
+        if (!dataUrl) {
+          try {
+            dataUrl = await getVideoBlob(clipId);
+            if (dataUrl) videoBlobCache.set(clipId, dataUrl);
+          } catch (e) {
+            console.error('[VideoClip] Failed to load blob', clipId, e);
+          }
         }
-      }, [el('span', { text: 'Remove' })]);
-      return el('div', { class: 'video-clip-item' }, [
-        el('span', { class: 'tiny', text: `Clip ${i + 1}` }),
-        video,
-        removeBtn
-      ]);
-    }));
+
+        const video = el('video', { controls: 'controls', class: 'video-clip', playsinline: 'playsinline' });
+        if (dataUrl) video.src = dataUrl;
+        else video.poster = ''; // Empty placeholder if blob missing
+
+        const removeBtn = el('button', {
+          class: 'btn mini ghost',
+          type: 'button',
+          onclick: async () => {
+            const cur = getSelectedEntry();
+            if (!cur) return;
+            // Remove from IndexedDB and cache
+            try { await deleteVideoBlob(clipId); } catch (e) { /* ignore */ }
+            videoBlobCache.delete(clipId);
+            // Remove reference from entry
+            updateSelected({ videoClips: (cur.videoClips || []).filter((c) => c.id !== clip.id) });
+          }
+        }, [el('span', { text: 'Remove' })]);
+
+        const clipEl = el('div', { class: 'video-clip-item' }, [
+          el('span', { class: 'tiny', text: dataUrl ? `Clip ${i + 1}` : `Clip ${i + 1} (loading…)` }),
+          video,
+          removeBtn
+        ]);
+        clipList.append(clipEl);
+      }
+    };
+
+    loadAndRenderClips();
 
     return el('div', { class: 'detail-grid' }, [
       el('div', { class: 'detail-card detail-card-wide' }, [
