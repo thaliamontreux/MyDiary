@@ -6092,7 +6092,8 @@ export function createApp(mount) {
 
   function renderVideoUI(entry) {
     const clips = Array.isArray(entry.videoClips) ? entry.videoClips : [];
-    const preview = el('video', { class: 'video-preview', muted: 'muted', playsinline: 'playsinline' });
+    const preview = el('video', { class: 'video-preview', playsinline: 'playsinline' });
+    preview.muted = true; // must set as property, not attribute, to actually mute
     const statusText = el('span', { class: 'tiny', text: '' });
 
     const recordBtn = el('button', {
@@ -6108,7 +6109,11 @@ export function createApp(mount) {
           videoRecorderState.stream = stream;
           videoRecorderState.chunks = [];
           videoRecorderState.recording = true;
-          preview.srcObject = stream;
+          // Show camera feed muted — use a video-only stream on the preview
+          // so the captured audio track never routes back through the speakers.
+          const videoOnlyStream = new MediaStream(stream.getVideoTracks());
+          preview.srcObject = videoOnlyStream;
+          preview.muted = true;
           preview.play();
           statusText.textContent = 'Recording video…';
           recordBtn.querySelector('span').textContent = '⏹ Stop';
