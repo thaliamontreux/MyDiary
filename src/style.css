@@ -2717,6 +2717,106 @@ body::before {
   flex-wrap: wrap;
 }
 
+/* ── Scrollable Folder List ──────────────────────────────────────────────── */
+.folder-scrollable-list {
+  max-height: 240px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 8px;
+  align-items: stretch;
+}
+
+.folder-scrollable-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.folder-scrollable-list::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.05);
+  border-radius: 3px;
+}
+
+.folder-scrollable-list::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.2);
+  border-radius: 3px;
+}
+
+:root[data-theme='dark'] .folder-scrollable-list::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.05);
+}
+
+:root[data-theme='dark'] .folder-scrollable-list::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.2);
+}
+
+.folder-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(0,0,0,0.03);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
+:root[data-theme='dark'] .folder-list-item {
+  background: rgba(255,255,255,0.04);
+}
+
+.folder-list-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+}
+
+.folder-list-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.folder-list-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+  text-align: left;
+}
+
+.folder-list-meta {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: left;
+}
+
+.folder-list-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.folder-list-actions .small-btn {
+  padding: 4px 8px;
+  min-height: auto;
+}
+
+.folder-list-empty {
+  text-align: left;
+  padding: 16px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .btn.is-disabled,
 .btn:disabled {
   opacity: 0.45;

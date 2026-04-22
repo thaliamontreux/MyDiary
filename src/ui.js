@@ -1972,52 +1972,44 @@ export function createApp(mount) {
   function renderAccountFoldersSection() {
     if (!state.auth.user) return el('div');
 
-    const rows = (state.folders || []).map((folder) => {
+    // Get folders for current vault
+    const currentFolders = state.folders.filter((f) => f.vaultSlot === state.activeVaultSlot);
+
+    const folderItems = currentFolders.map((folder) => {
       const count = countEntriesInFolder(folder.path);
-      const meta = el('div', {
-        class: 'account-helper',
-        text: `${count} entr${count === 1 ? 'y' : 'ies'} • ${folder.hasPassword ? 'Password set' : 'No password'}`
-      });
+      const isLocked = folder.hasPassword && !state.unlockedFolderIds.has(folder.id);
 
-      const actions = el('div', { class: 'folder-manager-actions' }, [
-        el('button', {
-          class: 'btn ghost small-btn',
-          type: 'button',
-          onclick: () => handleRenameFolder(folder)
-        }, [el('span', { class: 'btn-ic', text: '✎' }), el('span', { text: 'Rename' })]),
-        el('button', {
-          class: 'btn ghost small-btn',
-          type: 'button',
-          onclick: () => handleSetFolderPassword(folder)
-        }, [el('span', { class: 'btn-ic', text: folder.hasPassword ? '🔒' : '🔓' }), el('span', { text: folder.hasPassword ? 'Change password' : 'Lock' })]),
-        folder.hasPassword ? el('button', {
-          class: 'btn ghost small-btn',
-          type: 'button',
-          onclick: () => handleRemoveFolderPassword(folder)
-        }, [el('span', { class: 'btn-ic', text: '⚿' }), el('span', { text: 'Unlock' })]) : el('span'),
-        el('button', {
-          class: 'btn danger ghost small-btn',
-          type: 'button',
-          onclick: () => handleDeleteFolder(folder)
-        }, [el('span', { class: 'btn-ic', text: '✕' }), el('span', { text: 'Delete' })]),
-        el('button', {
-          class: 'btn danger small-btn',
-          type: 'button',
-          onclick: () => handlePurgeFolder(folder)
-        }, [el('span', { class: 'btn-ic', text: '⚠' }), el('span', { text: 'Purge' })])
-      ]);
-
-      return el('div', { class: 'folder-manager-row' }, [
-        el('div', { class: 'folder-manager-info' }, [
-          el('div', { class: 'account-label', text: folder.path }),
-          meta
+      return el('div', { class: 'folder-list-item' }, [
+        el('div', { class: 'folder-list-icon' }, isLocked ? '🔒' : '📁'),
+        el('div', { class: 'folder-list-info' }, [
+          el('div', { class: 'folder-list-name', text: folder.path }),
+          el('div', { class: 'folder-list-meta', text: `${count} entr${count === 1 ? 'y' : 'ies'}` })
         ]),
-        actions
+        el('div', { class: 'folder-list-actions' }, [
+          el('button', {
+            class: 'btn ghost small-btn',
+            type: 'button',
+            title: 'Rename',
+            onclick: () => handleRenameFolder(folder)
+          }, [el('span', { class: 'btn-ic', text: '✎' })]),
+          el('button', {
+            class: 'btn ghost small-btn',
+            type: 'button',
+            title: folder.hasPassword ? 'Change password' : 'Set password',
+            onclick: () => handleSetFolderPassword(folder)
+          }, [el('span', { class: 'btn-ic', text: folder.hasPassword ? '🔒' : '🔓' })]),
+          el('button', {
+            class: 'btn danger ghost small-btn',
+            type: 'button',
+            title: 'Delete',
+            onclick: () => handleDeleteFolder(folder)
+          }, [el('span', { class: 'btn-ic', text: '✕' })])
+        ])
       ]);
     });
 
-    const emptyState = rows.length === 0
-      ? el('div', { class: 'account-helper', text: 'No folders yet. Create one below.' })
+    const emptyState = currentFolders.length === 0
+      ? el('div', { class: 'folder-list-empty', text: 'No folders yet. Create one below.' })
       : null;
 
     const createBtn = el('button', {
@@ -2028,10 +2020,10 @@ export function createApp(mount) {
 
     return el('div', { class: 'account-folders' }, [
       el('div', { class: 'account-section-header' }, [
-        el('div', { class: 'account-label', text: 'Folder Manager' }),
+        el('div', { class: 'account-label', text: `Folders (${currentFolders.length})` }),
         createBtn
       ]),
-      emptyState || el('div', { class: 'folder-manager-list' }, rows)
+      emptyState || el('div', { class: 'folder-scrollable-list' }, folderItems)
     ]);
   }
 
