@@ -6,6 +6,9 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
+import fsp from 'node:fs/promises';
+import multer from 'multer';
+import AdmZip from 'adm-zip';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -53,7 +56,9 @@ import {
   getUserTotp,
   setUserRecoveryCodes,
   getUserRecoveryCodes,
-  selfUpdateUserProfile
+  selfUpdateUserProfile,
+  saveUserTheme,
+  saveUserThemesJson
 } from './db.js';
 import { requireAuth, signAuthToken } from './auth.js';
 import { log, logError, requestLogger } from './logger.js';
@@ -678,7 +683,8 @@ app.post('/api/auth/register', authRateLimiter, async (req, res) => {
         countryCode,
         tosAccepted: false,
         isAdmin: false,
-        mustChangePassword: false
+        mustChangePassword: false,
+        theme: 'trans-pride-dark'
       }
     });
   } catch (error) {
@@ -721,7 +727,8 @@ app.post('/api/auth/login', authRateLimiter, async (req, res) => {
         countryCode: user.country_code || null,
         tosAccepted: Boolean(user.tos_accepted_at),
         isAdmin: Boolean(user.is_admin),
-        mustChangePassword: Boolean(user.must_change_password)
+        mustChangePassword: Boolean(user.must_change_password),
+        theme: user.theme || 'trans-pride-dark'
       }
     });
   } catch (error) {
@@ -1099,6 +1106,123 @@ app.patch('/api/auth/profile', requireAuth, async (req, res) => {
   } catch (err) {
     logError('profile_update_failed', err, { requestId: req.requestId, userId: req.user?.id });
     res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
+// ── User Theme ────────────────────────────────────────────────────────────────
+app.post('/api/user/theme', requireAuth, async (req, res) => {
+  try {
+    const themeId = String(req.body?.theme || '').trim();
+    if (!themeId) {
+      res.status(400).json({ error: 'theme is required' });
+      return;
+    }
+    await saveUserTheme(req.user.id, themeId);
+    res.json({ ok: true, theme: themeId });
+  } catch (err) {
+    logError('user_theme_save_failed', err, { userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to save theme' });
+  }
+});
+
+// ── Theme Upload (ZIP) ────────────────────────────────────────────────────────
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+
+app.post('/api/themes/upload', requireAuth, upload.single('themeZip'), async (req, res) => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: 'No file uploaded' });
+      return;
+    }
+    const zip = new AdmZip(req.file.buffer);
+    const entries = zip.getEntries();
+    const themeJsonEntry = entries.find(e => e.entryName === 'theme.json' || e.entryName.endsWith('/theme.json'));
+    const bgEntry = entries.find(e => e.entryName === 'background.webp' || e.entryName.endsWith('/background.webp'));
+
+    if (!themeJsonEntry || !bgEntry) {
+      res.status(400).json({ error: 'ZIP must contain theme.json and background.webp' });
+      return;
+    }
+
+    const themeConfig = JSON.parse(themeJsonEntry.getData().toString('utf8'));
+    if (!themeConfig.id || !themeConfig.name) {
+      res.status(400).json({ error: 'theme.json must have id and name fields' });
+      return;
+    }
+
+    // Save to themes/<id>/ directory
+    const themeDir = path.resolve(DIST_DIR, '..', 'themes', themeConfig.id);
+    await fsp.mkdir(themeDir, { recursive: true });
+    await fsp.writeFile(path.join(themeDir, 'background.webp'), bgEntry.getData());
+    await fsp.writeFile(path.join(themeDir, 'theme.json'), JSON.stringify(themeConfig, null, 2), 'utf8');
+
+    // Also copy to dist if it exists
+    if (fs.existsSync(DIST_DIR)) {
+      const distThemeDir = path.join(DIST_DIR, 'themes', themeConfig.id);
+      await fsp.mkdir(distThemeDir, { recursive: true });
+      await fsp.writeFile(path.join(distThemeDir, 'background.webp'), bgEntry.getData());
+      await fsp.writeFile(path.join(distThemeDir, 'theme.json'), JSON.stringify(themeConfig, null, 2), 'utf8');
+    }
+
+    // Update themes.json
+    const themesJsonPath = path.resolve(DIST_DIR, '..', 'themes.json');
+    let themesData = { themes: [] };
+    try {
+      themesData = JSON.parse(await fsp.readFile(themesJsonPath, 'utf8'));
+    } catch { /* start fresh if missing */ }
+
+    themeConfig.image = `themes/${themeConfig.id}/background.webp`;
+    const existingIdx = themesData.themes.findIndex(t => t.id === themeConfig.id);
+    if (existingIdx >= 0) {
+      themesData.themes[existingIdx] = themeConfig;
+    } else {
+      themesData.themes.push(themeConfig);
+    }
+
+    await fsp.writeFile(themesJsonPath, JSON.stringify(themesData, null, 2), 'utf8');
+    if (fs.existsSync(DIST_DIR)) {
+      await fsp.writeFile(path.join(DIST_DIR, 'themes.json'), JSON.stringify(themesData, null, 2), 'utf8');
+    }
+
+    await saveUserThemesJson(JSON.stringify(themesData));
+    res.json({ ok: true, themeName: themeConfig.name, themeId: themeConfig.id });
+  } catch (err) {
+    logError('theme_upload_failed', err, { userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to install theme: ' + err.message });
+  }
+});
+
+app.delete('/api/themes/:id', requireAuth, async (req, res) => {
+  try {
+    const themeId = String(req.params.id || '').trim().replace(/[^a-z0-9-]/gi, '');
+    if (!themeId) {
+      res.status(400).json({ error: 'Theme ID is required' });
+      return;
+    }
+
+    // Remove theme directory
+    const themeDir = path.resolve(DIST_DIR, '..', 'themes', themeId);
+    try { await fsp.rm(themeDir, { recursive: true, force: true }); } catch { /* ok if missing */ }
+    if (fs.existsSync(DIST_DIR)) {
+      const distThemeDir = path.join(DIST_DIR, 'themes', themeId);
+      try { await fsp.rm(distThemeDir, { recursive: true, force: true }); } catch { /* ok */ }
+    }
+
+    // Remove from themes.json
+    const themesJsonPath = path.resolve(DIST_DIR, '..', 'themes.json');
+    let themesData = { themes: [] };
+    try { themesData = JSON.parse(await fsp.readFile(themesJsonPath, 'utf8')); } catch { /* ok */ }
+    themesData.themes = themesData.themes.filter(t => t.id !== themeId);
+    await fsp.writeFile(themesJsonPath, JSON.stringify(themesData, null, 2), 'utf8');
+    if (fs.existsSync(DIST_DIR)) {
+      await fsp.writeFile(path.join(DIST_DIR, 'themes.json'), JSON.stringify(themesData, null, 2), 'utf8');
+    }
+
+    await saveUserThemesJson(JSON.stringify(themesData));
+    res.json({ ok: true });
+  } catch (err) {
+    logError('theme_delete_failed', err, { userId: req.user?.id });
+    res.status(500).json({ error: 'Failed to delete theme: ' + err.message });
   }
 });
 

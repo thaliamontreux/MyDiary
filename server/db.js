@@ -407,6 +407,24 @@ export async function initializeDatabase() {
     );
   }
 
+  // Add theme column to users if missing
+  const [themeColMigrations] = await pool.query(
+    'SELECT name FROM schema_migrations WHERE name = ? LIMIT 1',
+    ['add_user_theme_v1']
+  );
+  if (themeColMigrations.length === 0) {
+    const databaseName = bootstrap.databaseName;
+    const [rows] = await pool.query(
+      `SELECT COUNT(*) AS count FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME = 'theme'`,
+      [databaseName]
+    );
+    if (!rows[0].count) {
+      await pool.query(`ALTER TABLE users ADD COLUMN theme VARCHAR(64) DEFAULT 'trans-pride-dark'`);
+    }
+    await pool.query('INSERT INTO schema_migrations (name) VALUES (?)', ['add_user_theme_v1']);
+  }
+
   // Seed default admin if not present
   const [adminRows] = await pool.query(
     'SELECT id FROM users WHERE is_admin = 1 LIMIT 1'
@@ -485,7 +503,8 @@ export async function findUserByEmail(email) {
        country_code,
        tos_accepted_at,
        is_admin,
-       must_change_password
+       must_change_password,
+       theme
      FROM users
      WHERE email = ?
      LIMIT 1`,
@@ -512,13 +531,39 @@ export async function findUserById(userId) {
        tos_accepted_at,
        is_admin,
        must_change_password,
-       created_at
+       created_at,
+       theme
      FROM users
      WHERE id = ?
      LIMIT 1`,
     [userId]
   );
   return rows[0] || null;
+}
+
+export async function saveUserTheme(userId, themeId) {
+  ensurePool();
+  await pool.query('UPDATE users SET theme = ? WHERE id = ?', [themeId, userId]);
+}
+
+export async function saveUserThemesJson(themesJson) {
+  ensurePool();
+  await pool.query(
+    'INSERT INTO schema_migrations (name) VALUES (?) ON DUPLICATE KEY UPDATE applied_at = CURRENT_TIMESTAMP',
+    ['themes_json_update']
+  );
+  // Store as a JSON blob in a simple key-value settings table (created if needed)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS site_settings (
+      key_name VARCHAR(128) PRIMARY KEY,
+      value_data LONGTEXT,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await pool.query(
+    'INSERT INTO site_settings (key_name, value_data) VALUES (?, ?) ON DUPLICATE KEY UPDATE value_data = ?, updated_at = CURRENT_TIMESTAMP',
+    ['themes_json', themesJson, themesJson]
+  );
 }
 
 export async function upsertUserPassword(userId, passwordHash) {

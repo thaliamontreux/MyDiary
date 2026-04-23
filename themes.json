@@ -3,7 +3,7 @@
     {
       "id": "trans-pride-dark",
       "name": "Trans Pride Dark",
-      "image": "Images/trans-pride-dark.webp",
+      "image": "themes/trans-pride-dark/background.webp",
       "mode": "dark",
       "category": "pride",
       "colors": {
@@ -20,7 +20,7 @@
     {
       "id": "elegant-dark",
       "name": "Elegant Dark",
-      "image": "Images/elegant-dark.webp",
+      "image": "themes/elegant-dark/background.webp",
       "mode": "dark",
       "category": "elegant",
       "colors": {
@@ -37,7 +37,7 @@
     {
       "id": "support-dark",
       "name": "Support Dark",
-      "image": "Images/support-dark.webp",
+      "image": "themes/support-dark/background.webp",
       "mode": "dark",
       "category": "support",
       "colors": {
@@ -54,7 +54,7 @@
     {
       "id": "abstract-dark",
       "name": "Abstract Dark",
-      "image": "Images/abstract-dark.webp",
+      "image": "themes/abstract-dark/background.webp",
       "mode": "dark",
       "category": "abstract",
       "colors": {
@@ -71,7 +71,7 @@
     {
       "id": "community-dark",
       "name": "Community Dark",
-      "image": "Images/community-dark.webp",
+      "image": "themes/community-dark/background.webp",
       "mode": "dark",
       "category": "community",
       "colors": {
@@ -88,7 +88,7 @@
     {
       "id": "flowing-rivers-dark",
       "name": "Flowing Rivers",
-      "image": "Images/flowing-rivers-dark.webp",
+      "image": "themes/flowing-rivers-dark/background.webp",
       "mode": "dark",
       "category": "nature",
       "colors": {
@@ -105,7 +105,7 @@
     {
       "id": "journey-dark",
       "name": "Journey Dark",
-      "image": "Images/journey-dark.webp",
+      "image": "themes/journey-dark/background.webp",
       "mode": "dark",
       "category": "journey",
       "colors": {
@@ -122,7 +122,7 @@
     {
       "id": "abstract-shapes-dark",
       "name": "Abstract Shapes Dark",
-      "image": "Images/abstract-shapes-dark.webp",
+      "image": "themes/abstract-shapes-dark/background.webp",
       "mode": "dark",
       "category": "abstract",
       "colors": {
@@ -139,7 +139,7 @@
     {
       "id": "strength-dark",
       "name": "Strength Dark",
-      "image": "Images/strength-dark.webp",
+      "image": "themes/strength-dark/background.webp",
       "mode": "dark",
       "category": "strength",
       "colors": {
@@ -156,7 +156,7 @@
     {
       "id": "constellation-night",
       "name": "Constellation Night",
-      "image": "Images/constellation-night.webp",
+      "image": "themes/constellation-night/background.webp",
       "mode": "dark",
       "category": "celestial",
       "colors": {
@@ -173,7 +173,7 @@
     {
       "id": "trans-pride-light",
       "name": "Trans Pride Light",
-      "image": "Images/trans-pride-light.webp",
+      "image": "themes/trans-pride-light/background.webp",
       "mode": "light",
       "category": "pride",
       "colors": {
@@ -190,7 +190,7 @@
     {
       "id": "blooming-light",
       "name": "Blooming Light",
-      "image": "Images/blooming-light.webp",
+      "image": "themes/blooming-light/background.webp",
       "mode": "light",
       "category": "nature",
       "colors": {
@@ -207,7 +207,7 @@
     {
       "id": "support-light",
       "name": "Support Light",
-      "image": "Images/support-light.webp",
+      "image": "themes/support-light/background.webp",
       "mode": "light",
       "category": "support",
       "colors": {
@@ -224,7 +224,7 @@
     {
       "id": "abstract-light",
       "name": "Abstract Light",
-      "image": "Images/abstract-light.webp",
+      "image": "themes/abstract-light/background.webp",
       "mode": "light",
       "category": "abstract",
       "colors": {
@@ -241,7 +241,7 @@
     {
       "id": "community-light",
       "name": "Community Light",
-      "image": "Images/community-light.webp",
+      "image": "themes/community-light/background.webp",
       "mode": "light",
       "category": "community",
       "colors": {
@@ -258,7 +258,7 @@
     {
       "id": "sunrise-hope",
       "name": "Sunrise Hope",
-      "image": "Images/sunrise-hope.webp",
+      "image": "themes/sunrise-hope/background.webp",
       "mode": "light",
       "category": "hope",
       "colors": {
@@ -275,7 +275,7 @@
     {
       "id": "journey-light",
       "name": "Journey Light",
-      "image": "Images/journey-light.webp",
+      "image": "themes/journey-light/background.webp",
       "mode": "light",
       "category": "journey",
       "colors": {
@@ -292,7 +292,7 @@
     {
       "id": "soft-abstract-light",
       "name": "Soft Abstract Light",
-      "image": "Images/soft-abstract-light.webp",
+      "image": "themes/soft-abstract-light/background.webp",
       "mode": "light",
       "category": "abstract",
       "colors": {
@@ -309,7 +309,7 @@
     {
       "id": "pride-light",
       "name": "Pride Light",
-      "image": "Images/pride-light.webp",
+      "image": "themes/pride-light/background.webp",
       "mode": "light",
       "category": "pride",
       "colors": {
@@ -326,7 +326,7 @@
     {
       "id": "modern-abstract-light",
       "name": "Modern Abstract Light",
-      "image": "Images/modern-abstract-light.webp",
+      "image": "themes/modern-abstract-light/background.webp",
       "mode": "light",
       "category": "modern",
       "colors": {

@@ -2283,6 +2283,161 @@ export function createApp(mount) {
     }
   }
 
+  function renderAccountThemeSection() {
+    if (!state.auth.user) return el('div');
+
+    const currentTheme = state.auth.user?.theme || 'trans-pride-dark';
+    const [availableThemes, setAvailableThemes] = useState([]);
+
+    // Load themes from JSON
+    useEffect(() => {
+      fetch('themes.json')
+        .then(r => r.json())
+        .then(data => setAvailableThemes(data.themes || []))
+        .catch(() => setAvailableThemes([]));
+    }, []);
+
+    const applyTheme = async (themeId) => {
+      document.documentElement.setAttribute('data-theme', themeId);
+      
+      // Save to user settings
+      try {
+        await fetch('/api/user/theme', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ theme: themeId })
+        });
+        state.auth.user.theme = themeId;
+        showToast(`Theme changed to ${themeId}`);
+      } catch (e) {
+        showToast('Theme applied locally but not saved');
+      }
+      render(false);
+    };
+
+    const handleThemeUpload = async (file) => {
+      if (!file || !file.name.endsWith('.zip')) {
+        showToast('Please upload a .zip file');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('themeZip', file);
+
+      try {
+        showToast('Uploading theme...');
+        const res = await fetch('/api/themes/upload', {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          showToast(`Theme "${data.themeName}" installed!`);
+          // Refresh themes list
+          fetch('themes.json')
+            .then(r => r.json())
+            .then(data => setAvailableThemes(data.themes || []));
+        } else {
+          showToast('Failed to install theme');
+        }
+      } catch (e) {
+        showToast('Upload failed: ' + e.message);
+      }
+    };
+
+    const handleDeleteTheme = async (themeId, themeName) => {
+      if (!confirm(`Remove theme "${themeName}"? This cannot be undone.`)) return;
+      try {
+        const res = await fetch(`/api/themes/${encodeURIComponent(themeId)}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${state.auth.token}` }
+        });
+        if (res.ok) {
+          showToast(`Theme "${themeName}" removed`);
+          // If the deleted theme was active, reset to default
+          if (state.auth.user?.theme === themeId) {
+            state.auth.user.theme = 'trans-pride-dark';
+            document.documentElement.setAttribute('data-theme', 'trans-pride-dark');
+          }
+          // Refresh the themes list
+          fetch('themes.json')
+            .then(r => r.json())
+            .then(data => setAvailableThemes(data.themes || []));
+        } else {
+          showToast('Failed to remove theme');
+        }
+      } catch (e) {
+        showToast('Error: ' + e.message);
+      }
+    };
+
+    const BUILTIN_THEMES = new Set([
+      'trans-pride-dark','elegant-dark','support-dark','abstract-dark','community-dark',
+      'flowing-rivers-dark','journey-dark','abstract-shapes-dark','strength-dark','constellation-night',
+      'trans-pride-light','blooming-light','support-light','abstract-light','community-light',
+      'sunrise-hope','journey-light','soft-abstract-light','pride-light','modern-abstract-light'
+    ]);
+
+    const themeGrid = availableThemes.length > 0
+      ? el('div', { class: 'theme-selector' },
+          availableThemes.map(theme => {
+            const isActive = currentTheme === theme.id;
+            const isBuiltin = BUILTIN_THEMES.has(theme.id);
+            const deleteBtn = !isBuiltin
+              ? el('button', {
+                  class: 'btn ghost small-btn theme-delete-btn',
+                  type: 'button',
+                  title: 'Remove theme',
+                  onclick: (e) => { e.stopPropagation(); handleDeleteTheme(theme.id, theme.name); }
+                }, [el('span', { text: '🗑' })])
+              : null;
+            return el('div', {
+              class: `theme-card ${isActive ? 'active' : ''}`,
+              onclick: () => applyTheme(theme.id)
+            }, [
+              el('div', { class: 'theme-preview-wrap' }, [
+                el('div', {
+                  class: 'theme-preview',
+                  style: `background-image: url('${theme.image}')`
+                }),
+                ...(deleteBtn ? [deleteBtn] : [])
+              ]),
+              el('span', { class: 'theme-card-name', text: theme.name }),
+              el('span', { class: 'theme-card-mode', text: theme.mode })
+            ]);
+          })
+        )
+      : el('div', { class: 'tiny', text: 'Loading themes...' });
+
+    const uploadInput = el('input', {
+      type: 'file',
+      accept: '.zip',
+      style: 'display: none',
+      onchange: (e) => {
+        if (e.target.files[0]) {
+          handleThemeUpload(e.target.files[0]);
+        }
+      }
+    });
+
+    const uploadBtn = el('button', {
+      class: 'btn small-btn',
+      type: 'button',
+      onclick: () => uploadInput.click()
+    }, [el('span', { text: '📁 Upload Theme (.zip)' })]);
+
+    return el('div', { class: 'account-section' }, [
+      el('div', { class: 'section-title', text: '🎨 Theme Settings' }),
+      el('div', { class: 'section-desc', text: `Current: ${currentTheme}` }),
+      themeGrid,
+      el('div', { style: 'margin-top: 12px;' }, [uploadInput, uploadBtn]),
+      el('div', { class: 'tiny', style: 'margin-top: 8px;' }, [
+        el('span', { text: 'Upload custom themes as .zip files containing: theme.json, background.webp, and optionally preview.png' })
+      ])
+    ]);
+  }
+
   function renderAccountVaultsSection() {
     if (!state.auth.user) return el('div');
 
@@ -2942,7 +3097,9 @@ export function createApp(mount) {
     root.dataset.comfort = state.ui.comfortMode ? 'on' : 'off';
     root.dataset.kid = state.ui.kidMode ? 'on' : 'off';
     root.dataset.vault = state.activeVaultSlot;
-    document.documentElement.dataset.theme = state.ui.themeId;
+    // Use user's saved background theme if logged in, otherwise fall back to ui themeId
+    const bgTheme = state.auth.user?.theme || state.ui.themeId;
+    document.documentElement.dataset.theme = bgTheme;
     brandTitleNode.textContent = state.activeVaultSlot === 'decoy' ? 'My Secret Diary · decoy' : 'My Secret Diary';
     brandSubNode.textContent = state.activeVaultSlot === 'decoy'
       ? 'soft cover story, separate vault, same encryption'
@@ -3549,6 +3706,7 @@ export function createApp(mount) {
       keyHelper,
       keyRow,
       securitySection,
+      renderAccountThemeSection(),
       renderAccountVaultsSection(),
       renderAccountFoldersSection(),
       closeBtn
@@ -3746,6 +3904,12 @@ export function createApp(mount) {
     if (!state.selectedId && state.vault.entries.length) {
       state.selectedId = sortEntriesDesc(state.vault.entries)[0].id;
     }
+
+    // Apply the user's saved background theme on login
+    if (state.auth.user?.theme) {
+      document.documentElement.setAttribute('data-theme', state.auth.user.theme);
+    }
+
     render();
   }
 
