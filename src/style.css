@@ -3699,8 +3699,8 @@ body::before {
 
 /* Dark mode calendar styling - light grid, white text */
 :root[data-theme='dark'] .calendar-day {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.25);
   color: #fff;
 }
 

@@ -4924,13 +4924,23 @@ export function createApp(mount) {
     // Get all entry dates from the vault
     const entries = state.vault?.entries || [];
     const entryDates = new Map();
-    entries.forEach(e => {
+    console.log('Calendar debug: total entries:', entries.length);
+    entries.forEach((e, i) => {
       const d = normalizeEntry(e).date;
+      console.log(`Calendar debug: entry ${i} raw date:`, d, 'type:', typeof d);
       if (d) {
         const key = d.substring(0, 10); // YYYY-MM-DD
+        console.log(`Calendar debug: entry ${i} extracted key:`, key);
         entryDates.set(key, (entryDates.get(key) || 0) + 1);
       }
     });
+    console.log('Calendar debug: unique dates map:', Array.from(entryDates.entries()));
+    console.log('Calendar debug: current view:', year, month + 1); // month is 0-indexed
+    // Check for entries in current month
+    const currentMonthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+    console.log('Calendar debug: looking for prefix:', currentMonthPrefix);
+    const entriesInCurrentMonth = Array.from(entryDates.keys()).filter(k => k.startsWith(currentMonthPrefix));
+    console.log('Calendar debug: entries in current month:', entriesInCurrentMonth);
 
     // Build calendar grid
     const firstDay = new Date(year, month, 1);
