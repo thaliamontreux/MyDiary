@@ -3125,15 +3125,31 @@ export function createApp(mount) {
 
   function captureFocusState() {
     const active = document.activeElement;
-    if (!active?.matches?.('input, textarea, select')) return null;
+    // Capture library rail scroll position
+    const libraryRail = root.querySelector('.library-rail');
+    const libraryScrollTop = libraryRail ? libraryRail.scrollTop : 0;
+    const focusState = active?.matches?.('input, textarea, select')
+      ? {
+          focusKey: active.dataset.focusKey || '',
+          selectionStart: typeof active.selectionStart === 'number' ? active.selectionStart : null,
+          selectionEnd: typeof active.selectionEnd === 'number' ? active.selectionEnd : null
+        }
+      : null;
     return {
-      focusKey: active.dataset.focusKey || '',
-      selectionStart: typeof active.selectionStart === 'number' ? active.selectionStart : null,
-      selectionEnd: typeof active.selectionEnd === 'number' ? active.selectionEnd : null
+      libraryScrollTop,
+      focusState
     };
   }
 
-  function restoreFocusState(focusState) {
+  function restoreFocusState(state) {
+    if (!state) return;
+    // Restore library rail scroll position
+    const libraryRail = root.querySelector('.library-rail');
+    if (libraryRail && typeof state.libraryScrollTop === 'number') {
+      libraryRail.scrollTop = state.libraryScrollTop;
+    }
+    // Restore input focus
+    const focusState = state.focusState;
     if (!focusState?.focusKey) return;
     const next = root.querySelector(`[data-focus-key="${focusState.focusKey}"]`);
     if (!next || typeof next.focus !== 'function') return;
