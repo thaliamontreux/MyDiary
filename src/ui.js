@@ -6340,26 +6340,36 @@ export function createApp(mount) {
           voiceRecorderState.mediaRecorder = mr;
           mr.ondataavailable = (e) => { if (e.data.size > 0) voiceRecorderState.chunks.push(e.data); };
           mr.onstop = async () => {
-            voiceRecorderState.recording = false;
-            statusText.textContent = '';
-            stream.getTracks().forEach((t) => t.stop());
-            const blob = new Blob(voiceRecorderState.chunks, { type: 'audio/webm' });
-            if (blob.size > 10 * 1024 * 1024) { showToast('Recording too large (max 10MB).'); return; }
-            const dataUrl = await new Promise((res, rej) => {
-              const reader = new FileReader();
-              reader.onload = () => res(reader.result);
-              reader.onerror = rej;
-              reader.readAsDataURL(blob);
-            });
-            const cur = getSelectedEntry();
-            if (!cur) return;
-            const next = [...(cur.voiceMemos || []), {
-              id: `vm-${Date.now()}`,
-              dataUrl,
-              duration: null,
-              createdAt: new Date().toISOString()
-            }].slice(-8);
-            updateSelected({ voiceMemos: next });
+            try {
+              voiceRecorderState.recording = false;
+              statusText.textContent = '';
+              stream.getTracks().forEach((t) => t.stop());
+              const blob = new Blob(voiceRecorderState.chunks, { type: 'audio/webm' });
+              if (blob.size === 0) { showToast('Recording failed - no audio data captured.'); return; }
+              if (blob.size > 10 * 1024 * 1024) { showToast('Recording too large (max 10MB).'); return; }
+              const dataUrl = await new Promise((res, rej) => {
+                const reader = new FileReader();
+                reader.onload = () => res(reader.result);
+                reader.onerror = rej;
+                reader.readAsDataURL(blob);
+              });
+              console.log('Voice recording created, size:', dataUrl.length, 'chars');
+              const cur = getSelectedEntry();
+              if (!cur) return;
+              const next = [...(cur.voiceMemos || []), {
+                id: `vm-${Date.now()}`,
+                dataUrl,
+                duration: null,
+                createdAt: new Date().toISOString()
+              }].slice(-8);
+              updateSelected({ voiceMemos: next });
+              // Persist the vault to save the voice memo
+              await persistVault();
+              showToast('Voice memo saved');
+            } catch (err) {
+              console.error('Voice recording error:', err);
+              showToast('Failed to save voice recording: ' + (err?.message || 'Unknown error'));
+            }
           };
           mr.start();
           recordBtn.textContent = '⏹ Stop';
