@@ -1583,6 +1583,7 @@ export function createApp(mount) {
     showAdminMenu: false,
     showUserManagerOverlay: false,
     showSiteManagerOverlay: false,
+    calendarDate: new Date(),
     adminUsers: [],
     adminUsersLoading: false,
     adminSelectedUserId: null,
@@ -4847,6 +4848,7 @@ export function createApp(mount) {
           entry.recipient ? el('div', { class: 'mood-line soft', text: `For: ${entry.recipient}` }) : el('div'),
           entry.recipeCategory ? el('div', { class: 'mood-line soft', text: `Category: ${entry.recipeCategory}` }) : el('div')
         ]) : el('div'),
+        renderCalendarCard(),
         renderFolderListCard(snapshot)
       ])
     ]);
@@ -4910,6 +4912,174 @@ export function createApp(mount) {
       state.foldersLoading
         ? el('div', { class: 'lock-status', text: 'Loading folders…' })
         : el('div', { class: 'folder-list' }, rows)
+    ]);
+  }
+
+  // ── Calendar ─────────────────────────────────────────────────────────────
+  function renderCalendarCard() {
+    const year = state.calendarDate.getFullYear();
+    const month = state.calendarDate.getMonth();
+    const today = new Date();
+
+    // Get all entry dates from the vault
+    const entries = state.vault?.entries || [];
+    const entryDates = new Map();
+    entries.forEach(e => {
+      const d = normalizeEntry(e).date;
+      if (d) {
+        const key = d.substring(0, 10); // YYYY-MM-DD
+        entryDates.set(key, (entryDates.get(key) || 0) + 1);
+      }
+    });
+
+    // Build calendar grid
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startWeekday = firstDay.getDay(); // 0 = Sunday
+    const daysInMonth = lastDay.getDate();
+
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                       'July', 'August', 'September', 'October', 'November', 'December'];
+
+    // Year selector (2020-2050)
+    const yearOptions = [];
+    for (let y = 2020; y <= 2050; y++) {
+      yearOptions.push(el('option', { value: y, selected: y === year }, [el('span', { text: y })]));
+    }
+    const yearSelect = el('select', {
+      class: 'calendar-year-select',
+      onchange: (e) => {
+        state.calendarDate = new Date(parseInt(e.target.value), month, 1);
+        render();
+      }
+    }, yearOptions);
+
+    // Month navigation
+    const prevMonthBtn = el('button', {
+      class: 'btn mini ghost',
+      type: 'button',
+      onclick: () => {
+        state.calendarDate = new Date(year, month - 1, 1);
+        render();
+      }
+    }, [el('span', { text: '◀' })]);
+
+    const nextMonthBtn = el('button', {
+      class: 'btn mini ghost',
+      type: 'button',
+      onclick: () => {
+        state.calendarDate = new Date(year, month + 1, 1);
+        render();
+      }
+    }, [el('span', { text: '▶' })]);
+
+    // "Take me to current date" button
+    const goToTodayBtn = el('button', {
+      class: 'btn small-btn',
+      type: 'button',
+      onclick: () => {
+        state.calendarDate = new Date();
+        render();
+      }
+    }, [el('span', { text: 'Take me to current date' })]);
+
+    // Find previous/next entry functions
+    const findPreviousEntry = () => {
+      const sortedEntries = [...entries]
+        .map(e => normalizeEntry(e))
+        .filter(e => e.date)
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      // Find first entry before current month
+      const currentMonthStart = new Date(year, month, 1);
+      for (const entry of sortedEntries) {
+        const entryDate = new Date(entry.date);
+        if (entryDate < currentMonthStart) {
+          state.calendarDate = new Date(entryDate.getFullYear(), entryDate.getMonth(), 1);
+          render();
+          return;
+        }
+      }
+      showToast('No previous entries found');
+    };
+
+    const findNextEntry = () => {
+      const sortedEntries = [...entries]
+        .map(e => normalizeEntry(e))
+        .filter(e => e.date)
+        .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+      // Find first entry after current month
+      const currentMonthEnd = new Date(year, month + 1, 0);
+      for (const entry of sortedEntries) {
+        const entryDate = new Date(entry.date);
+        if (entryDate > currentMonthEnd) {
+          state.calendarDate = new Date(entryDate.getFullYear(), entryDate.getMonth(), 1);
+          render();
+          return;
+        }
+      }
+      showToast('No next entries found');
+    };
+
+    const prevEntryBtn = el('button', {
+      class: 'btn mini ghost',
+      type: 'button',
+      title: 'Previous entry',
+      onclick: findPreviousEntry
+    }, [el('span', { text: '⏮ Prev entry' })]);
+
+    const nextEntryBtn = el('button', {
+      class: 'btn mini ghost',
+      type: 'button',
+      title: 'Next entry',
+      onclick: findNextEntry
+    }, [el('span', { text: 'Next entry ⏭' })]);
+
+    // Build day cells
+    const dayCells = [];
+    // Empty cells for days before the 1st
+    for (let i = 0; i < startWeekday; i++) {
+      dayCells.push(el('div', { class: 'calendar-day empty' }, []));
+    }
+    // Day cells
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const hasEntry = entryDates.has(dateKey);
+      const entryCount = entryDates.get(dateKey) || 0;
+      const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+
+      dayCells.push(el('div', {
+        class: `calendar-day ${hasEntry ? 'has-entry' : ''} ${isToday ? 'today' : ''}`,
+        title: hasEntry ? `${entryCount} entr${entryCount === 1 ? 'y' : 'ies'}` : ''
+      }, [
+        el('span', { class: 'day-number', text: day }),
+        hasEntry ? el('span', { class: 'entry-dot' }) : null
+      ]));
+    }
+
+    return el('div', { class: 'calendar-card' }, [
+      el('div', { class: 'calendar-header' }, [
+        el('div', { class: 'calendar-title-row' }, [
+          prevMonthBtn,
+          el('div', { class: 'calendar-title' }, [
+            el('span', { class: 'month-name', text: monthNames[month] }),
+            yearSelect
+          ]),
+          nextMonthBtn
+        ]),
+        el('div', { class: 'calendar-jump-row' }, [
+          prevEntryBtn,
+          goToTodayBtn,
+          nextEntryBtn
+        ])
+      ]),
+      el('div', { class: 'calendar-weekdays' },
+        ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d =>
+          el('div', { class: 'weekday-label', text: d })
+        )
+      ),
+      el('div', { class: 'calendar-grid' }, dayCells)
     ]);
   }
 
