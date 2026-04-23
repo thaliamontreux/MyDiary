@@ -6370,7 +6370,11 @@ export function createApp(mount) {
     }, [el('span', { text: voiceRecorderState.recording ? '⏹ Stop' : '🎙 Record voice' })]);
 
     const memoList = el('div', { class: 'voice-memo-list' }, memos.map((memo, i) => {
-      const audio = el('audio', { controls: 'controls', src: memo.dataUrl, class: 'voice-audio' });
+      // Ensure dataUrl is valid before creating audio element
+      const validDataUrl = memo.dataUrl && memo.dataUrl.startsWith('data:');
+      const audio = validDataUrl
+        ? el('audio', { controls: '', src: memo.dataUrl, class: 'voice-audio', preload: 'metadata' })
+        : el('span', { class: 'tiny', text: '(recording unavailable)' });
       const removeBtn = el('button', {
         class: 'btn mini ghost',
         type: 'button',
