@@ -172,7 +172,20 @@ export function loadEncryptedVault(slot = 'primary') {
 }
 
 export function saveEncryptedVault(payload, slot = 'primary') {
-  localStorage.setItem(keyForSlot(VAULT_DATA_KEY, slot), JSON.stringify(payload));
+  try {
+    const json = JSON.stringify(payload);
+    if (json.length > 4.5 * 1024 * 1024) {
+      console.error('Vault size warning: payload is', json.length, 'bytes. LocalStorage limit is ~5MB.');
+      throw new Error(`Vault too large (${(json.length / 1024 / 1024).toFixed(2)}MB). Remove some voice memos, videos or photos.`);
+    }
+    localStorage.setItem(keyForSlot(VAULT_DATA_KEY, slot), json);
+  } catch (e) {
+    if (e.name === 'QuotaExceededError' || e.code === 22 || e.message?.includes('quota')) {
+      console.error('LocalStorage quota exceeded:', e);
+      throw new Error('Storage full: Voice memo too large. Try a shorter recording or delete some entries first.');
+    }
+    throw e;
+  }
 }
 
 export function loadUiPrefs() {

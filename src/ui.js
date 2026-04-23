@@ -3184,12 +3184,15 @@ export function createApp(mount) {
     });
   }
 
-  function persistVault() {
+  async function persistVault() {
     const payload = encryptVault(state.vault, state.key);
     saveEncryptedVault(payload, state.activeVaultSlot);
-    void syncVaultToServer(payload).catch(() => {
+    try {
+      await syncVaultToServer(payload);
+    } catch (e) {
       state.lockNotice = 'Could not sync with server. Check API/MySQL connection.';
-    });
+      console.error('Vault sync failed:', e);
+    }
   }
 
   function lock() {
@@ -6344,7 +6347,9 @@ export function createApp(mount) {
               voiceRecorderState.recording = false;
               statusText.textContent = '';
               stream.getTracks().forEach((t) => t.stop());
+              console.log('Recording stopped, chunks:', voiceRecorderState.chunks.length);
               const blob = new Blob(voiceRecorderState.chunks, { type: 'audio/webm' });
+              console.log('Blob created, size:', blob.size, 'bytes');
               if (blob.size === 0) { showToast('Recording failed - no audio data captured.'); return; }
               if (blob.size > 10 * 1024 * 1024) { showToast('Recording too large (max 10MB).'); return; }
               const dataUrl = await new Promise((res, rej) => {
@@ -6353,7 +6358,8 @@ export function createApp(mount) {
                 reader.onerror = rej;
                 reader.readAsDataURL(blob);
               });
-              console.log('Voice recording created, size:', dataUrl.length, 'chars');
+              console.log('Voice recording created, dataUrl length:', dataUrl.length, 'chars');
+              console.log('Voice recording dataUrl preview:', dataUrl.substring(0, 50) + '...');
               const cur = getSelectedEntry();
               if (!cur) return;
               const next = [...(cur.voiceMemos || []), {
@@ -6362,9 +6368,11 @@ export function createApp(mount) {
                 duration: null,
                 createdAt: new Date().toISOString()
               }].slice(-8);
+              console.log('Adding voice memo to entry, total memos:', next.length);
               updateSelected({ voiceMemos: next });
               // Persist the vault to save the voice memo
               await persistVault();
+              console.log('Voice memo persisted successfully');
               showToast('Voice memo saved');
             } catch (err) {
               console.error('Voice recording error:', err);
