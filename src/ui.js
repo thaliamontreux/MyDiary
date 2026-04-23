@@ -6321,6 +6321,8 @@ export function createApp(mount) {
 
   // ── Voice Memos ──────────────────────────────────────────────────────────────
   const voiceRecorderState = { mediaRecorder: null, chunks: [], recording: false };
+  // In-memory cache for voice blob URLs (loaded from IndexedDB)
+  const voiceBlobCache = new Map();
 
   function renderVoiceMemoUI(entry) {
     const memos = Array.isArray(entry.voiceMemos) ? entry.voiceMemos : [];
@@ -6330,16 +6332,12 @@ export function createApp(mount) {
       class: `btn ghost small-btn ${voiceRecorderState.recording ? 'active' : ''}`,
       type: 'button',
       onclick: async () => {
-        console.log('Voice record button clicked, recording state:', voiceRecorderState.recording);
         if (voiceRecorderState.recording) {
-          console.log('Stopping recording...');
           voiceRecorderState.mediaRecorder?.stop();
           return;
         }
         try {
-          console.log('Requesting microphone access...');
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          console.log('Microphone access granted');
           voiceRecorderState.chunks = [];
           voiceRecorderState.recording = true;
           statusText.textContent = 'Recording…';
@@ -6351,32 +6349,38 @@ export function createApp(mount) {
               voiceRecorderState.recording = false;
               statusText.textContent = '';
               stream.getTracks().forEach((t) => t.stop());
-              console.log('Recording stopped, chunks:', voiceRecorderState.chunks.length);
               const blob = new Blob(voiceRecorderState.chunks, { type: 'audio/webm' });
-              console.log('Blob created, size:', blob.size, 'bytes');
               if (blob.size === 0) { showToast('Recording failed - no audio data captured.'); return; }
               if (blob.size > 10 * 1024 * 1024) { showToast('Recording too large (max 10MB).'); return; }
+
+              // Save large blob to IndexedDB (not in the vault to avoid localStorage limit)
+              const blobId = `vm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
               const dataUrl = await new Promise((res, rej) => {
                 const reader = new FileReader();
                 reader.onload = () => res(reader.result);
                 reader.onerror = rej;
                 reader.readAsDataURL(blob);
               });
-              console.log('Voice recording created, dataUrl length:', dataUrl.length, 'chars');
-              console.log('Voice recording dataUrl preview:', dataUrl.substring(0, 50) + '...');
+              try {
+                await saveVoiceBlob(blobId, dataUrl);
+                voiceBlobCache.set(blobId, dataUrl);
+              } catch (e) {
+                showToast('Failed to save voice memo to storage');
+                console.error('saveVoiceBlob error:', e);
+                return;
+              }
+
               const cur = getSelectedEntry();
               if (!cur) return;
+              // Only save metadata (id reference) to the vault
               const next = [...(cur.voiceMemos || []), {
-                id: `vm-${Date.now()}`,
-                dataUrl,
+                id: blobId,
+                blobId, // reference to IndexedDB
                 duration: null,
                 createdAt: new Date().toISOString()
               }].slice(-8);
-              console.log('Adding voice memo to entry, total memos:', next.length);
               updateSelected({ voiceMemos: next });
-              // Persist the vault to save the voice memo
               await persistVault();
-              console.log('Voice memo persisted successfully');
               showToast('Voice memo saved');
             } catch (err) {
               console.error('Voice recording error:', err);
@@ -6384,42 +6388,71 @@ export function createApp(mount) {
             }
           };
           mr.start();
-          recordBtn.textContent = '⏹ Stop';
-        } catch (err) {
-          showToast('Microphone access denied or not available.');
+        } catch (e) {
+          showToast('Microphone access denied or not available');
         }
       }
-    }, [el('span', { text: voiceRecorderState.recording ? '⏹ Stop' : '🎙 Record voice' })]);
+    }, [el('span', { class: 'btn-ic', text: voiceRecorderState.recording ? '⏹' : '🎙' }), el('span', { text: voiceRecorderState.recording ? 'Stop' : 'Record voice' })]);
 
-    const memoList = el('div', { class: 'voice-memo-list' }, memos.map((memo, i) => {
-      // Ensure dataUrl is valid before creating audio element
-      const validDataUrl = memo.dataUrl && memo.dataUrl.startsWith('data:');
-      const audio = validDataUrl
-        ? el('audio', { controls: '', src: memo.dataUrl, class: 'voice-audio', preload: 'metadata' })
-        : el('span', { class: 'tiny', text: '(recording unavailable)' });
-      const removeBtn = el('button', {
-        class: 'btn mini ghost',
-        type: 'button',
-        onclick: () => {
-          const cur = getSelectedEntry();
-          if (!cur) return;
-          updateSelected({ voiceMemos: (cur.voiceMemos || []).filter((m) => m.id !== memo.id) });
+    // Render memo list with lazy-loaded voice data from IndexedDB
+    const memoList = el('div', { class: 'voice-memo-list' });
+
+    const loadAndRenderMemos = async () => {
+      memoList.innerHTML = '';
+      if (memos.length === 0) {
+        memoList.appendChild(el('span', { class: 'tiny', text: 'No voice memos yet.' }));
+        return;
+      }
+
+      for (let i = 0; i < memos.length; i++) {
+        const memo = memos[i];
+        const memoId = memo.blobId || memo.id;
+
+        // Load from cache or IndexedDB
+        let dataUrl = voiceBlobCache.get(memoId);
+        let loadError = false;
+        if (!dataUrl) {
+          try {
+            dataUrl = await getVoiceBlob(memoId);
+            if (dataUrl) voiceBlobCache.set(memoId, dataUrl);
+          } catch (e) {
+            console.error('Failed to load voice memo:', e);
+            loadError = true;
+          }
         }
-      }, [el('span', { text: 'Remove' })]);
-      return el('div', { class: 'voice-memo-item' }, [
-        el('span', { class: 'tiny', text: `Voice memo ${i + 1}` }),
-        audio,
-        removeBtn
-      ]);
-    }));
 
-    return el('div', { class: 'detail-grid' }, [
-      el('div', { class: 'detail-card detail-card-wide' }, [
-        el('span', { class: 'detail-label', text: 'Voice memos' }),
-        el('div', { class: 'voice-memo-controls' }, [recordBtn, statusText]),
-        memoList
-      ])
-    ]);
+        const audio = dataUrl
+          ? el('audio', { controls: '', src: dataUrl, class: 'voice-audio', preload: 'metadata' })
+          : el('span', { class: 'tiny', text: loadError ? '(recording unavailable)' : '(loading...)' });
+
+        const removeBtn = el('button', {
+          class: 'btn mini ghost',
+          type: 'button',
+          onclick: async () => {
+            const cur = getSelectedEntry();
+            if (!cur) return;
+            // Remove from IndexedDB and cache
+            try { await deleteVoiceBlob(memoId); } catch (e) { /* ignore */ }
+            voiceBlobCache.delete(memoId);
+            // Remove reference from entry
+            updateSelected({ voiceMemos: (cur.voiceMemos || []).filter((m) => (m.blobId || m.id) !== memoId) });
+            await persistVault();
+            loadAndRenderMemos();
+          }
+        }, [el('span', { text: 'Remove' })]);
+
+        memoList.appendChild(el('div', { class: 'voice-memo-item' }, [
+          el('span', { class: 'tiny', text: `Voice memo ${i + 1}` }),
+          audio,
+          removeBtn
+        ]));
+      }
+    };
+
+    // Load memos asynchronously
+    setTimeout(loadAndRenderMemos, 0);
+
+    return el('div', { class: 'voice-memo-ui' }, [recordBtn, statusText, memoList]);
   }
 
   // ── Video Recordings ─────────────────────────────────────────────────────────
