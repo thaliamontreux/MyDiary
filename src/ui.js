@@ -6330,12 +6330,16 @@ export function createApp(mount) {
       class: `btn ghost small-btn ${voiceRecorderState.recording ? 'active' : ''}`,
       type: 'button',
       onclick: async () => {
+        console.log('Voice record button clicked, recording state:', voiceRecorderState.recording);
         if (voiceRecorderState.recording) {
+          console.log('Stopping recording...');
           voiceRecorderState.mediaRecorder?.stop();
           return;
         }
         try {
+          console.log('Requesting microphone access...');
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          console.log('Microphone access granted');
           voiceRecorderState.chunks = [];
           voiceRecorderState.recording = true;
           statusText.textContent = 'Recording…';
