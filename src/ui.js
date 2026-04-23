@@ -6404,19 +6404,25 @@ export function createApp(mount) {
         return;
       }
 
+      console.log('Loading voice memos, count:', memos.length);
       for (let i = 0; i < memos.length; i++) {
         const memo = memos[i];
+        console.log('Voice memo', i, 'memo object:', memo);
         const memoId = memo.blobId || memo.id;
+        console.log('Voice memo', i, 'memoId:', memoId, 'blobId:', memo.blobId, 'id:', memo.id);
 
         // Load from cache or IndexedDB
         let dataUrl = voiceBlobCache.get(memoId);
+        console.log('Voice memo', i, 'cache hit:', !!dataUrl);
         let loadError = false;
         if (!dataUrl) {
           try {
+            console.log('Voice memo', i, 'fetching from IndexedDB...');
             dataUrl = await getVoiceBlob(memoId);
+            console.log('Voice memo', i, 'IndexedDB result:', dataUrl ? 'found (' + dataUrl.length + ' chars)' : 'not found');
             if (dataUrl) voiceBlobCache.set(memoId, dataUrl);
           } catch (e) {
-            console.error('Failed to load voice memo:', e);
+            console.error('Failed to load voice memo', i, ':', e);
             loadError = true;
           }
         }
@@ -6424,6 +6430,7 @@ export function createApp(mount) {
         const audio = dataUrl
           ? el('audio', { controls: '', src: dataUrl, class: 'voice-audio', preload: 'metadata' })
           : el('span', { class: 'tiny', text: loadError ? '(recording unavailable)' : '(loading...)' });
+        console.log('Voice memo', i, 'rendering:', dataUrl ? 'audio player' : (loadError ? 'unavailable' : 'loading'));
 
         const removeBtn = el('button', {
           class: 'btn mini ghost',
