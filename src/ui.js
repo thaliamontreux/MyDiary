@@ -5068,13 +5068,16 @@ export function createApp(mount) {
       ]));
     }
 
+    const totalEntries = Array.from(entryDates.values()).reduce((a, b) => a + b, 0);
+
     return el('div', { class: 'calendar-card' }, [
       el('div', { class: 'calendar-header' }, [
         el('div', { class: 'calendar-title-row' }, [
           prevMonthBtn,
           el('div', { class: 'calendar-title' }, [
             el('span', { class: 'month-name', text: monthNames[month] }),
-            yearSelect
+            yearSelect,
+            el('span', { class: 'entry-count-badge', text: `${totalEntries} entries` })
           ]),
           nextMonthBtn
         ]),
