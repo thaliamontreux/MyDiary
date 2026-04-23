@@ -3716,6 +3716,81 @@ body::before {
   color: #fff;
 }
 
+/* ── Modal Calendar (Calendar Overlay) ─────────────────────────────────────── */
+.cal-cell {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--text);
+  position: relative;
+  cursor: default;
+}
+
+.cal-cell.empty {
+  background: transparent;
+  border-color: transparent;
+}
+
+.cal-cell.has-entries {
+  background: var(--primary-soft) !important;
+  border-color: var(--primary) !important;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.cal-cell.has-entries:hover {
+  background: var(--primary) !important;
+  color: white !important;
+}
+
+.cal-cell.today {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px var(--accent) !important;
+}
+
+.cal-entry-badge {
+  font-size: 10px;
+  background: var(--primary);
+  color: white;
+  padding: 1px 4px;
+  border-radius: 8px;
+  margin-top: 2px;
+  font-weight: 600;
+}
+
+/* Dark mode for modal calendar */
+:root[data-theme='dark'] .cal-cell {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
+:root[data-theme='dark'] .cal-cell.empty {
+  background: transparent;
+  border-color: transparent;
+}
+
+:root[data-theme='dark'] .cal-cell.has-entries {
+  background: rgba(99, 102, 241, 0.4) !important;
+  border-color: rgba(99, 102, 241, 0.8) !important;
+}
+
+:root[data-theme='dark'] .cal-cell.has-entries:hover {
+  background: rgba(99, 102, 241, 0.7) !important;
+  color: #fff !important;
+}
+
+:root[data-theme='dark'] .cal-entry-badge {
+  background: #fff;
+  color: var(--primary);
+}
+
 .calendar-day.today.has-entry {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent);

@@ -4926,12 +4926,15 @@ export function createApp(mount) {
     const entryDates = new Map();
     console.log('Calendar debug: total entries:', entries.length);
     entries.forEach((e, i) => {
-      const d = normalizeEntry(e).date;
-      console.log(`Calendar debug: entry ${i} raw date:`, d, 'type:', typeof d);
-      if (d) {
+      const normalized = normalizeEntry(e);
+      const d = normalized.date;
+      console.log(`Calendar debug: entry ${i} moduleType:`, normalized.moduleType, 'date:', d, 'type:', typeof d);
+      if (d && typeof d === 'string') {
         const key = d.substring(0, 10); // YYYY-MM-DD
-        console.log(`Calendar debug: entry ${i} extracted key:`, key);
+        console.log(`Calendar debug: entry ${i} -> key:`, key);
         entryDates.set(key, (entryDates.get(key) || 0) + 1);
+      } else {
+        console.log(`Calendar debug: entry ${i} SKIPPED - no valid date`);
       }
     });
     console.log('Calendar debug: unique dates map:', Array.from(entryDates.entries()));
