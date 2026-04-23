@@ -1,0 +1,352 @@
+/* ── Theme System CSS Variables ─────────────────────────────────────────────── */
+/* Generated from themes.json - Do not edit directly, regenerate from JSON */
+
+/* ── Dark Themes ──────────────────────────────────────────────────────────── */
+
+/* Trans Pride Dark */
+[data-theme="trans-pride-dark"] {
+  --primary: #5BCEFA;
+  --primary-soft: rgba(91, 206, 250, 0.2);
+  --accent: #F5A9B8;
+  --text: #FFFFFF;
+  --text-muted: rgba(255, 255, 255, 0.7);
+  --surface: rgba(20, 20, 30, 0.85);
+  --background: #0a0a12;
+  --border: rgba(255, 255, 255, 0.15);
+  --bg-image: url('Images/trans-pride-dark.webp');
+}
+
+/* Elegant Dark */
+[data-theme="elegant-dark"] {
+  --primary: #9D8CE3;
+  --primary-soft: rgba(157, 140, 227, 0.2);
+  --accent: #E8D5F2;
+  --text: #F5F5F5;
+  --text-muted: rgba(245, 245, 245, 0.7);
+  --surface: rgba(25, 22, 35, 0.9);
+  --background: #0d0b14;
+  --border: rgba(255, 255, 255, 0.12);
+  --bg-image: url('Images/elegant-dark.webp');
+}
+
+/* Support Dark */
+[data-theme="support-dark"] {
+  --primary: #7BC8F6;
+  --primary-soft: rgba(123, 200, 246, 0.2);
+  --accent: #FFB5C2;
+  --text: #FFFFFF;
+  --text-muted: rgba(255, 255, 255, 0.7);
+  --surface: rgba(18, 22, 32, 0.88);
+  --background: #080a10;
+  --border: rgba(255, 255, 255, 0.15);
+  --bg-image: url('Images/support-dark.webp');
+}
+
+/* Abstract Dark */
+[data-theme="abstract-dark"] {
+  --primary: #6366F1;
+  --primary-soft: rgba(99, 102, 241, 0.2);
+  --accent: #A78BFA;
+  --text: #FFFFFF;
+  --text-muted: rgba(255, 255, 255, 0.7);
+  --surface: rgba(15, 15, 25, 0.9);
+  --background: #050508;
+  --border: rgba(255, 255, 255, 0.12);
+  --bg-image: url('Images/abstract-dark.webp');
+}
+
+/* Community Dark */
+[data-theme="community-dark"] {
+  --primary: #5BCEFA;
+  --primary-soft: rgba(91, 206, 250, 0.2);
+  --accent: #F5A9B8;
+  --text: #FFFFFF;
+  --text-muted: rgba(255, 255, 255, 0.7);
+  --surface: rgba(20, 18, 30, 0.9);
+  --background: #0a0910;
+  --border: rgba(255, 255, 255, 0.15);
+  --bg-image: url('Images/community-dark.webp');
+}
+
+/* Flowing Rivers */
+[data-theme="flowing-rivers-dark"] {
+  --primary: #4FC3F7;
+  --primary-soft: rgba(79, 195, 247, 0.2);
+  --accent: #81D4FA;
+  --text: #FFFFFF;
+  --text-muted: rgba(255, 255, 255, 0.7);
+  --surface: rgba(10, 20, 30, 0.88);
+  --background: #050a10;
+  --border: rgba(255, 255, 255, 0.12);
+  --bg-image: url('Images/flowing-rivers-dark.webp');
+}
+
+/* Journey Dark */
+[data-theme="journey-dark"] {
+  --primary: #B39DDB;
+  --primary-soft: rgba(179, 157, 219, 0.2);
+  --accent: #D1C4E9;
+  --text: #FFFFFF;
+  --text-muted: rgba(255, 255, 255, 0.7);
+  --surface: rgba(25, 20, 35, 0.9);
+  --background: #0d0a12;
+  --border: rgba(255, 255, 255, 0.12);
+  --bg-image: url('Images/journey-dark.webp');
+}
+
+/* Abstract Shapes Dark */
+[data-theme="abstract-shapes-dark"] {
+  --primary: #7E57C2;
+  --primary-soft: rgba(126, 87, 194, 0.2);
+  --accent: #9575CD;
+  --text: #FFFFFF;
+  --text-muted: rgba(255, 255, 255, 0.7);
+  --surface: rgba(18, 15, 28, 0.9);
+  --background: #090710;
+  --border: rgba(255, 255, 255, 0.12);
+  --bg-image: url('Images/abstract-shapes-dark.webp');
+}
+
+/* Strength Dark */
+[data-theme="strength-dark"] {
+  --primary: #5BCEFA;
+  --primary-soft: rgba(91, 206, 250, 0.2);
+  --accent: #F5A9B8;
+  --text: #FFFFFF;
+  --text-muted: rgba(255, 255, 255, 0.7);
+  --surface: rgba(15, 18, 28, 0.9);
+  --background: #080a10;
+  --border: rgba(255, 255, 255, 0.15);
+  --bg-image: url('Images/strength-dark.webp');
+}
+
+/* Constellation Night */
+[data-theme="constellation-night"] {
+  --primary: #90CAF9;
+  --primary-soft: rgba(144, 202, 249, 0.2);
+  --accent: #FFE082;
+  --text: #FFFFFF;
+  --text-muted: rgba(255, 255, 255, 0.7);
+  --surface: rgba(10, 12, 25, 0.88);
+  --background: #05060a;
+  --border: rgba(255, 255, 255, 0.12);
+  --bg-image: url('Images/constellation-night.webp');
+}
+
+/* ── Light Themes ─────────────────────────────────────────────────────────── */
+
+/* Trans Pride Light */
+[data-theme="trans-pride-light"] {
+  --primary: #5BCEFA;
+  --primary-soft: rgba(91, 206, 250, 0.15);
+  --accent: #F5A9B8;
+  --text: #1a1a2e;
+  --text-muted: rgba(26, 26, 46, 0.7);
+  --surface: rgba(255, 255, 255, 0.92);
+  --background: #f0f4f8;
+  --border: rgba(0, 0, 0, 0.1);
+  --bg-image: url('Images/trans-pride-light.webp');
+}
+
+/* Blooming Light */
+[data-theme="blooming-light"] {
+  --primary: #E8B4CB;
+  --primary-soft: rgba(232, 180, 203, 0.15);
+  --accent: #F4D1E8;
+  --text: #2d1f2e;
+  --text-muted: rgba(45, 31, 46, 0.7);
+  --surface: rgba(255, 253, 250, 0.92);
+  --background: #faf8f5;
+  --border: rgba(0, 0, 0, 0.08);
+  --bg-image: url('Images/blooming-light.webp');
+}
+
+/* Support Light */
+[data-theme="support-light"] {
+  --primary: #64B5F6;
+  --primary-soft: rgba(100, 181, 246, 0.15);
+  --accent: #90CAF9;
+  --text: #1a1a2e;
+  --text-muted: rgba(26, 26, 46, 0.7);
+  --surface: rgba(255, 255, 255, 0.92);
+  --background: #f5f7fa;
+  --border: rgba(0, 0, 0, 0.08);
+  --bg-image: url('Images/support-light.webp');
+}
+
+/* Abstract Light */
+[data-theme="abstract-light"] {
+  --primary: #7C4DFF;
+  --primary-soft: rgba(124, 77, 255, 0.15);
+  --accent: #B388FF;
+  --text: #1a1a2e;
+  --text-muted: rgba(26, 26, 46, 0.7);
+  --surface: rgba(255, 255, 255, 0.92);
+  --background: #f8f7fa;
+  --border: rgba(0, 0, 0, 0.08);
+  --bg-image: url('Images/abstract-light.webp');
+}
+
+/* Community Light */
+[data-theme="community-light"] {
+  --primary: #5BCEFA;
+  --primary-soft: rgba(91, 206, 250, 0.15);
+  --accent: #F5A9B8;
+  --text: #1a1a2e;
+  --text-muted: rgba(26, 26, 46, 0.7);
+  --surface: rgba(255, 255, 255, 0.92);
+  --background: #f5f4f8;
+  --border: rgba(0, 0, 0, 0.1);
+  --bg-image: url('Images/community-light.webp');
+}
+
+/* Sunrise Hope */
+[data-theme="sunrise-hope"] {
+  --primary: #FF8A65;
+  --primary-soft: rgba(255, 138, 101, 0.15);
+  --accent: #FFCC80;
+  --text: #2d1f1a;
+  --text-muted: rgba(45, 31, 26, 0.7);
+  --surface: rgba(255, 253, 245, 0.92);
+  --background: #fdf9f5;
+  --border: rgba(0, 0, 0, 0.08);
+  --bg-image: url('Images/sunrise-hope.webp');
+}
+
+/* Journey Light */
+[data-theme="journey-light"] {
+  --primary: #9575CD;
+  --primary-soft: rgba(149, 117, 205, 0.15);
+  --accent: #D1C4E9;
+  --text: #1a1a2e;
+  --text-muted: rgba(26, 26, 46, 0.7);
+  --surface: rgba(255, 255, 255, 0.92);
+  --background: #f8f7fa;
+  --border: rgba(0, 0, 0, 0.08);
+  --bg-image: url('Images/journey-light.webp');
+}
+
+/* Soft Abstract Light */
+[data-theme="soft-abstract-light"] {
+  --primary: #A1C4FD;
+  --primary-soft: rgba(161, 196, 253, 0.15);
+  --accent: #C2E9FB;
+  --text: #1a1a2e;
+  --text-muted: rgba(26, 26, 46, 0.7);
+  --surface: rgba(255, 255, 255, 0.92);
+  --background: #f8fafc;
+  --border: rgba(0, 0, 0, 0.08);
+  --bg-image: url('Images/soft-abstract-light.webp');
+}
+
+/* Pride Light */
+[data-theme="pride-light"] {
+  --primary: #5BCEFA;
+  --primary-soft: rgba(91, 206, 250, 0.15);
+  --accent: #F5A9B8;
+  --text: #1a1a2e;
+  --text-muted: rgba(26, 26, 46, 0.7);
+  --surface: rgba(255, 255, 255, 0.92);
+  --background: #f5f8fa;
+  --border: rgba(0, 0, 0, 0.1);
+  --bg-image: url('Images/pride-light.webp');
+}
+
+/* Modern Abstract Light */
+[data-theme="modern-abstract-light"] {
+  --primary: #536DFE;
+  --primary-soft: rgba(83, 109, 254, 0.15);
+  --accent: #8C9EFF;
+  --text: #1a1a2e;
+  --text-muted: rgba(26, 26, 46, 0.7);
+  --surface: rgba(255, 255, 255, 0.92);
+  --background: #f5f6fa;
+  --border: rgba(0, 0, 0, 0.08);
+  --bg-image: url('Images/modern-abstract-light.webp');
+}
+
+/* ── Theme Application ────────────────────────────────────────────────────── */
+
+/* Apply background image to body when theme is set */
+[data-theme] body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: var(--bg-image);
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  opacity: 0.15;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Theme preview cards */
+.theme-preview {
+  width: 120px;
+  height: 80px;
+  border-radius: 8px;
+  background-size: cover;
+  background-position: center;
+  border: 2px solid var(--border);
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.theme-preview:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.theme-preview.active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+/* Theme selector grid */
+.theme-selector {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 16px;
+  padding: 16px;
+}
+
+.theme-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.theme-card:hover {
+  background: var(--primary-soft);
+  transform: translateY(-2px);
+}
+
+.theme-card.active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-soft);
+}
+
+.theme-card-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  text-align: center;
+}
+
+.theme-card-mode {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}

@@ -1,0 +1,344 @@
+{
+  "themes": [
+    {
+      "id": "trans-pride-dark",
+      "name": "Trans Pride Dark",
+      "image": "Images/trans-pride-dark.webp",
+      "mode": "dark",
+      "category": "pride",
+      "colors": {
+        "primary": "#5BCEFA",
+        "primarySoft": "rgba(91, 206, 250, 0.2)",
+        "accent": "#F5A9B8",
+        "text": "#FFFFFF",
+        "textMuted": "rgba(255, 255, 255, 0.7)",
+        "surface": "rgba(20, 20, 30, 0.85)",
+        "background": "#0a0a12",
+        "border": "rgba(255, 255, 255, 0.15)"
+      }
+    },
+    {
+      "id": "elegant-dark",
+      "name": "Elegant Dark",
+      "image": "Images/elegant-dark.webp",
+      "mode": "dark",
+      "category": "elegant",
+      "colors": {
+        "primary": "#9D8CE3",
+        "primarySoft": "rgba(157, 140, 227, 0.2)",
+        "accent": "#E8D5F2",
+        "text": "#F5F5F5",
+        "textMuted": "rgba(245, 245, 245, 0.7)",
+        "surface": "rgba(25, 22, 35, 0.9)",
+        "background": "#0d0b14",
+        "border": "rgba(255, 255, 255, 0.12)"
+      }
+    },
+    {
+      "id": "support-dark",
+      "name": "Support Dark",
+      "image": "Images/support-dark.webp",
+      "mode": "dark",
+      "category": "support",
+      "colors": {
+        "primary": "#7BC8F6",
+        "primarySoft": "rgba(123, 200, 246, 0.2)",
+        "accent": "#FFB5C2",
+        "text": "#FFFFFF",
+        "textMuted": "rgba(255, 255, 255, 0.7)",
+        "surface": "rgba(18, 22, 32, 0.88)",
+        "background": "#080a10",
+        "border": "rgba(255, 255, 255, 0.15)"
+      }
+    },
+    {
+      "id": "abstract-dark",
+      "name": "Abstract Dark",
+      "image": "Images/abstract-dark.webp",
+      "mode": "dark",
+      "category": "abstract",
+      "colors": {
+        "primary": "#6366F1",
+        "primarySoft": "rgba(99, 102, 241, 0.2)",
+        "accent": "#A78BFA",
+        "text": "#FFFFFF",
+        "textMuted": "rgba(255, 255, 255, 0.7)",
+        "surface": "rgba(15, 15, 25, 0.9)",
+        "background": "#050508",
+        "border": "rgba(255, 255, 255, 0.12)"
+      }
+    },
+    {
+      "id": "community-dark",
+      "name": "Community Dark",
+      "image": "Images/community-dark.webp",
+      "mode": "dark",
+      "category": "community",
+      "colors": {
+        "primary": "#5BCEFA",
+        "primarySoft": "rgba(91, 206, 250, 0.2)",
+        "accent": "#F5A9B8",
+        "text": "#FFFFFF",
+        "textMuted": "rgba(255, 255, 255, 0.7)",
+        "surface": "rgba(20, 18, 30, 0.9)",
+        "background": "#0a0910",
+        "border": "rgba(255, 255, 255, 0.15)"
+      }
+    },
+    {
+      "id": "flowing-rivers-dark",
+      "name": "Flowing Rivers",
+      "image": "Images/flowing-rivers-dark.webp",
+      "mode": "dark",
+      "category": "nature",
+      "colors": {
+        "primary": "#4FC3F7",
+        "primarySoft": "rgba(79, 195, 247, 0.2)",
+        "accent": "#81D4FA",
+        "text": "#FFFFFF",
+        "textMuted": "rgba(255, 255, 255, 0.7)",
+        "surface": "rgba(10, 20, 30, 0.88)",
+        "background": "#050a10",
+        "border": "rgba(255, 255, 255, 0.12)"
+      }
+    },
+    {
+      "id": "journey-dark",
+      "name": "Journey Dark",
+      "image": "Images/journey-dark.webp",
+      "mode": "dark",
+      "category": "journey",
+      "colors": {
+        "primary": "#B39DDB",
+        "primarySoft": "rgba(179, 157, 219, 0.2)",
+        "accent": "#D1C4E9",
+        "text": "#FFFFFF",
+        "textMuted": "rgba(255, 255, 255, 0.7)",
+        "surface": "rgba(25, 20, 35, 0.9)",
+        "background": "#0d0a12",
+        "border": "rgba(255, 255, 255, 0.12)"
+      }
+    },
+    {
+      "id": "abstract-shapes-dark",
+      "name": "Abstract Shapes Dark",
+      "image": "Images/abstract-shapes-dark.webp",
+      "mode": "dark",
+      "category": "abstract",
+      "colors": {
+        "primary": "#7E57C2",
+        "primarySoft": "rgba(126, 87, 194, 0.2)",
+        "accent": "#9575CD",
+        "text": "#FFFFFF",
+        "textMuted": "rgba(255, 255, 255, 0.7)",
+        "surface": "rgba(18, 15, 28, 0.9)",
+        "background": "#090710",
+        "border": "rgba(255, 255, 255, 0.12)"
+      }
+    },
+    {
+      "id": "strength-dark",
+      "name": "Strength Dark",
+      "image": "Images/strength-dark.webp",
+      "mode": "dark",
+      "category": "strength",
+      "colors": {
+        "primary": "#5BCEFA",
+        "primarySoft": "rgba(91, 206, 250, 0.2)",
+        "accent": "#F5A9B8",
+        "text": "#FFFFFF",
+        "textMuted": "rgba(255, 255, 255, 0.7)",
+        "surface": "rgba(15, 18, 28, 0.9)",
+        "background": "#080a10",
+        "border": "rgba(255, 255, 255, 0.15)"
+      }
+    },
+    {
+      "id": "constellation-night",
+      "name": "Constellation Night",
+      "image": "Images/constellation-night.webp",
+      "mode": "dark",
+      "category": "celestial",
+      "colors": {
+        "primary": "#90CAF9",
+        "primarySoft": "rgba(144, 202, 249, 0.2)",
+        "accent": "#FFE082",
+        "text": "#FFFFFF",
+        "textMuted": "rgba(255, 255, 255, 0.7)",
+        "surface": "rgba(10, 12, 25, 0.88)",
+        "background": "#05060a",
+        "border": "rgba(255, 255, 255, 0.12)"
+      }
+    },
+    {
+      "id": "trans-pride-light",
+      "name": "Trans Pride Light",
+      "image": "Images/trans-pride-light.webp",
+      "mode": "light",
+      "category": "pride",
+      "colors": {
+        "primary": "#5BCEFA",
+        "primarySoft": "rgba(91, 206, 250, 0.15)",
+        "accent": "#F5A9B8",
+        "text": "#1a1a2e",
+        "textMuted": "rgba(26, 26, 46, 0.7)",
+        "surface": "rgba(255, 255, 255, 0.92)",
+        "background": "#f0f4f8",
+        "border": "rgba(0, 0, 0, 0.1)"
+      }
+    },
+    {
+      "id": "blooming-light",
+      "name": "Blooming Light",
+      "image": "Images/blooming-light.webp",
+      "mode": "light",
+      "category": "nature",
+      "colors": {
+        "primary": "#E8B4CB",
+        "primarySoft": "rgba(232, 180, 203, 0.15)",
+        "accent": "#F4D1E8",
+        "text": "#2d1f2e",
+        "textMuted": "rgba(45, 31, 46, 0.7)",
+        "surface": "rgba(255, 253, 250, 0.92)",
+        "background": "#faf8f5",
+        "border": "rgba(0, 0, 0, 0.08)"
+      }
+    },
+    {
+      "id": "support-light",
+      "name": "Support Light",
+      "image": "Images/support-light.webp",
+      "mode": "light",
+      "category": "support",
+      "colors": {
+        "primary": "#64B5F6",
+        "primarySoft": "rgba(100, 181, 246, 0.15)",
+        "accent": "#90CAF9",
+        "text": "#1a1a2e",
+        "textMuted": "rgba(26, 26, 46, 0.7)",
+        "surface": "rgba(255, 255, 255, 0.92)",
+        "background": "#f5f7fa",
+        "border": "rgba(0, 0, 0, 0.08)"
+      }
+    },
+    {
+      "id": "abstract-light",
+      "name": "Abstract Light",
+      "image": "Images/abstract-light.webp",
+      "mode": "light",
+      "category": "abstract",
+      "colors": {
+        "primary": "#7C4DFF",
+        "primarySoft": "rgba(124, 77, 255, 0.15)",
+        "accent": "#B388FF",
+        "text": "#1a1a2e",
+        "textMuted": "rgba(26, 26, 46, 0.7)",
+        "surface": "rgba(255, 255, 255, 0.92)",
+        "background": "#f8f7fa",
+        "border": "rgba(0, 0, 0, 0.08)"
+      }
+    },
+    {
+      "id": "community-light",
+      "name": "Community Light",
+      "image": "Images/community-light.webp",
+      "mode": "light",
+      "category": "community",
+      "colors": {
+        "primary": "#5BCEFA",
+        "primarySoft": "rgba(91, 206, 250, 0.15)",
+        "accent": "#F5A9B8",
+        "text": "#1a1a2e",
+        "textMuted": "rgba(26, 26, 46, 0.7)",
+        "surface": "rgba(255, 255, 255, 0.92)",
+        "background": "#f5f4f8",
+        "border": "rgba(0, 0, 0, 0.1)"
+      }
+    },
+    {
+      "id": "sunrise-hope",
+      "name": "Sunrise Hope",
+      "image": "Images/sunrise-hope.webp",
+      "mode": "light",
+      "category": "hope",
+      "colors": {
+        "primary": "#FF8A65",
+        "primarySoft": "rgba(255, 138, 101, 0.15)",
+        "accent": "#FFCC80",
+        "text": "#2d1f1a",
+        "textMuted": "rgba(45, 31, 26, 0.7)",
+        "surface": "rgba(255, 253, 245, 0.92)",
+        "background": "#fdf9f5",
+        "border": "rgba(0, 0, 0, 0.08)"
+      }
+    },
+    {
+      "id": "journey-light",
+      "name": "Journey Light",
+      "image": "Images/journey-light.webp",
+      "mode": "light",
+      "category": "journey",
+      "colors": {
+        "primary": "#9575CD",
+        "primarySoft": "rgba(149, 117, 205, 0.15)",
+        "accent": "#D1C4E9",
+        "text": "#1a1a2e",
+        "textMuted": "rgba(26, 26, 46, 0.7)",
+        "surface": "rgba(255, 255, 255, 0.92)",
+        "background": "#f8f7fa",
+        "border": "rgba(0, 0, 0, 0.08)"
+      }
+    },
+    {
+      "id": "soft-abstract-light",
+      "name": "Soft Abstract Light",
+      "image": "Images/soft-abstract-light.webp",
+      "mode": "light",
+      "category": "abstract",
+      "colors": {
+        "primary": "#A1C4FD",
+        "primarySoft": "rgba(161, 196, 253, 0.15)",
+        "accent": "#C2E9FB",
+        "text": "#1a1a2e",
+        "textMuted": "rgba(26, 26, 46, 0.7)",
+        "surface": "rgba(255, 255, 255, 0.92)",
+        "background": "#f8fafc",
+        "border": "rgba(0, 0, 0, 0.08)"
+      }
+    },
+    {
+      "id": "pride-light",
+      "name": "Pride Light",
+      "image": "Images/pride-light.webp",
+      "mode": "light",
+      "category": "pride",
+      "colors": {
+        "primary": "#5BCEFA",
+        "primarySoft": "rgba(91, 206, 250, 0.15)",
+        "accent": "#F5A9B8",
+        "text": "#1a1a2e",
+        "textMuted": "rgba(26, 26, 46, 0.7)",
+        "surface": "rgba(255, 255, 255, 0.92)",
+        "background": "#f5f8fa",
+        "border": "rgba(0, 0, 0, 0.1)"
+      }
+    },
+    {
+      "id": "modern-abstract-light",
+      "name": "Modern Abstract Light",
+      "image": "Images/modern-abstract-light.webp",
+      "mode": "light",
+      "category": "modern",
+      "colors": {
+        "primary": "#536DFE",
+        "primarySoft": "rgba(83, 109, 254, 0.15)",
+        "accent": "#8C9EFF",
+        "text": "#1a1a2e",
+        "textMuted": "rgba(26, 26, 46, 0.7)",
+        "surface": "rgba(255, 255, 255, 0.92)",
+        "background": "#f5f6fa",
+        "border": "rgba(0, 0, 0, 0.08)"
+      }
+    }
+  ]
+}
