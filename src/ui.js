@@ -41,6 +41,17 @@ import {
   adminSetUserAdmin,
   adminDeleteUser,
   adminGetSiteSummary,
+  adminGetStats,
+  adminGetAuditLogs,
+  adminGetSiteSettings,
+  adminSaveSiteSettings,
+  adminResetUserPassword,
+  adminSuspendUser,
+  adminGetRecentRegistrations,
+  adminListInviteCodes,
+  adminCreateInviteCode,
+  adminRevokeInviteCode,
+  getUserStats,
   adminGetUser,
   adminUpdateUser,
   listFolders,
@@ -117,7 +128,8 @@ const MODULE_OPTIONS = [
   ['diary', 'Diary'],
   ['note', 'Notes'],
   ['letter', 'Letters'],
-  ['recipe', 'Recipes']
+  ['recipe', 'Recipes'],
+  ['resolution', 'Resolutions']
 ];
 
 const LETTER_KIND_OPTIONS = [
@@ -1279,6 +1291,13 @@ function normalizeEntry(entry = {}) {
     servings: entry.servings || '',
     prepTime: entry.prepTime || '',
     recipeCategory: entry.recipeCategory || '',
+    cookTime: entry.cookTime || '',
+    totalTime: entry.totalTime || '',
+    difficulty: entry.difficulty || '',
+    cuisine: entry.cuisine || '',
+    dietaryTags: Array.isArray(entry.dietaryTags) ? entry.dietaryTags.slice(0, 8) : [],
+    nutritionNotes: entry.nutritionNotes || '',
+    source: entry.source || '',
     keepsakes: Array.isArray(entry.keepsakes) ? entry.keepsakes.slice(0, 12) : [],
     photoCaptions: Array.isArray(entry.photoCaptions) ? entry.photoCaptions.slice(0, 12) : [],
     voiceNotes: Array.isArray(entry.voiceNotes) ? entry.voiceNotes.slice(0, 8) : [],
@@ -1302,8 +1321,75 @@ function normalizeEntry(entry = {}) {
     goalIds: Array.isArray(entry.goalIds) ? entry.goalIds : [],
     weight: entry.weight || '',
     sleepHours: entry.sleepHours || '',
-    coverImage: entry.coverImage || ''
+    coverImage: entry.coverImage || '',
+    starred: Boolean(entry.starred),
+    // ── Resolution fields ──────────────────────────────────────────────────
+    triggerName: entry.triggerName || '',
+    triggerPerson: entry.triggerPerson || '',
+    triggerDescription: entry.triggerDescription || '',
+    emotionalResponse: entry.emotionalResponse || '',
+    physicalResponse: entry.physicalResponse || '',
+    thoughtPatterns: entry.thoughtPatterns || '',
+    defaultReaction: entry.defaultReaction || '',
+    rootCause: entry.rootCause || '',
+    desiredResponse: entry.desiredResponse || '',
+    deEscalationSteps: Array.isArray(entry.deEscalationSteps) ? entry.deEscalationSteps.slice(0, 8) : [],
+    communicationPlan: entry.communicationPlan || '',
+    supportNeeded: entry.supportNeeded || '',
+    resolutionStatement: entry.resolutionStatement || '',
+    resolutionStatus: entry.resolutionStatus || 'open'
   };
+}
+
+function buildStreakData(entries) {
+  const diaryCounts = new Map();
+  entries.forEach(e => {
+    if (e.date) diaryCounts.set(e.date, (diaryCounts.get(e.date) || 0) + 1);
+  });
+  const today = isoDate();
+  let streak = 0;
+  let check = today;
+  while (diaryCounts.has(check)) {
+    streak++;
+    const d = new Date(check);
+    d.setDate(d.getDate() - 1);
+    check = d.toISOString().slice(0, 10);
+  }
+  const longestStreak = (() => {
+    const sorted = [...diaryCounts.keys()].sort();
+    let best = 0, cur = 0, prev = null;
+    for (const d of sorted) {
+      if (prev) {
+        const diff = (new Date(d) - new Date(prev)) / 86400000;
+        cur = diff === 1 ? cur + 1 : 1;
+      } else { cur = 1; }
+      if (cur > best) best = cur;
+      prev = d;
+    }
+    return best;
+  })();
+  return { streak, longestStreak, totalDays: diaryCounts.size };
+}
+
+function buildMoodSparklineSvg(entries) {
+  const MOOD_SCORES = { sparkly:5, excited:5, hopeful:4, grateful:4, peaceful:4, cozy:3, numb:2, melancholy:2, anxious:2, angry:1 };
+  const recent = sortEntriesDesc(entries)
+    .filter(e => e.mood && (e.moduleType === 'diary' || !e.moduleType))
+    .slice(0, 14).reverse();
+  if (recent.length < 2) return null;
+  const scores = recent.map(e => MOOD_SCORES[e.mood] || 3);
+  const W = 180, H = 40, pad = 4;
+  const minS = 1, maxS = 5;
+  const xStep = (W - pad * 2) / (scores.length - 1);
+  const yFor = s => H - pad - ((s - minS) / (maxS - minS)) * (H - pad * 2);
+  const points = scores.map((s, i) => `${pad + i * xStep},${yFor(s)}`).join(' ');
+  const fill = scores.map((s, i) => `${pad + i * xStep},${yFor(s)}`).concat([`${pad + (scores.length-1)*xStep},${H}`, `${pad},${H}`]).join(' ');
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" style="display:block;width:100%;height:${H}px">
+    <defs><linearGradient id="mg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a78bfa" stop-opacity="0.35"/><stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/></linearGradient></defs>
+    <polygon points="${fill}" fill="url(#mg)"/>
+    <polyline points="${points}" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    ${scores.map((s,i)=>`<circle cx="${pad+i*xStep}" cy="${yFor(s)}" r="2.5" fill="#a78bfa"/>`).join('')}
+  </svg>`;
 }
 
 function moodBlendText(entry) {
@@ -1437,6 +1523,10 @@ function entryContextText(entry) {
     const parts = [entry.recipeCategory || 'Recipe', entry.prepTime || '', entry.servings ? `${entry.servings} servings` : ''];
     return parts.filter(Boolean).join(' • ');
   }
+  if (entry.moduleType === 'resolution') {
+    const status = entry.resolutionStatus === 'resolved' ? '✅ Resolved' : entry.resolutionStatus === 'in-progress' ? '🟡 In progress' : '🔴 Open';
+    return entry.triggerPerson ? `${status} • Triggered by ${entry.triggerPerson}` : status;
+  }
   return entryTypeLabel(entry.entryType);
 }
 
@@ -1448,6 +1538,9 @@ function summarizeEntry(entry) {
   if (entry.moduleType === 'recipe') {
     const summary = [entry.ingredients?.[0], entry.ingredients?.[1]].filter(Boolean).join(', ');
     return summary || 'Add ingredients and steps to save the recipe';
+  }
+  if (entry.moduleType === 'resolution') {
+    return entry.resolutionStatement || entry.triggerDescription || 'Document your trigger and healthy response';
   }
   return 'Blank page waiting for your words';
 }
@@ -1466,7 +1559,9 @@ function buildLibrarySnapshot(entries) {
     sentLetters: letters.filter((entry) => entry.letterKind === 'sent').length,
     futureLetters: letters.filter((entry) => entry.letterKind === 'future-self').length,
     recipeCount: recipes.length,
-    cozyRecipes: recipes.filter((entry) => entry.recipeCategory).length
+    cozyRecipes: recipes.filter((entry) => entry.recipeCategory).length,
+    resolutionCount: items.filter((entry) => entry.moduleType === 'resolution').length,
+    resolvedCount: items.filter((entry) => entry.moduleType === 'resolution' && entry.resolutionStatus === 'resolved').length
   };
 }
 
@@ -2744,236 +2839,762 @@ export function createApp(mount) {
 
   function renderUserManagerOverlay() {
     if (!state.showUserManagerOverlay || !state.auth.user?.isAdmin) return null;
-    const rows = state.adminUsers || [];
 
-    const title = el('div', { class: 'lock-title', text: 'User Manager' });
-    const subtitle = el('div', { class: 'lock-subtle', text: 'Tap a user to view and edit their account details. Diaries remain encrypted and private to each user.' });
+    if (!state.ui.adminTab) state.ui.adminTab = 'dashboard';
+    const activeTab = state.ui.adminTab;
+    const setTab = (t) => { state.ui.adminTab = t; render(false); };
 
-    const headerRow = el('div', { class: 'admin-table-row admin-table-header' }, [
-      el('div', { class: 'admin-cell', text: 'Email' }),
-      el('div', { class: 'admin-cell', text: 'Username' }),
-      el('div', { class: 'admin-cell', text: 'Admin' }),
-      el('div', { class: 'admin-cell', text: 'ToS' })
-    ]);
+    // ── Tab: Dashboard ────────────────────────────────────────────────────
+    function buildDashboardTab() {
+      const summary = state.adminSiteSummary;
+      const statCards = summary ? [
+        ['Total Users', summary.totalUsers, '👥', 'var(--primary)'],
+        ['Admins', summary.adminUsers, '🛡️', '#8b5cf6'],
+        ['ToS Accepted', summary.tosAcceptedUsers, '✅', '#10b981'],
+        ['Environment', summary.nodeEnv || 'unknown', '🌐', '#f59e0b']
+      ].map(([label, value, icon, color]) =>
+        el('div', { class: 'admin-stat-card' }, [
+          el('div', { class: 'admin-stat-icon', text: icon }),
+          el('div', { class: 'admin-stat-value', style: `color:${color}`, text: String(value) }),
+          el('div', { class: 'admin-stat-label', text: label })
+        ])
+      ) : [el('div', { class: 'cp-row-hint', text: state.adminSiteSummaryLoading ? 'Loading…' : 'No data yet.' })];
 
-    const bodyRows = rows.map((u) => {
-      const row = el('button', {
-        class: 'admin-table-row admin-row-button',
-        type: 'button',
-        onclick: async () => {
+      const [recentUsers, setRecentUsers] = useState([]);
+      useEffect(() => {
+        adminGetRecentRegistrations(state.auth.token, 8)
+          .then(d => setRecentUsers(d.users || []))
+          .catch(() => {});
+      }, []);
+
+      const recentRows = recentUsers.map(u =>
+        el('div', { class: 'cp-row', style: 'cursor:pointer', onclick: () => {
           state.adminSelectedUserId = u.id;
-          state.adminSelectedUserLoading = true;
-          render(false);
-          try {
-            const { user } = await adminGetUser(state.auth.token, u.id);
-            state.adminSelectedUser = user || null;
-          } catch (e) {
-            showToast(e?.message || 'Failed to load user details');
-          } finally {
-            state.adminSelectedUserLoading = false;
-            render(false);
-          }
-        }
-      }, [
-        el('div', { class: 'admin-cell', text: u.email }),
-        el('div', { class: 'admin-cell', text: u.username || '—' }),
-        el('div', { class: 'admin-cell', text: u.isAdmin ? 'Yes' : 'No' }),
-        el('div', { class: 'admin-cell', text: u.tosAccepted ? 'Accepted' : 'Pending' })
-      ]);
-      return row;
-    });
+          state.adminSelectedUser = null;
+          setTab('users');
+          adminGetUser(state.auth.token, u.id)
+            .then(r => { state.adminSelectedUser = r.user || null; render(false); })
+            .catch(() => {});
+        }}, [
+          el('div', {}, [
+            el('div', { class: 'cp-row-label', text: u.email }),
+            el('div', { class: 'cp-row-hint', text: new Date(u.created_at).toLocaleDateString() })
+          ]),
+          el('div', { style: 'display:flex;gap:6px;align-items:center' }, [
+            u.is_admin ? el('span', { class: 'admin-badge', style: 'background:#8b5cf620;color:#8b5cf6', text: 'Admin' }) : el('span'),
+            !u.tos_accepted_at ? el('span', { class: 'admin-badge', style: 'background:#f59e0b20;color:#f59e0b', text: '⚠️ ToS' }) : el('span')
+          ])
+        ])
+      );
 
-    const listColumnChildren = [headerRow, ...bodyRows];
-    if (state.adminUsersLoading) {
-      listColumnChildren.push(el('div', { class: 'lock-status', text: 'Loading users…' }));
+      const announcementPreview = summary?.announcement
+        ? el('div', { class: 'dashboard-announcement-preview' }, [
+            el('span', { class: 'dashboard-announcement-icon', text: '📢' }),
+            el('span', { text: summary.announcement })
+          ])
+        : null;
+
+      return el('div', { class: 'cp-body' }, [
+        ...(announcementPreview ? [el('div', { class: 'cp-section' }, [el('div', { class: 'cp-section-title', text: 'Active Announcement' }), announcementPreview])] : []),
+        el('div', { class: 'cp-section' }, [
+          el('div', { class: 'cp-section-title', text: 'Site Overview' }),
+          el('div', { class: 'admin-stat-grid' }, statCards)
+        ]),
+        el('div', { class: 'cp-two-col' }, [
+          el('div', { class: 'cp-section' }, [
+            el('div', { class: 'cp-section-title', text: 'Recent Registrations' }),
+            ...(recentRows.length ? recentRows : [el('div', { class: 'cp-row-hint', text: 'No users yet.' })])
+          ]),
+          el('div', { class: 'cp-section' }, [
+            el('div', { class: 'cp-section-title', text: 'Quick Actions' }),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'User Manager' }), el('div', { class: 'cp-row-hint', text: 'View, edit and manage all user accounts' })]),
+              el('button', { class: 'btn small-btn', type: 'button', onclick: () => setTab('users') }, [el('span', { class: 'btn-ic', text: '👥' }), el('span', { text: 'Manage Users' })])
+            ]),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'Analytics' }), el('div', { class: 'cp-row-hint', text: 'Growth, activity and usage stats' })]),
+              el('button', { class: 'btn small-btn', type: 'button', onclick: () => setTab('analytics') }, [el('span', { class: 'btn-ic', text: '📈' }), el('span', { text: 'View Analytics' })])
+            ]),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'Announcements' }), el('div', { class: 'cp-row-hint', text: 'Set site-wide banners and MOTD' })]),
+              el('button', { class: 'btn small-btn', type: 'button', onclick: () => setTab('announcements') }, [el('span', { class: 'btn-ic', text: '📢' }), el('span', { text: 'Edit Announcements' })])
+            ]),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'Theme Manager' }), el('div', { class: 'cp-row-hint', text: 'Upload themes and set default login theme' })]),
+              el('button', { class: 'btn small-btn', type: 'button', onclick: () => setTab('themes') }, [el('span', { class: 'btn-ic', text: '🎨' }), el('span', { text: 'Manage Themes' })])
+            ]),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'Invite Codes' }), el('div', { class: 'cp-row-hint', text: 'Generate single-use registration links' })]),
+              el('button', { class: 'btn small-btn', type: 'button', onclick: () => setTab('invitations') }, [el('span', { class: 'btn-ic', text: '🎟️' }), el('span', { text: 'Manage Invites' })])
+            ])
+          ])
+        ])
+      ]);
     }
 
-    const listColumn = el('div', { class: 'admin-users-column' }, listColumnChildren);
+    // ── Tab: Users ────────────────────────────────────────────────────────
+    function buildUsersTab() {
+      const allRows = state.adminUsers || [];
+      const [userSearch, setUserSearch] = useState('');
+      const [showAdminsOnly, setShowAdminsOnly] = useState(false);
 
-    const detail = state.adminSelectedUser;
-    const detailChildren = [];
-
-    if (state.adminSelectedUserLoading) {
-      detailChildren.push(el('div', { class: 'lock-status', text: 'Loading account…' }));
-    } else if (detail) {
-      const status = el('div', { class: 'lock-status', text: '' });
-
-      const emailInput = el('input', { class: 'lock-input', type: 'email', value: detail.email || '' });
-      const usernameInput = el('input', { class: 'lock-input', value: detail.username || '' });
-      const firstNameInput = el('input', { class: 'lock-input', value: detail.firstName || '' });
-      const middleNameInput = el('input', { class: 'lock-input', value: detail.middleName || '' });
-      const lastNameInput = el('input', { class: 'lock-input', value: detail.lastName || '' });
-      const addressInput = el('input', { class: 'lock-input', value: detail.addressLine || '' });
-      const cityInput = el('input', { class: 'lock-input', value: detail.city || '' });
-      const stateRegionInput = el('input', { class: 'lock-input', value: detail.stateRegion || '' });
-      const postalCodeInput = el('input', { class: 'lock-input', value: detail.postalCode || '' });
-      const countryCodeInput = el('input', { class: 'lock-input', value: detail.countryCode || '' });
-
-      const isAdminCheckbox = el('input', { type: 'checkbox' });
-      if (detail.isAdmin) isAdminCheckbox.checked = true;
-      const mcpCheckbox = el('input', { type: 'checkbox' });
-      if (detail.mustChangePassword) mcpCheckbox.checked = true;
-
-      const tosText = el('div', {
-        class: 'account-value',
-        text: detail.tosAccepted ? 'Accepted' : 'Not yet accepted'
+      const rows = allRows.filter(u => {
+        if (showAdminsOnly && !u.isAdmin) return false;
+        if (!userSearch) return true;
+        const q = userSearch.toLowerCase();
+        return (u.email || '').toLowerCase().includes(q) || (u.username || '').toLowerCase().includes(q);
       });
 
-      const keyRow = el('div', { class: 'account-row' }, [
-        el('div', { class: 'account-label', text: 'Encryption key' }),
-        el('div', {
-          class: 'account-value',
-          text: 'Locked to this account. Admins cannot view or change the key or diary contents.'
-        })
+      const searchBox = el('input', {
+        class: 'lock-input', placeholder: '🔍 Search by email or username…',
+        value: userSearch, oninput: (e) => setUserSearch(e.target.value),
+        style: 'margin-bottom:6px;'
+      });
+      const adminFilterBtn = el('button', {
+        class: `pill ${showAdminsOnly ? 'active' : ''}`, type: 'button',
+        style: 'margin-bottom:8px;',
+        onclick: () => setShowAdminsOnly(!showAdminsOnly)
+      }, [el('span', { text: '🛡️ Admins only' })]);
+
+      const userList = el('div', { class: 'cp-split-list' }, [
+        searchBox,
+        adminFilterBtn,
+        el('div', { class: 'cp-section-title', style: 'padding:2px 4px 8px', text: `${rows.length} of ${allRows.length} user${allRows.length !== 1 ? 's' : ''}` }),
+        ...(state.adminUsersLoading
+          ? [el('div', { class: 'cp-row-hint', text: 'Loading users…' })]
+          : rows.map(u => el('button', {
+              class: `cp-user-row ${state.adminSelectedUserId === u.id ? 'selected' : ''}`,
+              type: 'button',
+              onclick: async () => {
+                state.adminSelectedUserId = u.id;
+                state.adminSelectedUserLoading = true;
+                render(false);
+                try {
+                  const { user } = await adminGetUser(state.auth.token, u.id);
+                  state.adminSelectedUser = user || null;
+                } catch (e) { showToast(e?.message || 'Failed to load user'); }
+                finally { state.adminSelectedUserLoading = false; render(false); }
+              }
+            }, [
+              el('div', { class: 'cp-user-email', text: u.email }),
+              el('div', { class: 'cp-user-meta', text: [
+                u.username ? `@${u.username}` : null,
+                u.isAdmin ? '🛡️ Admin' : null,
+                u.tosAccepted ? null : '⚠️ ToS',
+                u.created_at ? new Date(u.created_at).toLocaleDateString() : null
+              ].filter(Boolean).join(' · ') || 'User' })
+            ])
+          )
+        )
       ]);
 
-      const saveBtn = el('button', {
-        class: 'btn small-btn',
-        type: 'button',
-        onclick: async () => {
+      const detail = state.adminSelectedUser;
+      let detailContent;
+      if (state.adminSelectedUserLoading) {
+        detailContent = el('div', { class: 'cp-row-hint', text: 'Loading account…' });
+      } else if (detail) {
+        const status = el('div', { class: 'lock-status', text: '' });
+        const mkIn = (v) => el('input', { class: 'lock-input', value: v || '' });
+        const emailInput       = el('input', { class: 'lock-input', type: 'email', value: detail.email || '' });
+        const usernameInput    = mkIn(detail.username);
+        const firstNameInput   = mkIn(detail.firstName);
+        const middleNameInput  = mkIn(detail.middleName);
+        const lastNameInput    = mkIn(detail.lastName);
+        const addressInput     = mkIn(detail.addressLine);
+        const cityInput        = mkIn(detail.city);
+        const stateRegionInput = mkIn(detail.stateRegion);
+        const postalCodeInput  = mkIn(detail.postalCode);
+        const countryCodeInput = mkIn(detail.countryCode);
+        const isAdminChk = el('input', { type: 'checkbox' }); if (detail.isAdmin) isAdminChk.checked = true;
+        const mcpChk     = el('input', { type: 'checkbox' }); if (detail.mustChangePassword) mcpChk.checked = true;
+
+        const saveBtn = el('button', { class: 'btn small-btn', type: 'button', onclick: async () => {
           if (state.adminSelectedUserSaving) return;
           state.adminSelectedUserSaving = true;
-          status.textContent = 'Saving changes…';
+          status.textContent = 'Saving…';
           try {
-            const payload = {
-              email: emailInput.value,
-              username: usernameInput.value,
-              firstName: firstNameInput.value,
-              middleName: middleNameInput.value,
-              lastName: lastNameInput.value,
-              addressLine: addressInput.value,
-              city: cityInput.value,
-              stateRegion: stateRegionInput.value,
-              postalCode: postalCodeInput.value,
-              countryCode: countryCodeInput.value,
-              isAdmin: Boolean(isAdminCheckbox.checked),
-              mustChangePassword: Boolean(mcpCheckbox.checked)
-            };
-            const result = await adminUpdateUser(state.auth.token, detail.id, payload);
+            const result = await adminUpdateUser(state.auth.token, detail.id, {
+              email: emailInput.value, username: usernameInput.value,
+              firstName: firstNameInput.value, middleName: middleNameInput.value, lastName: lastNameInput.value,
+              addressLine: addressInput.value, city: cityInput.value, stateRegion: stateRegionInput.value,
+              postalCode: postalCodeInput.value, countryCode: countryCodeInput.value,
+              isAdmin: Boolean(isAdminChk.checked), mustChangePassword: Boolean(mcpChk.checked)
+            });
             state.adminSelectedUser = result?.user || null;
             await ensureAdminUsersLoaded();
-            status.textContent = 'Saved';
-          } catch (e) {
-            status.textContent = e?.message || 'Failed to save changes';
-          } finally {
-            state.adminSelectedUserSaving = false;
-            render(false);
-          }
-        }
-      }, [
-        el('span', { class: 'btn-ic', text: '✓' }),
-        el('span', { text: 'Save account' })
-      ]);
+            status.textContent = '✓ Saved';
+            showToast('User updated');
+          } catch (e) { status.textContent = e?.message || 'Failed'; }
+          finally { state.adminSelectedUserSaving = false; render(false); }
+        }}, [el('span', { class: 'btn-ic', text: '✓' }), el('span', { text: 'Save' })]);
 
-      const deleteBtn = el('button', {
-        class: 'btn danger ghost small-btn',
-        type: 'button',
-        onclick: async () => {
-          if (!confirm('Delete this user and all of their diary data? This cannot be undone.')) return;
+        const deleteBtn = el('button', { class: 'btn danger ghost small-btn', type: 'button', onclick: async () => {
+          if (!confirm('Delete this user and all their diary data? This cannot be undone.')) return;
           try {
             await adminDeleteUser(state.auth.token, detail.id);
             showToast('User deleted');
             state.adminSelectedUserId = null;
             state.adminSelectedUser = null;
             await ensureAdminUsersLoaded();
-          } catch (e) {
-            showToast(e?.message || 'Failed to delete user');
-          } finally {
-            render(false);
-          }
-        }
-      }, [
-        el('span', { class: 'btn-ic', text: '✕' }),
-        el('span', { text: 'Delete user' })
-      ]);
+          } catch (e) { showToast(e?.message || 'Failed'); }
+          finally { render(false); }
+        }}, [el('span', { class: 'btn-ic', text: '🗑' }), el('span', { text: 'Delete user' })]);
 
-      detailChildren.push(
-        el('div', { class: 'account-row' }, [
-          el('div', { class: 'account-label', text: 'Email' }),
-          emailInput
-        ]),
-        el('div', { class: 'account-row' }, [
-          el('div', { class: 'account-label', text: 'Username' }),
-          usernameInput
-        ]),
-        el('div', { class: 'account-row' }, [
-          el('div', { class: 'account-label', text: 'First name' }),
-          firstNameInput
-        ]),
-        el('div', { class: 'account-row' }, [
-          el('div', { class: 'account-label', text: 'Middle name' }),
-          middleNameInput
-        ]),
-        el('div', { class: 'account-row' }, [
-          el('div', { class: 'account-label', text: 'Last name' }),
-          lastNameInput
-        ]),
-        el('div', { class: 'account-row' }, [
-          el('div', { class: 'account-label', text: 'Street address' }),
-          addressInput
-        ]),
-        el('div', { class: 'account-row' }, [
-          el('div', { class: 'account-label', text: 'City' }),
-          cityInput
-        ]),
-        el('div', { class: 'account-row' }, [
-          el('div', { class: 'account-label', text: 'State / Region' }),
-          stateRegionInput
-        ]),
-        el('div', { class: 'account-row' }, [
-          el('div', { class: 'account-label', text: 'Postal code' }),
-          postalCodeInput
-        ]),
-        el('div', { class: 'account-row' }, [
-          el('div', { class: 'account-label', text: 'Country code' }),
-          countryCodeInput
-        ]),
-        el('div', { class: 'account-row' }, [
-          el('div', { class: 'account-label', text: 'Admin' }),
-          isAdminCheckbox
-        ]),
-        el('div', { class: 'account-row' }, [
-          el('div', { class: 'account-label', text: 'Must change password' }),
-          mcpCheckbox
-        ]),
-        el('div', { class: 'account-row' }, [
-          el('div', { class: 'account-label', text: 'Terms of Service' }),
-          tosText
-        ]),
-        keyRow,
-        el('div', { class: 'account-row' }, [
-          saveBtn,
-          deleteBtn
-        ]),
-        status
-      );
-    } else {
-      detailChildren.push(el('div', { class: 'lock-status', text: 'Select a user to manage their account.' }));
+        const resetPwIn = el('input', { class: 'lock-input', type: 'password', placeholder: 'New password (min 10 chars)' });
+        const resetPwStatus = el('div', { class: 'lock-status', text: '' });
+        const resetPwBtn = el('button', { class: 'btn ghost small-btn', type: 'button', onclick: async () => {
+          if (resetPwIn.value.length < 10) { resetPwStatus.textContent = 'At least 10 characters required'; return; }
+          if (!confirm(`Reset password for ${detail.email}?`)) return;
+          try {
+            await adminResetUserPassword(state.auth.token, detail.id, resetPwIn.value);
+            resetPwIn.value = '';
+            resetPwStatus.textContent = '✓ Password reset';
+            showToast('Password reset successfully');
+          } catch (e) { resetPwStatus.textContent = e?.message || 'Failed'; }
+        }}, [el('span', { class: 'btn-ic', text: '🔑' }), el('span', { text: 'Reset password' })]);
+
+        detailContent = el('div', { class: 'cp-split-detail' }, [
+          el('div', { class: 'cp-section-title', text: detail.email }),
+          el('div', { class: 'cp-two-col' }, [
+            el('div', { class: 'cp-section' }, [
+              el('div', { class: 'cp-section-title', text: 'Identity' }),
+              el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'Email' }), emailInput]),
+              el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'Username' }), usernameInput]),
+              el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'First name' }), firstNameInput]),
+              el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'Middle name' }), middleNameInput]),
+              el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'Last name' }), lastNameInput]),
+            ]),
+            el('div', { class: 'cp-section' }, [
+              el('div', { class: 'cp-section-title', text: 'Address' }),
+              el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'Street' }), addressInput]),
+              el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'City' }), cityInput]),
+              el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'State / Region' }), stateRegionInput]),
+              el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'Postal' }), postalCodeInput]),
+              el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'Country' }), countryCodeInput]),
+            ])
+          ]),
+          el('div', { class: 'cp-section' }, [
+            el('div', { class: 'cp-section-title', text: 'Permissions & Flags' }),
+            el('div', { class: 'cp-row' }, [el('div', {}, [el('div', { class: 'cp-row-label', text: 'Admin' }), el('div', { class: 'cp-row-hint', text: 'Grant full admin access' })]), isAdminChk]),
+            el('div', { class: 'cp-row' }, [el('div', {}, [el('div', { class: 'cp-row-label', text: 'Must change password' }), el('div', { class: 'cp-row-hint', text: 'Force password reset on next login' })]), mcpChk]),
+            el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'Terms of Service' }), el('div', { class: 'account-value', text: detail.tosAccepted ? '✅ Accepted' : '⚠️ Not accepted' })]),
+            el('div', { class: 'cp-row-hint', text: '🔒 Diary content is fully encrypted — admins cannot read or modify it.' }),
+          ]),
+          el('div', { class: 'cp-section' }, [
+            el('div', { class: 'cp-section-title', text: 'Reset Password' }),
+            el('div', { class: 'cp-row-hint', text: 'Set a new temporary password for this user. They should change it on next login.' }),
+            el('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px' }, [resetPwIn, resetPwBtn, resetPwStatus])
+          ]),
+          el('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap;' }, [saveBtn, deleteBtn, status])
+        ]);
+      } else {
+        detailContent = el('div', { class: 'cp-split-detail' }, [
+          el('div', { class: 'cp-row-hint', style: 'padding:20px;', text: '← Select a user from the list to view and edit their account.' })
+        ]);
+      }
+
+      return el('div', { class: 'cp-split', style: 'flex:1;overflow:hidden;' }, [userList, detailContent]);
     }
 
-    const detailColumn = el('div', { class: 'admin-user-detail-column' }, detailChildren);
+    // ── Tab: Themes ───────────────────────────────────────────────────────
+    function buildThemesTab() {
+      const [availableThemes, setAvailableThemes] = useState([]);
+      const [defaultLoginTheme, setDefaultLoginTheme] = useState(state.adminSiteSummary?.defaultLoginTheme || 'trans-pride-dark');
+
+      useEffect(() => {
+        fetch('themes.json')
+          .then(r => r.json())
+          .then(data => setAvailableThemes(data.themes || []))
+          .catch(() => setAvailableThemes([]));
+      }, []);
+
+      const saveDefaultTheme = async (themeId) => {
+        try {
+          await fetch('/api/admin/site-settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.auth.token}` },
+            body: JSON.stringify({ defaultLoginTheme: themeId })
+          });
+          setDefaultLoginTheme(themeId);
+          showToast(`Default login theme set to "${themeId}"`);
+        } catch (e) { showToast('Failed to save default theme'); }
+      };
+
+      const handleThemeUpload = async (file) => {
+        if (!file || !file.name.endsWith('.zip')) { showToast('Please upload a .zip file'); return; }
+        const formData = new FormData();
+        formData.append('themeZip', file);
+        try {
+          showToast('Uploading theme…');
+          const res = await fetch('/api/themes/upload', { method: 'POST', headers: { Authorization: `Bearer ${state.auth.token}` }, body: formData });
+          if (res.ok) {
+            const data = await res.json();
+            showToast(`Theme "${data.themeName}" installed!`);
+            fetch('themes.json').then(r => r.json()).then(d => setAvailableThemes(d.themes || []));
+          } else { showToast('Failed to install theme'); }
+        } catch (e) { showToast('Upload failed: ' + e.message); }
+      };
+
+      const handleDeleteTheme = async (themeId, themeName) => {
+        if (!confirm(`Remove theme "${themeName}"? This cannot be undone.`)) return;
+        try {
+          const res = await fetch(`/api/themes/${encodeURIComponent(themeId)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${state.auth.token}` } });
+          if (res.ok) {
+            showToast(`Theme "${themeName}" removed`);
+            fetch('themes.json').then(r => r.json()).then(d => setAvailableThemes(d.themes || []));
+          } else { showToast('Failed to remove theme'); }
+        } catch (e) { showToast('Error: ' + e.message); }
+      };
+
+      const BUILTIN_THEMES = new Set([
+        'trans-pride-dark','elegant-dark','support-dark','abstract-dark','community-dark',
+        'flowing-rivers-dark','journey-dark','abstract-shapes-dark','strength-dark','constellation-night',
+        'trans-pride-light','blooming-light','support-light','abstract-light','community-light',
+        'sunrise-hope','journey-light','soft-abstract-light','pride-light','modern-abstract-light'
+      ]);
+
+      const uploadInput = el('input', { type: 'file', accept: '.zip', style: 'display:none', onchange: (e) => { if (e.target.files[0]) handleThemeUpload(e.target.files[0]); } });
+      const uploadBtn = el('button', { class: 'btn small-btn', type: 'button', onclick: () => uploadInput.click() }, [el('span', { class: 'btn-ic', text: '📁' }), el('span', { text: 'Upload Theme (.zip)' })]);
+
+      const themeGrid = availableThemes.length > 0
+        ? el('div', { class: 'theme-selector' },
+            availableThemes.map(theme => {
+              const isDefault = defaultLoginTheme === theme.id;
+              const isBuiltin = BUILTIN_THEMES.has(theme.id);
+              const deleteBtn = !isBuiltin
+                ? el('button', { class: 'btn ghost small-btn theme-delete-btn', type: 'button', title: 'Remove theme',
+                    onclick: (e) => { e.stopPropagation(); handleDeleteTheme(theme.id, theme.name); }
+                  }, [el('span', { text: '🗑' })])
+                : null;
+              return el('div', {
+                class: `theme-card ${isDefault ? 'active' : ''}`,
+                onclick: () => saveDefaultTheme(theme.id)
+              }, [
+                el('div', { class: 'theme-preview-wrap' }, [
+                  el('div', { class: 'theme-preview', style: `background-image: url('${theme.image}')` }),
+                  ...(deleteBtn ? [deleteBtn] : [])
+                ]),
+                el('span', { class: 'theme-card-name', text: theme.name }),
+                el('span', { class: 'theme-card-mode', text: isDefault ? '✓ Default Login Theme' : theme.mode })
+              ]);
+            })
+          )
+        : el('div', { class: 'cp-row-hint', text: 'Loading themes…' });
+
+      return el('div', { class: 'cp-body' }, [
+        el('div', { class: 'cp-section' }, [
+          el('div', { class: 'cp-section-title', text: 'Default Login Theme' }),
+          el('div', { class: 'cp-row-hint', text: 'Click a theme to set it as the default background shown on the login page for all visitors.' }),
+          el('div', { class: 'cp-row', style: 'margin-top:4px' }, [
+            el('div', { class: 'cp-row-label', text: 'Current default' }),
+            el('div', { class: 'account-value', text: defaultLoginTheme })
+          ])
+        ]),
+        themeGrid,
+        el('div', { class: 'cp-section' }, [
+          el('div', { class: 'cp-section-title', text: 'Upload Custom Theme' }),
+          el('div', { class: 'cp-row-hint', text: 'Upload a .zip file containing: theme.json, background.webp, and optionally preview.png' }),
+          el('div', { style: 'margin-top:10px;display:flex;gap:10px;' }, [uploadInput, uploadBtn])
+        ])
+      ]);
+    }
+
+    // ── Tab: Analytics ────────────────────────────────────────────────────
+    function buildAnalyticsTab() {
+      const [stats, setStats] = useState(null);
+      const [loading, setLoading] = useState(true);
+      useEffect(() => {
+        adminGetStats(state.auth.token)
+          .then(s => { setStats(s); setLoading(false); })
+          .catch(() => setLoading(false));
+      }, []);
+
+      if (loading) return el('div', { class: 'cp-body' }, [el('div', { class: 'cp-row-hint', text: 'Loading analytics…' })]);
+      if (!stats)  return el('div', { class: 'cp-body' }, [el('div', { class: 'cp-row-hint', text: 'Could not load analytics.' })]);
+
+      const statCards = [
+        ['New Today',    stats.newUsersToday,    '✨', 'var(--primary)'],
+        ['New This Week',stats.newUsersWeek,     '📅', '#10b981'],
+        ['New This Month',stats.newUsersMonth,   '📆', '#f59e0b'],
+        ['Active Today', stats.activeToday,      '🟢', '#06b6d4'],
+        ['With 2FA',     stats.with2fa,          '🔐', '#8b5cf6'],
+        ['Audit Events', stats.totalAuditEvents, '📋', '#6366f1'],
+      ].map(([label, val, icon, color]) =>
+        el('div', { class: 'admin-stat-card' }, [
+          el('div', { class: 'admin-stat-icon', text: icon }),
+          el('div', { class: 'admin-stat-value', style: `color:${color}`, text: String(val ?? '—') }),
+          el('div', { class: 'admin-stat-label', text: label })
+        ])
+      );
+
+      const topActionsRows = (stats.topActions || []).map(a =>
+        el('div', { class: 'cp-row' }, [
+          el('div', { class: 'cp-row-label', text: a.action }),
+          el('div', { class: 'admin-badge', text: String(a.count) })
+        ])
+      );
+
+      const dailyRows = (stats.dailySignups || []).map(d => {
+        const pct = stats.newUsersWeek > 0 ? Math.round((Number(d.count) / stats.newUsersWeek) * 100) : 0;
+        return el('div', { class: 'admin-bar-row' }, [
+          el('div', { class: 'admin-bar-label', text: String(d.day).slice(5) }),
+          el('div', { class: 'admin-bar-track' }, [
+            el('div', { class: 'admin-bar-fill', style: `width:${pct}%` })
+          ]),
+          el('div', { class: 'admin-bar-count', text: String(d.count) })
+        ]);
+      });
+
+      return el('div', { class: 'cp-body' }, [
+        el('div', { class: 'cp-section' }, [
+          el('div', { class: 'cp-section-title', text: 'Growth & Activity' }),
+          el('div', { class: 'admin-stat-grid' }, statCards)
+        ]),
+        el('div', { class: 'cp-two-col' }, [
+          el('div', { class: 'cp-section' }, [
+            el('div', { class: 'cp-section-title', text: 'Sign-ups (Last 7 Days)' }),
+            ...(dailyRows.length ? dailyRows : [el('div', { class: 'cp-row-hint', text: 'No sign-ups in the last 7 days.' })])
+          ]),
+          el('div', { class: 'cp-section' }, [
+            el('div', { class: 'cp-section-title', text: 'Top Audit Events' }),
+            ...(topActionsRows.length ? topActionsRows : [el('div', { class: 'cp-row-hint', text: 'No audit events yet.' })])
+          ])
+        ])
+      ]);
+    }
+
+    // ── Tab: Audit Log ─────────────────────────────────────────────────────
+    function buildAuditTab() {
+      const [logs, setLogs] = useState(null);
+      const [filterUser, setFilterUser] = useState('');
+      const [limit, setLimit] = useState(100);
+
+      useEffect(() => {
+        adminGetAuditLogs(state.auth.token, limit)
+          .then(d => setLogs(d.logs || []))
+          .catch(() => setLogs([]));
+      }, [limit]);
+
+      const searchInput = el('input', {
+        class: 'lock-input', placeholder: 'Filter by email or action…', value: filterUser,
+        oninput: (e) => setFilterUser(e.target.value)
+      });
+
+      const filtered = (logs || []).filter(l =>
+        !filterUser || (l.email || '').includes(filterUser) || l.action.includes(filterUser)
+      );
+
+      const ACTION_COLORS = {
+        login: '#10b981', login_failed: '#ef4444', register: '#6366f1',
+        profile_updated: '#f59e0b', '2fa_enabled': '#8b5cf6', admin_reset_user_password: '#ef4444',
+        admin_user_suspended: '#f97316', admin_site_settings_updated: '#06b6d4'
+      };
+
+      const rows = filtered.map(l =>
+        el('div', { class: 'admin-audit-row' }, [
+          el('div', { class: 'admin-audit-badge', style: `background:${ACTION_COLORS[l.action] || '#6b7280'}20;color:${ACTION_COLORS[l.action] || '#6b7280'}`, text: l.action }),
+          el('div', { class: 'admin-audit-email', text: l.email || `user #${l.user_id}` }),
+          el('div', { class: 'admin-audit-ip', text: l.ip_address || '—' }),
+          el('div', { class: 'admin-audit-time', text: l.created_at ? new Date(l.created_at).toLocaleString() : '—' })
+        ])
+      );
+
+      const limitBtns = [50, 100, 250, 500].map(n =>
+        el('button', { class: `pill ${limit === n ? 'active' : ''}`, type: 'button', onclick: () => setLimit(n) }, [el('span', { text: String(n) })])
+      );
+
+      return el('div', { class: 'cp-body' }, [
+        el('div', { class: 'cp-section' }, [
+          el('div', { class: 'cp-section-title', text: 'Site-wide Audit Log' }),
+          el('div', { class: 'cp-row', style: 'gap:12px;flex-wrap:wrap' }, [
+            searchInput,
+            el('div', { class: 'setting-pill-row', style: 'gap:6px' }, limitBtns)
+          ])
+        ]),
+        el('div', { class: 'admin-audit-header' }, [
+          el('div', { text: 'Action' }), el('div', { text: 'User' }),
+          el('div', { text: 'IP' }), el('div', { text: 'Time' })
+        ]),
+        ...(logs === null
+          ? [el('div', { class: 'cp-row-hint', text: 'Loading…' })]
+          : rows.length ? rows : [el('div', { class: 'cp-row-hint', text: 'No matching events.' })]
+        )
+      ]);
+    }
+
+    // ── Tab: Announcements ────────────────────────────────────────────────
+    function buildAnnouncementsTab() {
+      const summary = state.adminSiteSummary || {};
+      const announcementIn = el('textarea', {
+        class: 'lock-input admin-textarea',
+        placeholder: 'Enter a site-wide announcement shown to all users on login…',
+        rows: '4'
+      });
+      announcementIn.value = summary.announcement || '';
+
+      const motdIn = el('textarea', {
+        class: 'lock-input admin-textarea',
+        placeholder: 'Message of the Day — shown on the dashboard after login…',
+        rows: '3'
+      });
+
+      const [motd, setMotd] = useState('');
+      useEffect(() => {
+        adminGetSiteSettings(state.auth.token)
+          .then(d => { motdIn.value = d.settings?.motd || ''; })
+          .catch(() => {});
+      }, []);
+
+      const status = el('div', { class: 'lock-status', text: '' });
+
+      const saveBtn = el('button', { class: 'btn small-btn', type: 'button', onclick: async () => {
+        status.textContent = 'Saving…';
+        try {
+          await adminSaveSiteSettings(state.auth.token, {
+            announcement: announcementIn.value.trim(),
+            motd: motdIn.value.trim()
+          });
+          if (state.adminSiteSummary) state.adminSiteSummary.announcement = announcementIn.value.trim();
+          status.textContent = '✓ Saved';
+          showToast('Announcements saved');
+        } catch (e) { status.textContent = e.message || 'Failed'; }
+      }}, [el('span', { class: 'btn-ic', text: '✓' }), el('span', { text: 'Save announcements' })]);
+
+      const clearBtn = el('button', { class: 'btn ghost small-btn', type: 'button', onclick: async () => {
+        announcementIn.value = '';
+        motdIn.value = '';
+        try {
+          await adminSaveSiteSettings(state.auth.token, { announcement: '', motd: '' });
+          if (state.adminSiteSummary) state.adminSiteSummary.announcement = '';
+          showToast('Announcements cleared');
+          status.textContent = '✓ Cleared';
+        } catch (e) { status.textContent = e.message || 'Failed'; }
+      }}, [el('span', { class: 'btn-ic', text: '✕' }), el('span', { text: 'Clear all' })]);
+
+      return el('div', { class: 'cp-body' }, [
+        el('div', { class: 'cp-section' }, [
+          el('div', { class: 'cp-section-title', text: 'Site-wide Announcement' }),
+          el('div', { class: 'cp-row-hint', text: 'Displayed as a banner to all users when they log in or visit the site.' }),
+          announcementIn
+        ]),
+        el('div', { class: 'cp-section' }, [
+          el('div', { class: 'cp-section-title', text: 'Message of the Day' }),
+          el('div', { class: 'cp-row-hint', text: 'A brief greeting or notice shown on the dashboard after login.' }),
+          motdIn
+        ]),
+        el('div', { style: 'display:flex;gap:10px;align-items:center;' }, [saveBtn, clearBtn, status])
+      ]);
+    }
+
+    // ── Tab: Site Settings ────────────────────────────────────────────────
+    function buildSiteSettingsTab() {
+      const summary = state.adminSiteSummary || {};
+      const [settings, setSettings] = useState({
+        siteName: summary.siteName || 'My Secret Diary',
+        maintenanceMode: summary.maintenanceMode || false,
+        registrationEnabled: summary.registrationEnabled !== false,
+        defaultLoginTheme: summary.defaultLoginTheme || 'trans-pride-dark'
+      });
+
+      const siteNameIn = el('input', { class: 'lock-input', value: settings.siteName, placeholder: 'Site name' });
+
+      const status = el('div', { class: 'lock-status', text: '' });
+
+      const saveSiteBtn = el('button', { class: 'btn small-btn', type: 'button', onclick: async () => {
+        status.textContent = 'Saving…';
+        try {
+          await adminSaveSiteSettings(state.auth.token, {
+            site_name: siteNameIn.value.trim() || 'My Secret Diary',
+            maintenance_mode: String(settings.maintenanceMode),
+            registration_enabled: String(settings.registrationEnabled)
+          });
+          if (state.adminSiteSummary) {
+            state.adminSiteSummary.siteName = siteNameIn.value.trim();
+            state.adminSiteSummary.maintenanceMode = settings.maintenanceMode;
+            state.adminSiteSummary.registrationEnabled = settings.registrationEnabled;
+          }
+          status.textContent = '✓ Saved';
+          showToast('Site settings saved');
+        } catch (e) { status.textContent = e.message || 'Failed'; }
+      }}, [el('span', { class: 'btn-ic', text: '✓' }), el('span', { text: 'Save settings' })]);
+
+      const refreshBtn = el('button', { class: 'btn ghost small-btn', type: 'button', onclick: async () => {
+        state.adminSiteSummary = null;
+        state.adminSiteSummaryLoading = false;
+        await ensureSiteSummaryLoaded();
+        showToast('Site data refreshed');
+        render(false);
+      }}, [el('span', { class: 'btn-ic', text: '↻' }), el('span', { text: 'Refresh data' })]);
+
+      return el('div', { class: 'cp-body' }, [
+        el('div', { class: 'cp-two-col' }, [
+          el('div', { class: 'cp-section' }, [
+            el('div', { class: 'cp-section-title', text: 'General' }),
+            el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'Site name' }), siteNameIn]),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'User registration' }), el('div', { class: 'cp-row-hint', text: 'Allow new users to sign up' })]),
+              el('button', { class: `toggle-chip ${settings.registrationEnabled ? 'active' : ''}`, type: 'button',
+                onclick: () => { settings.registrationEnabled = !settings.registrationEnabled; render(false); }
+              }, [el('span', { text: settings.registrationEnabled ? 'Enabled' : 'Disabled' })])
+            ]),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'Maintenance mode' }), el('div', { class: 'cp-row-hint', text: 'Block all user access temporarily' })]),
+              el('button', { class: `toggle-chip ${settings.maintenanceMode ? 'active' : ''}`, type: 'button',
+                onclick: () => { settings.maintenanceMode = !settings.maintenanceMode; render(false); }
+              }, [el('span', { text: settings.maintenanceMode ? '⚠️ ON' : 'Off' })])
+            ]),
+            el('div', { style: 'display:flex;gap:10px;align-items:center;margin-top:8px' }, [saveSiteBtn, status])
+          ]),
+          el('div', { class: 'cp-section' }, [
+            el('div', { class: 'cp-section-title', text: 'Installation Info' }),
+            el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'Environment' }), el('div', { class: 'account-value', text: summary.nodeEnv || '—' })]),
+            el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'Total users' }), el('div', { class: 'account-value', text: String(summary.totalUsers ?? '—') })]),
+            el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'Admin users' }), el('div', { class: 'account-value', text: String(summary.adminUsers ?? '—') })]),
+            el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'ToS accepted' }), el('div', { class: 'account-value', text: String(summary.tosAcceptedUsers ?? '—') })]),
+            el('div', { class: 'cp-section-title', style: 'margin-top:14px', text: 'Maintenance' }),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'Reload site data' }), el('div', { class: 'cp-row-hint', text: 'Force-refresh all cached admin data' })]),
+              refreshBtn
+            ])
+          ])
+        ])
+      ]);
+    }
+
+    // ── Tab: Invitations ──────────────────────────────────────────────────
+    function buildInvitationsTab() {
+      const [codes, setCodes] = useState(null);
+      const [noteIn, setNoteIn] = useState('');
+      const [maxUses, setMaxUses] = useState(1);
+      const [daysValid, setDaysValid] = useState(0);
+      const [creating, setCreating] = useState(false);
+      const [copied, setCopied] = useState(null);
+
+      const loadCodes = () => adminListInviteCodes(state.auth.token)
+        .then(d => setCodes(d.codes || []))
+        .catch(() => setCodes([]));
+
+      useEffect(() => { loadCodes(); }, []);
+
+      const noteInput = el('input', {
+        class: 'lock-input', placeholder: 'Note (optional) — e.g. "For Alice"',
+        value: noteIn, oninput: (e) => setNoteIn(e.target.value)
+      });
+      const maxUsesSelect = el('select', { class: 'lock-input', style: 'width:auto', onchange: (e) => setMaxUses(Number(e.target.value)) },
+        [1,2,5,10,25,50].map(n => el('option', { value: String(n), text: `${n} use${n>1?'s':''}` }))
+      );
+      const expirySelect = el('select', { class: 'lock-input', style: 'width:auto', onchange: (e) => setDaysValid(Number(e.target.value)) },
+        [[0,'Never expires'],[1,'1 day'],[3,'3 days'],[7,'7 days'],[30,'30 days']].map(([v,l]) => el('option', { value: String(v), text: l }))
+      );
+
+      const createBtn = el('button', { class: 'btn small-btn', type: 'button', onclick: async () => {
+        setCreating(true);
+        try {
+          await adminCreateInviteCode(state.auth.token, { note: noteIn, maxUses, daysValid });
+          setNoteIn(''); await loadCodes();
+          showToast('Invite code created');
+        } catch (e) { showToast(e?.message || 'Failed'); }
+        finally { setCreating(false); }
+      }}, [el('span', { class: 'btn-ic', text: creating ? '⏳' : '✚' }), el('span', { text: 'Generate code' })]);
+
+      const copyCode = async (code) => {
+        try {
+          await navigator.clipboard.writeText(code);
+          setCopied(code);
+          setTimeout(() => setCopied(null), 2000);
+        } catch { showToast('Copy failed'); }
+      };
+
+      const codeRows = (codes || []).map(c => {
+        const isExpired = c.expires_at && new Date(c.expires_at) < new Date();
+        const isUsed = c.use_count >= c.max_uses;
+        const statusBadge = isExpired ? 'Expired' : isUsed ? 'Used up' : 'Active';
+        const statusColor = isExpired || isUsed ? '#ef4444' : '#10b981';
+        return el('div', { class: 'invite-code-row' }, [
+          el('div', { class: 'invite-code-col' }, [
+            el('div', { class: 'invite-code-text', text: c.code }),
+            c.note ? el('div', { class: 'invite-code-note', text: c.note }) : el('span')
+          ]),
+          el('div', { class: 'invite-code-meta' }, [
+            el('span', { class: 'admin-badge', style: `background:${statusColor}20;color:${statusColor}`, text: statusBadge }),
+            el('span', { class: 'invite-code-uses', text: `${c.use_count}/${c.max_uses}` }),
+            c.expires_at ? el('span', { class: 'invite-code-expiry', text: new Date(c.expires_at).toLocaleDateString() }) : el('span')
+          ]),
+          el('div', { class: 'invite-code-actions' }, [
+            el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => copyCode(c.code) }, [
+              el('span', { text: copied === c.code ? '✓ Copied' : '⧉ Copy' })
+            ]),
+            el('button', { class: 'btn danger ghost small-btn', type: 'button', onclick: async () => {
+              if (!confirm('Revoke this invite code?')) return;
+              try { await adminRevokeInviteCode(state.auth.token, c.id); await loadCodes(); showToast('Revoked'); }
+              catch (e) { showToast(e?.message || 'Failed'); }
+            }}, [el('span', { text: '✕' })])
+          ])
+        ]);
+      });
+
+      return el('div', { class: 'cp-body' }, [
+        el('div', { class: 'cp-section' }, [
+          el('div', { class: 'cp-section-title', text: 'Generate Invite Code' }),
+          el('div', { class: 'cp-row-hint', text: 'Create single-use or limited-use codes to invite new users when registration is closed.' }),
+          el('div', { class: 'invite-create-row' }, [noteInput, maxUsesSelect, expirySelect, createBtn])
+        ]),
+        el('div', { class: 'cp-section' }, [
+          el('div', { class: 'cp-section-title', text: `Existing Codes (${codes ? codes.length : '…'})` }),
+          codes === null
+            ? el('div', { class: 'cp-row-hint', text: 'Loading…' })
+            : codes.length === 0
+              ? el('div', { class: 'cp-row-hint', text: 'No invite codes yet.' })
+              : el('div', { class: 'invite-code-list' }, codeRows)
+        ])
+      ]);
+    }
+
+    const ADMIN_TABS = [
+      { id: 'dashboard',      icon: '📊', label: 'Dashboard' },
+      { id: 'users',          icon: '👥', label: 'Users' },
+      { id: 'analytics',      icon: '📈', label: 'Analytics' },
+      { id: 'audit',          icon: '🔍', label: 'Audit Log' },
+      { id: 'announcements',  icon: '📢', label: 'Announcements' },
+      { id: 'invitations',    icon: '🎟️', label: 'Invitations' },
+      { id: 'themes',         icon: '🎨', label: 'Themes' },
+      { id: 'site-settings',  icon: '⚙️', label: 'Site Settings' },
+    ];
+
+    const tabBar = el('div', { class: 'cp-tabs' },
+      ADMIN_TABS.map(t => el('button', {
+        class: `cp-tab ${activeTab === t.id ? 'active' : ''}`,
+        type: 'button',
+        onclick: () => setTab(t.id)
+      }, [el('span', { class: 'cp-tab-icon', text: t.icon }), el('span', { text: t.label })]))
+    );
+
+    let tabContent;
+    if      (activeTab === 'dashboard')     tabContent = buildDashboardTab();
+    else if (activeTab === 'users')         tabContent = buildUsersTab();
+    else if (activeTab === 'analytics')     tabContent = buildAnalyticsTab();
+    else if (activeTab === 'audit')         tabContent = buildAuditTab();
+    else if (activeTab === 'announcements') tabContent = buildAnnouncementsTab();
+    else if (activeTab === 'invitations')   tabContent = buildInvitationsTab();
+    else if (activeTab === 'themes')        tabContent = buildThemesTab();
+    else                                    tabContent = buildSiteSettingsTab();
 
     const closeBtn = el('button', {
-      class: 'btn ghost small-btn',
+      class: 'btn ghost small-btn cp-close-btn',
       type: 'button',
-      onclick: () => {
-        state.showUserManagerOverlay = false;
-        state.adminSelectedUserId = null;
-        state.adminSelectedUser = null;
-        render(false);
-      }
-    }, [
-      el('span', { class: 'btn-ic', text: '✕' }),
-      el('span', { text: 'Close' })
-    ]);
+      onclick: () => { state.showUserManagerOverlay = false; state.adminSelectedUserId = null; state.adminSelectedUser = null; render(false); }
+    }, [el('span', { class: 'btn-ic', text: '✕' }), el('span', { text: 'Close' })]);
 
-    const contentRow = el('div', { class: 'admin-user-manager-grid' }, [listColumn, detailColumn]);
-
-    const card = el('div', { class: 'account-card' }, [
-      title,
-      subtitle,
-      contentRow,
-      closeBtn
+    const card = el('div', { class: 'account-card', style: 'position:relative' }, [
+      el('div', { class: 'cp-header' }, [
+        el('div', {}, [
+          el('div', { class: 'cp-title', text: '🛡️ Admin Control Panel' }),
+          el('div', { class: 'cp-subtitle', text: 'Site administration — users, themes, and settings' })
+        ]),
+        closeBtn
+      ]),
+      tabBar,
+      tabContent
     ]);
 
     return el('div', { class: 'account-overlay' }, [card]);
@@ -2981,50 +3602,10 @@ export function createApp(mount) {
 
   function renderSiteManagerOverlay() {
     if (!state.showSiteManagerOverlay || !state.auth.user?.isAdmin) return null;
-    const summary = state.adminSiteSummary;
-
-    const title = el('div', { class: 'lock-title', text: 'Site Manager' });
-    const subtitle = el('div', { class: 'lock-subtle', text: 'High-level health and usage for this diary installation.' });
-
-    const grid = summary ? el('div', { class: 'admin-summary-grid' }, [
-      el('div', { class: 'summary-card' }, [
-        el('div', { class: 'summary-label', text: 'Total users' }),
-        el('div', { class: 'summary-value', text: String(summary.totalUsers) })
-      ]),
-      el('div', { class: 'summary-card' }, [
-        el('div', { class: 'summary-label', text: 'Admins' }),
-        el('div', { class: 'summary-value', text: String(summary.adminUsers) })
-      ]),
-      el('div', { class: 'summary-card' }, [
-        el('div', { class: 'summary-label', text: 'ToS accepted' }),
-        el('div', { class: 'summary-value', text: String(summary.tosAcceptedUsers) })
-      ]),
-      el('div', { class: 'summary-card' }, [
-        el('div', { class: 'summary-label', text: 'Environment' }),
-        el('div', { class: 'summary-value', text: summary.nodeEnv || 'unknown' })
-      ])
-    ]) : el('div', { class: 'lock-status', text: state.adminSiteSummaryLoading ? 'Loading site summary…' : 'No summary yet.' });
-
-    const closeBtn = el('button', {
-      class: 'btn ghost small-btn',
-      type: 'button',
-      onclick: () => {
-        state.showSiteManagerOverlay = false;
-        render(false);
-      }
-    }, [
-      el('span', { class: 'btn-ic', text: '✕' }),
-      el('span', { text: 'Close' })
-    ]);
-
-    const card = el('div', { class: 'account-card' }, [
-      title,
-      subtitle,
-      grid,
-      closeBtn
-    ]);
-
-    return el('div', { class: 'account-overlay' }, [card]);
+    state.showSiteManagerOverlay = false;
+    state.showUserManagerOverlay = true;
+    state.ui.adminTab = 'site-settings';
+    return null;
   }
 
   function renderPasswordChangeOverlay() {
@@ -3230,23 +3811,13 @@ export function createApp(mount) {
             onclick: () => {
               state.showAdminMenu = false;
               state.showUserManagerOverlay = true;
+              state.ui.adminTab = 'dashboard';
               ensureAdminUsersLoaded();
-              render(false);
-            }
-          }, [
-            el('span', { text: 'User Manager' })
-          ]),
-          el('button', {
-            class: 'admin-menu-item',
-            type: 'button',
-            onclick: () => {
-              state.showAdminMenu = false;
-              state.showSiteManagerOverlay = true;
               ensureSiteSummaryLoaded();
               render(false);
             }
           }, [
-            el('span', { text: 'Site Manager' })
+            el('span', { text: '🛡️ Admin Control Panel' })
           ]),
           el('button', {
             class: 'admin-menu-item',
@@ -3330,6 +3901,7 @@ export function createApp(mount) {
     return sortEntriesDesc(state.vault.entries)
       .map(normalizeEntry)
       .filter((entry) => {
+        if (state.filterStarred && !entry.starred) return false;
         if (state.activeFolderPath && entry.folder !== state.activeFolderPath) return false;
         if (!matchesEntry(entry, state.searchQuery, state.activeModule, state.activeType)) return false;
         if (f.mood && entry.mood !== f.mood) return false;
@@ -3337,7 +3909,44 @@ export function createApp(mount) {
         if (f.toDate && entry.date && entry.date > f.toDate) return false;
         if (f.tagId && !(entry.tags || []).some((t) => String(t.id || t) === String(f.tagId))) return false;
         return true;
+      })
+      .sort((a, b) => {
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
+        return 0;
       });
+  }
+
+  // ── Keyboard Shortcuts Overlay ───────────────────────────────────────────
+  function renderShortcutsOverlay() {
+    const shortcuts = [
+      ['Ctrl + B', 'Bold text (in editor)'],
+      ['Ctrl + I', 'Italic text (in editor)'],
+      ['Ctrl + U', 'Underline text (in editor)'],
+      ['Ctrl + S', 'Save current entry'],
+      ['Ctrl + N', 'New diary entry'],
+      ['Ctrl + Shift + N', 'New quick thought'],
+      ['Ctrl + Shift + G', 'New gratitude entry'],
+      ['Ctrl + Shift + L', 'New letter'],
+      ['Ctrl + Shift + R', 'New recipe'],
+      ['Ctrl + K', 'Advanced search'],
+      ['Ctrl + ,', 'Account settings'],
+      ['Ctrl + /', 'Show this shortcuts panel'],
+      ['Escape', 'Close overlay / deselect'],
+    ];
+    const overlay = el('div', { class: 'overlay-backdrop', onclick: (e) => { if (e.target === overlay) overlay.remove(); } });
+    const modal = el('div', { class: 'overlay-modal' }, [
+      el('div', { class: 'overlay-title', text: '⌨️ Keyboard Shortcuts' }),
+      el('div', { class: 'shortcuts-grid' },
+        shortcuts.map(([key, desc]) => [
+          el('div', { class: 'shortcut-key', text: key }),
+          el('div', { class: 'shortcut-desc', text: desc })
+        ]).flat()
+      ),
+      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Close' })])
+    ]);
+    overlay.append(modal);
+    document.body.append(overlay);
   }
 
   function showToast(message) {
@@ -3467,6 +4076,11 @@ export function createApp(mount) {
     const user = state.auth.user;
     const displayName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.username || user.email;
 
+    if (!state.ui.accountTab) state.ui.accountTab = 'profile';
+    const activeTab = state.ui.accountTab;
+
+    const setTab = (t) => { state.ui.accountTab = t; render(false); };
+
     let keyString = '';
     if (state.key && typeof Uint8Array !== 'undefined') {
       try {
@@ -3474,242 +4088,468 @@ export function createApp(mount) {
         let binary = '';
         for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
         keyString = btoa(binary);
-      } catch {
-        keyString = '';
-      }
+      } catch { keyString = ''; }
     }
 
-    // ── Editable profile form ──────────────────────────────────────────────
-    const profileStatus = el('div', { class: 'lock-status', text: '' });
+    // ── Tab: Profile ──────────────────────────────────────────────────────
+    function buildProfileTab() {
+      const profileStatus = el('div', { class: 'lock-status', text: '' });
+      const mkInput = (placeholder, value, opts = {}) => el('input', {
+        class: 'lock-input',
+        type: opts.type || 'text',
+        placeholder,
+        value: value || '',
+        ...(opts.readonly ? { readonly: 'readonly' } : {})
+      });
+      const firstNameIn  = mkInput('First name', user.firstName);
+      const middleNameIn = mkInput('Middle name (optional)', user.middleName);
+      const lastNameIn   = mkInput('Last name', user.lastName);
+      const usernameIn   = mkInput(
+        user.username ? user.username : 'Choose a username (permanent once set)',
+        user.username || '',
+        user.username ? { readonly: true } : {}
+      );
+      const addressIn = mkInput('Street address', user.addressLine);
+      const cityIn    = mkInput('City', user.city);
+      const stateIn   = mkInput('State / Region', user.stateRegion);
+      const postalIn  = mkInput('ZIP / Postal code', user.postalCode);
+      const COUNTRY_OPTIONS = [
+        ['', 'Select country'],
+        ['US','United States'],['CA','Canada'],['GB','United Kingdom'],['AU','Australia'],
+        ['NZ','New Zealand'],['IE','Ireland'],['DE','Germany'],['FR','France'],['BR','Brazil'],
+        ['IN','India'],['ZA','South Africa'],['MX','Mexico'],['JP','Japan'],['KR','South Korea'],
+        ['CN','China'],['SG','Singapore'],['PH','Philippines'],['NG','Nigeria'],['GH','Ghana'],
+        ['KE','Kenya'],['AR','Argentina'],['CL','Chile'],['CO','Colombia'],['IT','Italy'],
+        ['ES','Spain'],['PT','Portugal'],['NL','Netherlands'],['SE','Sweden'],['NO','Norway'],
+        ['DK','Denmark'],['FI','Finland'],['PL','Poland'],['RU','Russia'],['UA','Ukraine'],
+        ['TR','Turkey'],['EG','Egypt'],['OTHER','Other']
+      ];
+      const countrySelect = el('select', { class: 'lock-input' },
+        COUNTRY_OPTIONS.map(([val, label]) => el('option', { value: val, text: label }))
+      );
+      countrySelect.value = user.countryCode || '';
 
-    const mkInput = (placeholder, value, opts = {}) => el('input', {
-      class: 'lock-input profile-field',
-      type: opts.type || 'text',
-      placeholder,
-      value: value || '',
-      ...(opts.readonly ? { readonly: 'readonly' } : {})
-    });
-
-    const firstNameIn  = mkInput('First name',         user.firstName);
-    const middleNameIn = mkInput('Middle name (optional)', user.middleName);
-    const lastNameIn   = mkInput('Last name',           user.lastName);
-
-    // Username: editable only if not yet set
-    const usernameIn = mkInput(
-      user.username ? user.username : 'Choose a username (permanent once set)',
-      user.username || '',
-      user.username ? { readonly: true } : {}
-    );
-    const usernameHint = user.username
-      ? el('div', { class: 'profile-hint', text: '🔒 Username is permanent and cannot be changed.' })
-      : el('div', { class: 'profile-hint', text: '⚠️ Choose carefully — username cannot be changed once set.' });
-
-    const emailDisplay = el('div', { class: 'account-row' }, [
-      el('div', { class: 'account-label', text: 'Email' }),
-      el('div', { class: 'account-value', text: user.email })
-    ]);
-
-    const addressLine1In = mkInput('Street address (line 1)', user.addressLine);
-    const cityIn         = mkInput('City',                    user.city);
-    const stateIn        = mkInput('State / Region',          user.stateRegion);
-    const postalIn       = mkInput('ZIP / Postal code',       user.postalCode);
-
-    const COUNTRY_OPTIONS = [
-      ['', 'Select country'],
-      ['US', 'United States'], ['CA', 'Canada'], ['GB', 'United Kingdom'],
-      ['AU', 'Australia'], ['NZ', 'New Zealand'], ['IE', 'Ireland'],
-      ['DE', 'Germany'], ['FR', 'France'], ['BR', 'Brazil'],
-      ['IN', 'India'], ['ZA', 'South Africa'], ['MX', 'Mexico'],
-      ['JP', 'Japan'], ['KR', 'South Korea'], ['CN', 'China'],
-      ['SG', 'Singapore'], ['PH', 'Philippines'], ['NG', 'Nigeria'],
-      ['GH', 'Ghana'], ['KE', 'Kenya'], ['AR', 'Argentina'],
-      ['CL', 'Chile'], ['CO', 'Colombia'], ['IT', 'Italy'],
-      ['ES', 'Spain'], ['PT', 'Portugal'], ['NL', 'Netherlands'],
-      ['SE', 'Sweden'], ['NO', 'Norway'], ['DK', 'Denmark'],
-      ['FI', 'Finland'], ['PL', 'Poland'], ['RU', 'Russia'],
-      ['UA', 'Ukraine'], ['TR', 'Turkey'], ['EG', 'Egypt'],
-      ['OTHER', 'Other']
-    ];
-    const countrySelect = el('select', { class: 'lock-input profile-field' },
-      COUNTRY_OPTIONS.map(([val, label]) => el('option', { value: val, text: label }))
-    );
-    countrySelect.value = user.countryCode || '';
-
-    const saveProfileBtn = el('button', {
-      class: 'btn small-btn',
-      type: 'button',
-      onclick: async () => {
+      const saveBtn = el('button', { class: 'btn small-btn', type: 'button', onclick: async () => {
         profileStatus.textContent = 'Saving…';
-        saveProfileBtn.disabled = true;
+        saveBtn.disabled = true;
         try {
           const payload = {
-            firstName:   firstNameIn.value.trim(),
-            middleName:  middleNameIn.value.trim() || null,
-            lastName:    lastNameIn.value.trim(),
-            addressLine: addressLine1In.value.trim(),
-            city:        cityIn.value.trim(),
-            stateRegion: stateIn.value.trim(),
-            postalCode:  postalIn.value.trim(),
-            countryCode: countrySelect.value || null
+            firstName: firstNameIn.value.trim(), middleName: middleNameIn.value.trim() || null,
+            lastName: lastNameIn.value.trim(), addressLine: addressIn.value.trim(),
+            city: cityIn.value.trim(), stateRegion: stateIn.value.trim(),
+            postalCode: postalIn.value.trim(), countryCode: countrySelect.value || null
           };
-          if (!user.username) {
-            payload.username = usernameIn.value.trim();
-          }
+          if (!user.username) payload.username = usernameIn.value.trim();
           const result = await updateProfile(state.auth.token, payload);
           state.auth.user = result.user;
           saveAuthSession({ ...state.auth });
-          profileStatus.textContent = '✓ Profile saved';
+          profileStatus.textContent = '✓ Saved';
           showToast('Profile updated');
           render(false);
-        } catch (err) {
-          profileStatus.textContent = err?.message || 'Failed to save';
-        } finally {
-          saveProfileBtn.disabled = false;
-        }
-      }
-    }, [
-      el('span', { class: 'btn-ic', text: '✓' }),
-      el('span', { text: 'Save profile' })
-    ]);
+        } catch (err) { profileStatus.textContent = err?.message || 'Failed'; }
+        finally { saveBtn.disabled = false; }
+      }}, [el('span', { class: 'btn-ic', text: '✓' }), el('span', { text: 'Save profile' })]);
 
-    const profileSection = el('div', { class: 'account-section' }, [
-      el('div', { class: 'account-section-title', text: 'Profile information' }),
-      el('div', { class: 'profile-grid' }, [
-        el('label', { class: 'profile-label', text: 'First name' }), firstNameIn,
-        el('label', { class: 'profile-label', text: 'Middle name' }), middleNameIn,
-        el('label', { class: 'profile-label', text: 'Last name' }), lastNameIn,
-        el('label', { class: 'profile-label', text: 'Username' }), usernameIn,
-      ]),
-      usernameHint,
-      emailDisplay,
-      el('div', { class: 'account-section-title', style: 'margin-top:14px', text: 'Address' }),
-      el('div', { class: 'profile-grid' }, [
-        el('label', { class: 'profile-label', text: 'Street address' }), addressLine1In,
-        el('label', { class: 'profile-label', text: 'City' }), cityIn,
-        el('label', { class: 'profile-label', text: 'State / Region' }), stateIn,
-        el('label', { class: 'profile-label', text: 'ZIP / Postal' }), postalIn,
-        el('label', { class: 'profile-label', text: 'Country' }), countrySelect,
-      ]),
-      el('div', { class: 'profile-save-row' }, [saveProfileBtn, profileStatus])
-    ]);
+      const avatarInitials = (displayName || '?').slice(0, 2).toUpperCase();
+      const avatarCard = el('div', { class: 'profile-avatar-card' }, [
+        el('div', { class: 'profile-avatar-circle', text: avatarInitials }),
+        el('div', { class: 'profile-avatar-info' }, [
+          el('div', { class: 'profile-avatar-name', text: displayName }),
+          el('div', { class: 'profile-avatar-email', text: user.email }),
+          user.isAdmin ? el('div', { class: 'profile-admin-badge', text: '🛡️ Administrator' }) : el('span'),
+        ])
+      ]);
 
-    const keyLabel = el('div', { class: 'account-label', text: 'Diary encryption key' });
-    const keyHelper = el('div', {
-      class: 'account-helper',
-      text: 'This key is what protects your diary. Click reveal to see it, then copy and paste it somewhere safe. Never share it with anyone you do not fully trust.'
-    });
+      const deleteStatus = el('div', { class: 'lock-status', text: '' });
+      const deleteConfirmIn = el('input', { class: 'lock-input', type: 'text', placeholder: 'Type DELETE to confirm' });
+      const deleteBtn = el('button', { class: 'btn danger ghost small-btn', type: 'button', onclick: async () => {
+        if (deleteConfirmIn.value !== 'DELETE') { deleteStatus.textContent = 'Type DELETE exactly to confirm'; return; }
+        if (!confirm('This permanently deletes your account and all diary data. This cannot be undone.')) return;
+        try {
+          await deleteAccount(state.auth.token);
+          logoutCompletely('Account deleted.');
+        } catch (e) { deleteStatus.textContent = e?.message || 'Failed'; }
+      }}, [el('span', { class: 'btn-ic', text: '🗑' }), el('span', { text: 'Delete my account' })]);
 
-    const keyField = el('input', {
-      class: 'key-display',
-      type: 'text',
-      readonly: 'readonly',
-      value: state.showEncryptionKey && keyString ? keyString : '••••••••••••••••••••••••••••••••'
-    });
+      return el('div', { class: 'cp-body' }, [
+        avatarCard,
+        el('div', { class: 'cp-two-col' }, [
+          el('div', { class: 'cp-section' }, [
+            el('div', { class: 'cp-section-title', text: 'Personal information' }),
+            el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'Email' }), el('div', { class: 'account-value', text: user.email })]),
+            el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'First name' }), firstNameIn]),
+            el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'Middle name' }), middleNameIn]),
+            el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'Last name' }), lastNameIn]),
+            el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'Username' }), usernameIn]),
+            el('div', { class: 'profile-hint', text: user.username ? '🔒 Username is locked once set.' : '⚠️ Choose carefully — permanent once set.' }),
+          ]),
+          el('div', { class: 'cp-section' }, [
+            el('div', { class: 'cp-section-title', text: 'Address' }),
+            el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'Street' }), addressIn]),
+            el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'City' }), cityIn]),
+            el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'State / Region' }), stateIn]),
+            el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'ZIP / Postal' }), postalIn]),
+            el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'Country' }), countrySelect]),
+          ])
+        ]),
+        el('div', { style: 'display:flex;gap:10px;align-items:center;' }, [saveBtn, profileStatus]),
+        el('div', { class: 'cp-section cp-danger-zone' }, [
+          el('div', { class: 'cp-section-title', text: '⚠️ Danger Zone' }),
+          el('div', { class: 'cp-row-hint', text: 'Permanently delete your account and all encrypted diary data. This cannot be undone.' }),
+          el('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px' }, [deleteConfirmIn, deleteBtn, deleteStatus])
+        ])
+      ]);
+    }
 
-    const revealBtn = el('button', {
-      class: 'btn ghost small-btn',
-      type: 'button',
-      onclick: () => {
-        state.showEncryptionKey = !state.showEncryptionKey;
-        render(false);
-      }
-    }, [
-      el('span', { class: 'btn-ic', text: state.showEncryptionKey ? '🙈' : '👁' }),
-      el('span', { text: state.showEncryptionKey ? 'Hide key' : 'Reveal key' })
-    ]);
+    // ── Tab: Security ─────────────────────────────────────────────────────
+    function buildSecurityTab() {
+      const keyField = el('input', {
+        class: 'key-display', type: 'text', readonly: 'readonly',
+        value: state.showEncryptionKey && keyString ? keyString : '••••••••••••••••••••••••••••••••'
+      });
+      const revealBtn = el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => { state.showEncryptionKey = !state.showEncryptionKey; render(false); } }, [
+        el('span', { class: 'btn-ic', text: state.showEncryptionKey ? '🙈' : '👁' }),
+        el('span', { text: state.showEncryptionKey ? 'Hide' : 'Reveal' })
+      ]);
+      const copyBtn = el('button', { class: 'btn ghost small-btn', type: 'button', onclick: async () => {
+        try {
+          if (!keyString) throw new Error('Key not available');
+          if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(keyString); }
+          else { keyField.select(); document.execCommand('copy'); }
+          showToast('Key copied — store it somewhere safe!');
+        } catch (e) { showToast(e?.message || 'Could not copy'); }
+      }}, [el('span', { class: 'btn-ic', text: '⧉' }), el('span', { text: 'Copy key' })]);
+
+      const [recentLogs, setRecentLogs] = useState([]);
+      useEffect(() => {
+        getAuditLogs(state.auth.token, 8)
+          .then(d => setRecentLogs(d.logs || []))
+          .catch(() => {});
+      }, []);
+
+      const ACTION_ICONS = { login: '🟢', login_failed: '🔴', register: '✨', profile_updated: '✏️', '2fa_enabled': '🔐', password_changed: '🔑', recovery_codes_regenerated: '🔑' };
+      const logRows = recentLogs.map(l =>
+        el('div', { class: 'security-log-row' }, [
+          el('span', { class: 'security-log-icon', text: ACTION_ICONS[l.action] || '📋' }),
+          el('span', { class: 'security-log-action', text: l.action.replace(/_/g, ' ') }),
+          el('span', { class: 'security-log-time', text: l.created_at ? new Date(l.created_at).toLocaleString() : '—' }),
+          l.ip_address ? el('span', { class: 'security-log-ip', text: l.ip_address }) : el('span')
+        ])
+      );
+
+      return el('div', { class: 'cp-body' }, [
+        el('div', { class: 'cp-two-col' }, [
+          el('div', { class: 'cp-section' }, [
+            el('div', { class: 'cp-section-title', text: 'Login & Access' }),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'Password' }), el('div', { class: 'cp-row-hint', text: 'Change your login password' })]),
+              el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => { const o = renderPasswordChangeOverlay(); root.append(o); } }, [el('span', { class: 'btn-ic', text: '✎' }), el('span', { text: 'Change password' })])
+            ]),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'Two-factor auth' }), el('div', { class: 'cp-row-hint', text: 'TOTP authenticator app' })]),
+              el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderTwoFactorOverlay() }, [el('span', { class: 'btn-ic', text: '🔐' }), el('span', { text: 'Manage 2FA' })])
+            ]),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'Recovery codes' }), el('div', { class: 'cp-row-hint', text: 'Backup access codes' })]),
+              el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderRecoveryCodesOverlay() }, [el('span', { class: 'btn-ic', text: '🔑' }), el('span', { text: 'Manage codes' })])
+            ]),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'Signed in as' }), el('div', { class: 'cp-row-hint', text: user.email })]),
+              el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => { state.showAccountOverlay = false; logoutCompletely('Signed out.'); } }, [el('span', { class: 'btn-ic', text: '⏏' }), el('span', { text: 'Sign out' })])
+            ]),
+          ]),
+          el('div', { class: 'cp-section' }, [
+            el('div', { class: 'cp-section-title', text: 'Encryption Key' }),
+            el('div', { class: 'cp-row-hint', text: 'Your diary is encrypted with this key. Store it somewhere safe — it cannot be recovered if lost.' }),
+            el('div', { class: 'account-key-row' }, [keyField, copyBtn, revealBtn]),
+          ])
+        ]),
+        el('div', { class: 'cp-section' }, [
+          el('div', { class: 'cp-section-title', text: 'Recent Account Activity' }),
+          el('div', { class: 'cp-row-hint', text: 'Your last 8 security events on this account.' }),
+          ...(recentLogs.length ? logRows : [el('div', { class: 'cp-row-hint', text: 'No recent activity recorded.' })]),
+          el('div', { style: 'margin-top:8px' }, [
+            el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderAuditLogOverlay() }, [el('span', { class: 'btn-ic', text: '📋' }), el('span', { text: 'View full activity log' })])
+          ])
+        ])
+      ]);
+    }
+
+    // ── Tab: Appearance ───────────────────────────────────────────────────
+    function buildAppearanceTab() {
+      const AMBIENCE_OPTIONS = [
+        ['silent', '🔇 Silent'], ['gentle', '🎵 Gentle'], ['nature', '🌿 Nature'], ['rain', '🌧 Rain']
+      ];
+      const DENSITY_OPTIONS = [['compact', 'Compact'], ['normal', 'Normal'], ['comfortable', 'Comfortable']];
+      const FONT_SIZE_OPTIONS = [['small', 'Small'], ['medium', 'Medium'], ['large', 'Large']];
+
+      return el('div', { class: 'cp-body' }, [
+        el('div', { class: 'cp-section' }, [
+          el('div', { class: 'cp-section-title', text: 'Background Theme' }),
+          el('div', { class: 'cp-row-hint', text: 'Select a background theme for your diary. Your choice is saved to your account.' }),
+        ]),
+        renderAccountThemeSection(),
+        el('div', { class: 'cp-two-col' }, [
+          el('div', { class: 'cp-section' }, [
+            el('div', { class: 'cp-section-title', text: 'Ambience' }),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'Sound mood' }), el('div', { class: 'cp-row-hint', text: 'Background audio while writing' })]),
+              el('div', { class: 'setting-pill-row' }, AMBIENCE_OPTIONS.map(([val, label]) =>
+                el('button', { class: `pill ${state.ui.ambience === val ? 'active' : ''}`, type: 'button', onclick: () => updateUiPrefs({ ambience: val }) }, [el('span', { text: label })])
+              ))
+            ]),
+          ]),
+          el('div', { class: 'cp-section' }, [
+            el('div', { class: 'cp-section-title', text: 'Layout & Text' }),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'UI density' }), el('div', { class: 'cp-row-hint', text: 'Spacing between elements' })]),
+              el('div', { class: 'setting-pill-row' }, DENSITY_OPTIONS.map(([val, label]) =>
+                el('button', { class: `pill ${(state.ui.density || 'normal') === val ? 'active' : ''}`, type: 'button', onclick: () => updateUiPrefs({ density: val }) }, [el('span', { text: label })])
+              ))
+            ]),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'Font size' }), el('div', { class: 'cp-row-hint', text: 'Base reading/writing size' })]),
+              el('div', { class: 'setting-pill-row' }, FONT_SIZE_OPTIONS.map(([val, label]) =>
+                el('button', { class: `pill ${(state.ui.fontSize || 'medium') === val ? 'active' : ''}`, type: 'button', onclick: () => updateUiPrefs({ fontSize: val }) }, [el('span', { text: label })])
+              ))
+            ]),
+          ])
+        ])
+      ]);
+    }
+
+    // ── Tab: Vaults & Folders ─────────────────────────────────────────────
+    function buildVaultsTab() {
+      return el('div', { class: 'cp-body' }, [
+        el('div', { class: 'cp-section' }, [
+          el('div', { class: 'cp-section-title', text: 'Vaults' }),
+          renderAccountVaultsSection(),
+        ]),
+        el('div', { class: 'cp-section' }, [
+          el('div', { class: 'cp-section-title', text: 'Folders' }),
+          renderAccountFoldersSection(),
+        ])
+      ]);
+    }
+
+    // ── Tab: Preferences ─────────────────────────────────────────────────
+    function buildPreferencesTab() {
+      const AUTO_LOCK_OPTIONS = [0, 5, 15, 30, 60];
+      const LOCALE_OPTIONS = [
+        ['en-US','🇺🇸 English (US)'],['en-GB','🇬🇧 English (UK)'],['es-ES','🇪🇸 Español'],
+        ['fr-FR','🇫🇷 Français'],['de-DE','🇩🇪 Deutsch'],['pt-BR','🇧🇷 Português'],
+        ['ja-JP','🇯🇵 日本語'],['zh-CN','🇨🇳 中文'],['ko-KR','🇰🇷 한국어'],['ar-SA','🇸🇦 العربية']
+      ];
+      const EDITOR_FONT_OPTIONS = [
+        ['sans', 'Sans-serif'], ['serif', 'Serif'], ['mono', 'Monospace'], ['cursive', 'Cursive']
+      ];
+      const ENTRY_TYPE_OPTIONS = [
+        ['all', 'No default'], ['diary', '📖 Diary'], ['note', '📝 Note'], ['gratitude', '🙏 Gratitude'], ['dream', '💭 Dream']
+      ];
+
+      return el('div', { class: 'cp-body' }, [
+        el('div', { class: 'cp-two-col' }, [
+          el('div', { class: 'cp-section' }, [
+            el('div', { class: 'cp-section-title', text: 'Display' }),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'Color mode' }), el('div', { class: 'cp-row-hint', text: 'Light / Dark base' })]),
+              el('div', { class: 'setting-pill-row' }, [
+                el('button', { class: `pill ${state.ui.themeId === 'light' ? 'active' : ''}`, type: 'button', onclick: () => updateUiPrefs({ themeId: 'light' }) }, [el('span', { text: '☀️ Light' })]),
+                el('button', { class: `pill ${state.ui.themeId === 'dark' ? 'active' : ''}`, type: 'button', onclick: () => updateUiPrefs({ themeId: 'dark' }) }, [el('span', { text: '🌙 Dark' })])
+              ])
+            ]),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'Page motion' }), el('div', { class: 'cp-row-hint', text: 'Animated page transitions' })]),
+              el('button', { class: `toggle-chip ${state.ui.pageMotion ? 'active' : ''}`, type: 'button', onclick: () => updateUiPrefs({ pageMotion: !state.ui.pageMotion }) }, [el('span', { text: state.ui.pageMotion ? 'On' : 'Off' })])
+            ]),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'Comfort mode' }), el('div', { class: 'cp-row-hint', text: 'Softer layout and spacing' })]),
+              el('button', { class: `toggle-chip ${state.ui.comfortMode ? 'active' : ''}`, type: 'button', onclick: () => updateUiPrefs({ comfortMode: !state.ui.comfortMode }) }, [el('span', { text: state.ui.comfortMode ? 'On' : 'Off' })])
+            ]),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'Kid mode' }), el('div', { class: 'cp-row-hint', text: 'Simplified interface' })]),
+              el('button', { class: `toggle-chip ${state.ui.kidMode ? 'active' : ''}`, type: 'button', onclick: () => updateUiPrefs({ kidMode: !state.ui.kidMode }) }, [el('span', { text: state.ui.kidMode ? 'On' : 'Off' })])
+            ]),
+          ]),
+          el('div', { class: 'cp-section' }, [
+            el('div', { class: 'cp-section-title', text: 'Security & Session' }),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'Auto-lock' }), el('div', { class: 'cp-row-hint', text: 'Lock diary after inactivity' })]),
+              el('div', { class: 'setting-pill-row' }, AUTO_LOCK_OPTIONS.map(m => el('button', {
+                class: `pill ${state.ui.autoLockMinutes === m ? 'active' : ''}`,
+                type: 'button', onclick: () => updateUiPrefs({ autoLockMinutes: m })
+              }, [el('span', { text: m ? `${m}m` : 'Off' })])))
+            ]),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'Trusted device' }), el('div', { class: 'cp-row-hint', text: 'Skip re-auth on this device' })]),
+              el('button', { class: `toggle-chip ${state.ui.trustedDevice ? 'active' : ''}`, type: 'button', onclick: () => updateUiPrefs({ trustedDevice: !state.ui.trustedDevice }) }, [el('span', { text: state.ui.trustedDevice ? 'Trusted' : 'Not trusted' })])
+            ]),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'Show decoy vault' }), el('div', { class: 'cp-row-hint', text: 'Show decoy option on lock screen' })]),
+              el('button', { class: `toggle-chip ${state.ui.showDecoyVault ? 'active' : ''}`, type: 'button', onclick: () => updateUiPrefs({ showDecoyVault: !state.ui.showDecoyVault }) }, [el('span', { text: state.ui.showDecoyVault ? 'Visible' : 'Hidden' })])
+            ]),
+          ])
+        ]),
+        el('div', { class: 'cp-two-col' }, [
+          el('div', { class: 'cp-section' }, [
+            el('div', { class: 'cp-section-title', text: 'Language & Locale' }),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'Language' }), el('div', { class: 'cp-row-hint', text: 'UI language and date format' })]),
+              (() => {
+                const sel = el('select', { class: 'lock-input', onchange: (e) => updateUiPrefs({ locale: e.target.value }) },
+                  LOCALE_OPTIONS.map(([val, label]) => el('option', { value: val, text: label }))
+                );
+                sel.value = state.ui.locale || 'en-US';
+                return sel;
+              })()
+            ]),
+          ]),
+          el('div', { class: 'cp-section' }, [
+            el('div', { class: 'cp-section-title', text: 'Writing' }),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'Editor font' }), el('div', { class: 'cp-row-hint', text: 'Font used while writing entries' })]),
+              el('div', { class: 'setting-pill-row' }, EDITOR_FONT_OPTIONS.map(([val, label]) =>
+                el('button', { class: `pill ${(state.ui.editorFont || 'sans') === val ? 'active' : ''}`, type: 'button', onclick: () => updateUiPrefs({ editorFont: val }) }, [el('span', { text: label })])
+              ))
+            ]),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'Default entry type' }), el('div', { class: 'cp-row-hint', text: 'Pre-select type for new entries' })]),
+              el('div', { class: 'setting-pill-row', style: 'flex-wrap:wrap' }, ENTRY_TYPE_OPTIONS.map(([val, label]) =>
+                el('button', { class: `pill ${(state.ui.defaultEntryType || 'all') === val ? 'active' : ''}`, type: 'button', onclick: () => updateUiPrefs({ defaultEntryType: val }) }, [el('span', { text: label })])
+              ))
+            ]),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'Spellcheck' }), el('div', { class: 'cp-row-hint', text: 'Browser spellcheck in editor' })]),
+              el('button', { class: `toggle-chip ${state.ui.spellcheck !== false ? 'active' : ''}`, type: 'button', onclick: () => updateUiPrefs({ spellcheck: state.ui.spellcheck === false ? true : false }) }, [el('span', { text: state.ui.spellcheck !== false ? 'On' : 'Off' })])
+            ]),
+            el('div', { class: 'cp-row' }, [
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'Daily word goal' }), el('div', { class: 'cp-row-hint', text: 'Progress bar shown in library rail (0 = off)' })]),
+              (() => {
+                const inp = el('input', {
+                  class: 'lock-input', type: 'number', min: '0', max: '10000', style: 'width:90px',
+                  value: String(state.ui.writingGoalWords || 0)
+                });
+                const saveGoalBtn = el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => {
+                  const v = Math.max(0, Math.min(10000, parseInt(inp.value, 10) || 0));
+                  updateUiPrefs({ writingGoalWords: v });
+                  showToast(v > 0 ? `Goal set: ${v} words/day` : 'Daily goal disabled');
+                }}, [el('span', { text: 'Set' })]);
+                return el('div', { style: 'display:flex;gap:8px;align-items:center' }, [inp, saveGoalBtn]);
+              })()
+            ]),
+          ])
+        ])
+      ]);
+    }
+
+    // ── Tab: My Stats ─────────────────────────────────────────────────────
+    function buildStatsTab() {
+      const [stats, setStats] = useState(null);
+      useEffect(() => {
+        getUserStats(state.auth.token)
+          .then(s => setStats(s))
+          .catch(() => setStats({}));
+      }, []);
+
+      const entries = state.vault?.entries || [];
+      const wordCount = entries.reduce((sum, e) => {
+        const text = [e.title || '', e.body || '', e.content || ''].join(' ');
+        return sum + text.trim().split(/\s+/).filter(Boolean).length;
+      }, 0);
+      const entryCount = entries.length;
+      const moodCounts = {};
+      entries.forEach(e => { if (e.mood) moodCounts[e.mood] = (moodCounts[e.mood] || 0) + 1; });
+      const topMood = Object.entries(moodCounts).sort((a, b) => b[1] - a[1])[0];
+      const typeCounts = {};
+      entries.forEach(e => { if (e.type) typeCounts[e.type] = (typeCounts[e.type] || 0) + 1; });
+
+      const memberSince = stats?.memberSince ? new Date(stats.memberSince).toLocaleDateString() : '—';
+      const lastLogin = stats?.lastLogin ? new Date(stats.lastLogin).toLocaleString() : '—';
+      const daysSince = stats?.memberSince ? Math.floor((Date.now() - new Date(stats.memberSince)) / 86400000) : null;
+
+      const vaultStatCards = [
+        ['📖 Entries', String(entryCount), 'Total diary entries in this vault'],
+        ['📝 Words', wordCount > 999 ? `${(wordCount/1000).toFixed(1)}k` : String(wordCount), 'Estimated words written'],
+        ['😊 Top mood', topMood ? topMood[0] : '—', topMood ? `${topMood[1]} entries` : 'No moods recorded'],
+        ['🔑 Logins', String(stats?.loginCount ?? '…'), 'Total times you\'ve signed in'],
+      ].map(([icon, value, hint]) =>
+        el('div', { class: 'admin-stat-card' }, [
+          el('div', { class: 'admin-stat-icon', text: icon }),
+          el('div', { class: 'admin-stat-value', text: value }),
+          el('div', { class: 'admin-stat-label', text: hint })
+        ])
+      );
+
+      const typeRows = Object.entries(typeCounts).sort((a,b) => b[1]-a[1]).map(([type, count]) => {
+        const pct = entryCount > 0 ? Math.round((count / entryCount) * 100) : 0;
+        return el('div', { class: 'admin-bar-row' }, [
+          el('div', { class: 'admin-bar-label', text: type }),
+          el('div', { class: 'admin-bar-track' }, [el('div', { class: 'admin-bar-fill', style: `width:${pct}%` })]),
+          el('div', { class: 'admin-bar-count', text: String(count) })
+        ]);
+      });
+
+      return el('div', { class: 'cp-body' }, [
+        el('div', { class: 'cp-section' }, [
+          el('div', { class: 'cp-section-title', text: 'Your Diary Stats' }),
+          el('div', { class: 'admin-stat-grid' }, vaultStatCards)
+        ]),
+        el('div', { class: 'cp-two-col' }, [
+          el('div', { class: 'cp-section' }, [
+            el('div', { class: 'cp-section-title', text: 'Account Info' }),
+            el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'Member since' }), el('div', { class: 'account-value', text: memberSince })]),
+            daysSince !== null ? el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'Days as member' }), el('div', { class: 'account-value', text: String(daysSince) })]) : el('span'),
+            el('div', { class: 'cp-row' }, [el('div', { class: 'cp-row-label', text: 'Last login' }), el('div', { class: 'account-value', text: lastLogin })]),
+          ]),
+          el('div', { class: 'cp-section' }, [
+            el('div', { class: 'cp-section-title', text: 'Entry Types Breakdown' }),
+            ...(typeRows.length ? typeRows : [el('div', { class: 'cp-row-hint', text: 'No typed entries yet.' })])
+          ])
+        ])
+      ]);
+    }
+
+    const TABS = [
+      { id: 'profile',     icon: '👤', label: 'Profile' },
+      { id: 'security',    icon: '🔒', label: 'Security' },
+      { id: 'appearance',  icon: '🎨', label: 'Appearance' },
+      { id: 'vaults',      icon: '🗄️',  label: 'Vaults & Folders' },
+      { id: 'preferences', icon: '⚙️',  label: 'Preferences' },
+      { id: 'stats',       icon: '📊',  label: 'My Stats' },
+    ];
+
+    const tabBar = el('div', { class: 'cp-tabs' },
+      TABS.map(t => el('button', {
+        class: `cp-tab ${activeTab === t.id ? 'active' : ''}`,
+        type: 'button',
+        onclick: () => setTab(t.id)
+      }, [el('span', { class: 'cp-tab-icon', text: t.icon }), el('span', { text: t.label })]))
+    );
+
+    let tabContent;
+    if (activeTab === 'profile')         tabContent = buildProfileTab();
+    else if (activeTab === 'security')   tabContent = buildSecurityTab();
+    else if (activeTab === 'appearance') tabContent = buildAppearanceTab();
+    else if (activeTab === 'vaults')     tabContent = buildVaultsTab();
+    else if (activeTab === 'stats')      tabContent = buildStatsTab();
+    else                                 tabContent = buildPreferencesTab();
 
     const closeBtn = el('button', {
-      class: 'btn ghost small-btn',
+      class: 'btn ghost small-btn cp-close-btn',
       type: 'button',
-      onclick: () => {
-        state.showAccountOverlay = false;
-        state.showEncryptionKey = false;
-        render(false);
-      }
-    }, [
-      el('span', { class: 'btn-ic', text: '✕' }),
-      el('span', { text: 'Close' })
-    ]);
+      onclick: () => { state.showAccountOverlay = false; state.showEncryptionKey = false; render(false); }
+    }, [el('span', { class: 'btn-ic', text: '✕' }), el('span', { text: 'Close' })]);
 
-    const copyBtn = el('button', {
-      class: 'btn ghost small-btn',
-      type: 'button',
-      onclick: async () => {
-        try {
-          if (!keyString) throw new Error('Key not available yet');
-          if (navigator.clipboard?.writeText) {
-            await navigator.clipboard.writeText(keyString);
-            showToast('Key copied. Paste it somewhere safe you control.');
-          } else {
-            keyField.select();
-            document.execCommand('copy');
-            showToast('Key copied. Paste it somewhere safe you control.');
-          }
-        } catch (e) {
-          showToast(e?.message || 'Could not copy key right now');
-        }
-      }
-    }, [
-      el('span', { class: 'btn-ic', text: '⧉' }),
-      el('span', { text: 'Copy key' })
-    ]);
-
-    const keyRow = el('div', { class: 'account-key-row' }, [keyField, copyBtn, revealBtn]);
-
-    const changePasswordBtn = el('button', {
-      class: 'btn ghost small-btn',
-      type: 'button',
-      onclick: () => {
-        const overlay = renderPasswordChangeOverlay();
-        root.append(overlay);
-      }
-    }, [
-      el('span', { class: 'btn-ic', text: '✎' }),
-      el('span', { text: 'Change password' })
-    ]);
-
-    const passwordRow = el('div', { class: 'account-row' }, [
-      el('div', { class: 'account-label', text: 'Password' }),
-      changePasswordBtn
-    ]);
-
-    const securitySection = el('div', { class: 'account-section' }, [
-      el('div', { class: 'account-section-title', text: 'Security & Privacy' }),
-      el('div', { class: 'account-row' }, [
-        el('div', { class: 'account-label', text: 'Two-factor auth (2FA)' }),
-        el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderTwoFactorOverlay() }, [
-          el('span', { class: 'btn-ic', text: '🔐' }),
-          el('span', { text: 'Manage 2FA' })
-        ])
+    const card = el('div', { class: 'account-card', style: 'position:relative' }, [
+      el('div', { class: 'cp-header' }, [
+        el('div', {}, [
+          el('div', { class: 'cp-title', text: `👤 ${displayName}` }),
+          el('div', { class: 'cp-subtitle', text: 'My Account' })
+        ]),
+        closeBtn
       ]),
-      el('div', { class: 'account-row' }, [
-        el('div', { class: 'account-label', text: 'Account recovery codes' }),
-        el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderRecoveryCodesOverlay() }, [
-          el('span', { class: 'btn-ic', text: '🔑' }),
-          el('span', { text: 'Recovery codes' })
-        ])
-      ]),
-      el('div', { class: 'account-row' }, [
-        el('div', { class: 'account-label', text: 'Security audit log' }),
-        el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderAuditLogOverlay() }, [
-          el('span', { class: 'btn-ic', text: '📋' }),
-          el('span', { text: 'View activity' })
-        ])
-      ])
-    ]);
-
-    const card = el('div', { class: 'account-card' }, [
-      el('div', { class: 'lock-title', text: 'Your account & security' }),
-      profileSection,
-      passwordRow,
-      keyLabel,
-      keyHelper,
-      keyRow,
-      securitySection,
-      renderAccountThemeSection(),
-      renderAccountVaultsSection(),
-      renderAccountFoldersSection(),
-      closeBtn
+      tabBar,
+      tabContent
     ]);
 
     return el('div', { class: 'account-overlay' }, [card]);
@@ -4479,16 +5319,22 @@ export function createApp(mount) {
       moduleType: 'recipe',
       date,
       time: currentTimeValue(),
-      title: 'Cozy recipe card',
-      mood: 'grateful',
+      title: 'New Recipe',
       privacyLevel: 'private',
       accentColor: 'mint',
-      recipeCategory: 'Cozy treat',
-      ingredients: [''],
-      steps: [''],
-      servings: '2',
-      prepTime: '15 min',
-      tags: ['recipe'],
+      recipeCategory: '',
+      ingredients: [],
+      steps: [],
+      servings: '',
+      prepTime: '',
+      cookTime: '',
+      totalTime: '',
+      difficulty: '',
+      cuisine: '',
+      dietaryTags: [],
+      nutritionNotes: '',
+      source: '',
+      tags: [],
       body: '',
       createdAt: now,
       updatedAt: now
@@ -4497,6 +5343,43 @@ export function createApp(mount) {
     await selectEntry(id);
     persistVault();
     showToast('Recipe saved');
+  }
+
+  async function createResolution() {
+    const id = createNewEntryId();
+    const date = isoDate();
+    const now = new Date().toISOString();
+    const entry = normalizeEntry({
+      id,
+      moduleType: 'resolution',
+      date,
+      time: currentTimeValue(),
+      title: 'Trigger Resolution',
+      privacyLevel: 'private',
+      accentColor: 'violet',
+      triggerName: '',
+      triggerPerson: '',
+      triggerDescription: '',
+      emotionalResponse: '',
+      physicalResponse: '',
+      thoughtPatterns: '',
+      defaultReaction: '',
+      rootCause: '',
+      desiredResponse: '',
+      deEscalationSteps: [],
+      communicationPlan: '',
+      supportNeeded: '',
+      resolutionStatement: '',
+      resolutionStatus: 'open',
+      tags: [],
+      body: '',
+      createdAt: now,
+      updatedAt: now
+    });
+    state.vault.entries.push(entry);
+    await selectEntry(id);
+    persistVault();
+    showToast('Resolution created');
   }
 
   function deleteEntry(id) {
@@ -4572,14 +5455,66 @@ export function createApp(mount) {
     const prepTimeInput = document.querySelector('[data-focus-key*="prepTime"]');
     if (prepTimeInput) patch.prepTime = prepTimeInput.value;
 
+    const cookTimeInput = document.querySelector('[data-focus-key*="cookTime"]');
+    if (cookTimeInput) patch.cookTime = cookTimeInput.value;
+
+    const totalTimeInput = document.querySelector('[data-focus-key*="totalTime"]');
+    if (totalTimeInput) patch.totalTime = totalTimeInput.value;
+
     const servingsInput = document.querySelector('[data-focus-key*="servings"]');
     if (servingsInput) patch.servings = servingsInput.value;
 
-    const ingredientsInput = document.querySelector('[data-focus-key*="ingredients"]');
-    if (ingredientsInput) patch.ingredients = normalizeLineList(ingredientsInput.value, 16);
+    const cuisineInput = document.querySelector('[data-focus-key*="cuisine"]');
+    if (cuisineInput) patch.cuisine = cuisineInput.value;
 
-    const stepsInput = document.querySelector('[data-focus-key*="steps"]');
-    if (stepsInput) patch.steps = normalizeLineList(stepsInput.value, 16);
+    const difficultyInput = document.querySelector('[data-focus-key*="difficulty"]');
+    if (difficultyInput) patch.difficulty = difficultyInput.value;
+
+    const sourceInput = document.querySelector('[data-focus-key*="source"]');
+    if (sourceInput) patch.source = sourceInput.value;
+
+    const nutritionNotesInput = document.querySelector('[data-focus-key*="nutritionNotes"]');
+    if (nutritionNotesInput) patch.nutritionNotes = nutritionNotesInput.value;
+
+    // Resolution fields
+    const triggerNameInput = document.querySelector('[data-focus-key*="triggerName"]');
+    if (triggerNameInput) patch.triggerName = triggerNameInput.value;
+
+    const triggerPersonInput = document.querySelector('[data-focus-key*="triggerPerson"]');
+    if (triggerPersonInput) patch.triggerPerson = triggerPersonInput.value;
+
+    const triggerDescriptionInput = document.querySelector('[data-focus-key*="triggerDescription"]');
+    if (triggerDescriptionInput) patch.triggerDescription = triggerDescriptionInput.value;
+
+    const emotionalResponseInput = document.querySelector('[data-focus-key*="emotionalResponse"]');
+    if (emotionalResponseInput) patch.emotionalResponse = emotionalResponseInput.value;
+
+    const physicalResponseInput = document.querySelector('[data-focus-key*="physicalResponse"]');
+    if (physicalResponseInput) patch.physicalResponse = physicalResponseInput.value;
+
+    const thoughtPatternsInput = document.querySelector('[data-focus-key*="thoughtPatterns"]');
+    if (thoughtPatternsInput) patch.thoughtPatterns = thoughtPatternsInput.value;
+
+    const defaultReactionInput = document.querySelector('[data-focus-key*="defaultReaction"]');
+    if (defaultReactionInput) patch.defaultReaction = defaultReactionInput.value;
+
+    const rootCauseInput = document.querySelector('[data-focus-key*="rootCause"]');
+    if (rootCauseInput) patch.rootCause = rootCauseInput.value;
+
+    const desiredResponseInput = document.querySelector('[data-focus-key*="desiredResponse"]');
+    if (desiredResponseInput) patch.desiredResponse = desiredResponseInput.value;
+
+    const communicationPlanInput = document.querySelector('[data-focus-key*="communicationPlan"]');
+    if (communicationPlanInput) patch.communicationPlan = communicationPlanInput.value;
+
+    const supportNeededInput = document.querySelector('[data-focus-key*="supportNeeded"]');
+    if (supportNeededInput) patch.supportNeeded = supportNeededInput.value;
+
+    const resolutionStatementInput = document.querySelector('[data-focus-key*="resolutionStatement"]');
+    if (resolutionStatementInput) patch.resolutionStatement = resolutionStatementInput.value;
+
+    const resolutionStatusInput = document.querySelector('[data-focus-key*="resolutionStatus"]');
+    if (resolutionStatusInput) patch.resolutionStatus = resolutionStatusInput.value;
 
     const richEditorEl = document.querySelector('.rich-editor[contenteditable]');
     if (richEditorEl) patch.body = htmlToMarkdown(richEditorEl.innerHTML);
@@ -4650,31 +5585,58 @@ export function createApp(mount) {
     const feedList = el('div', { class: 'feed-list' },
       visibleEntries.length ? visibleEntries.map((e) => {
         const active = e.id === state.selectedId;
-        const card = el('button', {
-          class: `entry-card feed-card accent-${e.accentColor || 'rose'} ${active ? 'active' : ''}`,
-          onclick: () => {
-            selectEntry(e.id);
+        const wordCount = (e.body || '').trim().split(/\s+/).filter(Boolean).length;
+        const readMins = wordCount > 0 ? Math.max(1, Math.round(wordCount / 200)) : null;
+
+        const starBtn = el('button', {
+          class: `entry-star-btn ${e.starred ? 'starred' : ''}`,
+          type: 'button',
+          title: e.starred ? 'Remove from favourites' : 'Add to favourites',
+          onmousedown: (ev) => { ev.stopPropagation(); ev.preventDefault(); },
+          onclick: (ev) => {
+            ev.stopPropagation();
+            const entry = state.vault.entries.find(x => x.id === e.id);
+            if (entry) { entry.starred = !entry.starred; persistVault(); render(false); }
           }
+        }, [el('span', { text: e.starred ? '★' : '☆' })]);
+
+        const card = el('button', {
+          class: `entry-card feed-card accent-${e.accentColor || 'rose'} ${active ? 'active' : ''} ${e.pinned ? 'pinned-card' : ''} ${e.starred ? 'starred-card' : ''}`,
+          onclick: () => { selectEntry(e.id); }
         }, [
-          el('div', { class: 'entry-card-top', }, [
-            el('span', { class: 'entry-type-chip', text: moduleLabel(e.moduleType) }),
-            el('span', { class: 'secondary-chip', text: entryContextText(e) })
+          el('div', { class: 'entry-card-top' }, [
+            el('div', { class: 'entry-card-badges' }, [
+              el('span', { class: 'entry-type-chip', text: moduleLabel(e.moduleType) }),
+              e.pinned ? el('span', { class: 'entry-pin-badge', text: '📌' }) : el('span'),
+              el('span', { class: 'secondary-chip', text: entryContextText(e) })
+            ]),
+            starBtn
           ]),
           el('div', { class: 'entry-title', text: e.title || 'Untitled' }),
           el('div', { class: 'entry-meta' }, [
             el('span', { text: formatPrettyDate(e.date) }),
             el('span', { class: 'dot', text: '•' }),
-            el('span', { text: e.time || formatEntryTime(e.createdAt) || nowTime() })
+            el('span', { text: e.time || formatEntryTime(e.createdAt) || nowTime() }),
+            readMins ? el('span', { class: 'entry-read-time', text: `· ~${readMins}m read` }) : el('span')
           ]),
-          e.moduleType !== 'recipe' ? el('div', { class: 'entry-mood-line' }, [
+          e.moduleType === 'recipe' ? el('div', { class: 'entry-mood-line' }, [
+            e.difficulty ? el('span', { class: 'insight-chip', text: e.difficulty }) : el('span'),
+            e.prepTime ? el('span', { class: 'insight-chip', text: `⏱ ${e.prepTime}` }) : el('span'),
+            e.servings ? el('span', { class: 'insight-chip', text: `${e.servings} servings` }) : el('span'),
+            (e.ingredients || []).filter(r => (r.name || r || '').toString().trim()).length
+              ? el('span', { class: 'insight-chip', text: `${(e.ingredients || []).filter(r => (r.name || r || '').toString().trim()).length} ingredients` })
+              : el('span')
+          ]) : e.moduleType === 'resolution' ? el('div', { class: 'entry-mood-line' }, [
+            e.resolutionStatus === 'resolved'
+              ? el('span', { class: 'insight-chip res-chip-resolved', text: '\u2705 Resolved' })
+              : e.resolutionStatus === 'in-progress'
+                ? el('span', { class: 'insight-chip res-chip-progress', text: '\ud83d\udfe1 In Progress' })
+                : el('span', { class: 'insight-chip res-chip-open', text: '\ud83d\udd34 Open' }),
+            e.triggerPerson ? el('span', { class: 'insight-chip', text: `\ud83d\udc64 ${e.triggerPerson}` }) : el('span')
+          ]) : el('div', { class: 'entry-mood-line' }, [
             el('span', { class: 'insight-chip', text: moodLabel(e.mood) }),
             el('span', { class: 'insight-chip', text: moodIntensityLabel(e.moodIntensity) }),
-            moodBlendText(e)
-              ? el('span', { class: 'insight-chip', text: moodBlendText(e) })
-              : el('span')
-          ]) : el('div', { class: 'entry-mood-line' }, [
-            e.prepTime ? el('span', { class: 'insight-chip', text: e.prepTime }) : el('span'),
-            e.servings ? el('span', { class: 'insight-chip', text: `${e.servings} servings` }) : el('span')
+            moodBlendText(e) ? el('span', { class: 'insight-chip', text: moodBlendText(e) }) : el('span')
           ]),
           el('div', { class: 'entry-preview', text: summarizeEntry(e) }),
           e.tags?.length
@@ -4729,6 +5691,7 @@ export function createApp(mount) {
     const editor = renderEditor(selected, keepEditorFocus);
 
     // Left navigation + search + entry feed
+    const starredCount = state.vault.entries.filter(e => e.starred).length;
     const sidebar = el('div', { class: 'sidebar' }, [
       el('div', { class: 'sidebar-head' }, [
         el('div', { class: 'sidebar-title', text: 'My world' }),
@@ -4745,14 +5708,21 @@ export function createApp(mount) {
         el('div', { class: 'filter-pills' }, [
           ...MODULE_OPTIONS
         ].map(([value, label]) => el('button', {
-          class: `pill ${state.activeModule === value ? 'active' : ''}`,
+          class: `pill ${state.activeModule === value && !state.filterStarred ? 'active' : ''}`,
           onclick: () => {
             state.activeModule = value;
+            state.filterStarred = false;
             if (value !== 'all' && value !== 'diary') state.activeType = 'all';
             render();
           }
         }, [el('span', { text: label })]))),
-        (state.activeModule === 'all' || state.activeModule === 'diary') ? el('div', { class: 'filter-pills' }, [
+        el('div', { class: 'filter-pills' }, [
+          el('button', {
+            class: `pill ${state.filterStarred ? 'active starred-pill' : ''}`,
+            onclick: () => { state.filterStarred = !state.filterStarred; render(); }
+          }, [el('span', { text: `★ Starred${starredCount ? ` (${starredCount})` : ''}` })])
+        ]),
+        (state.activeModule === 'all' || state.activeModule === 'diary') && !state.filterStarred ? el('div', { class: 'filter-pills' }, [
           ['all', 'All'],
           ...ENTRY_TYPE_OPTIONS
         ].map(([value, label]) => el('button', {
@@ -4948,8 +5918,39 @@ export function createApp(mount) {
       renderThemeRail()
     ]);
 
+    // ── FAB speed-dial ─────────────────────────────────────────────────
+    const fabItems = [
+      { icon: '\ud83d\udcd6', label: 'Diary entry', action: () => createEntry('journal') },
+      { icon: '\u270f\ufe0f', label: 'Quick thought', action: () => createEntry('quick') },
+      { icon: '\u2764\ufe0f', label: 'Gratitude', action: () => createEntry('gratitude') },
+      { icon: '\ud83c\udf19', label: 'Dream log', action: () => createEntry('dream') },
+      { icon: '\u2709\ufe0f', label: 'Letter', action: () => createLetter() },
+      { icon: '\ud83d\udcdd', label: 'Note', action: () => createNote() },
+      { icon: '\ud83c\udf73', label: 'Recipe', action: () => createRecipe() },
+      { icon: '\ud83e\udde0', label: 'Trigger Resolution', action: () => createResolution() },
+    ];
+    let fabOpen = false;
+    const fabMenu = el('div', { class: 'fab-menu' });
+    const fabToggle = el('button', {
+      class: 'fab-toggle', type: 'button', title: 'New entry…',
+      onclick: () => {
+        fabOpen = !fabOpen;
+        fabToggle.classList.toggle('fab-open', fabOpen);
+        fabMenu.classList.toggle('fab-menu-open', fabOpen);
+      }
+    }, [el('span', { class: 'fab-icon', text: '\u2712\ufe0f' })]);
+    fabItems.forEach(({ icon, label, action }) => {
+      const item = el('button', { class: 'fab-item', type: 'button', onclick: () => { action(); fabOpen = false; fabToggle.classList.remove('fab-open'); fabMenu.classList.remove('fab-menu-open'); } }, [
+        el('span', { class: 'fab-item-label', text: label }),
+        el('span', { class: 'fab-item-icon', text: icon })
+      ]);
+      fabMenu.append(item);
+    });
+    const fab = el('div', { class: 'fab-wrap' }, [fabMenu, fabToggle]);
+
     main.replaceChildren(
-      el('div', { class: 'layout layout-wide' }, [sidebar, feedColumn, rightRail])
+      el('div', { class: 'layout layout-wide' }, [sidebar, feedColumn, rightRail]),
+      fab
     );
 
     // Remove any existing overlays before adding new ones to avoid duplicates
@@ -4985,6 +5986,44 @@ export function createApp(mount) {
 
   function renderLibraryRail(selected, snapshot) {
     const entry = selected ? normalizeEntry(selected) : null;
+    const streakData = buildStreakData(state.vault.entries);
+    const sparklineSvg = buildMoodSparklineSvg(state.vault.entries);
+    const goalWords = state.ui.writingGoalWords || 0;
+    const todayWords = state.vault.entries
+      .filter(e => e.date === isoDate())
+      .reduce((sum, e) => sum + ((e.body || '').trim().split(/\s+/).filter(Boolean).length), 0);
+    const goalPct = goalWords > 0 ? Math.min(100, Math.round((todayWords / goalWords) * 100)) : 0;
+
+    const streakCard = el('div', { class: 'mood-card streak-card' }, [
+      el('div', { class: 'mood-card-title', text: '\ud83d\udd25 Writing Streak' }),
+      el('div', { class: 'streak-row' }, [
+        el('div', { class: 'streak-main' }, [
+          el('div', { class: 'streak-number', text: String(streakData.streak) }),
+          el('div', { class: 'streak-label', text: streakData.streak === 1 ? 'day in a row' : 'days in a row' })
+        ]),
+        el('div', { class: 'streak-sub-stats' }, [
+          el('div', { class: 'mood-stat-row' }, [el('span', { class: 'detail-label', text: 'Best streak' }), el('span', { class: 'mood-stat-value', text: `${streakData.longestStreak}d` })]),
+          el('div', { class: 'mood-stat-row' }, [el('span', { class: 'detail-label', text: 'Active days' }), el('span', { class: 'mood-stat-value', text: String(streakData.totalDays) })])
+        ])
+      ]),
+      ...(goalWords > 0 ? [
+        el('div', { class: 'goal-bar-wrap' }, [
+          el('div', { class: 'goal-bar-label' }, [
+            el('span', { class: 'detail-label', text: `Today: ${todayWords.toLocaleString()} / ${goalWords.toLocaleString()} words` }),
+            el('span', { class: 'mood-stat-value', text: `${goalPct}%` })
+          ]),
+          el('div', { class: 'goal-bar-track' }, [
+            el('div', { class: `goal-bar-fill ${goalPct >= 100 ? 'goal-complete' : ''}`, style: `width:${goalPct}%` })
+          ])
+        ])
+      ] : [])
+    ]);
+
+    const sparklineCard = sparklineSvg ? el('div', { class: 'mood-card' }, [
+      el('div', { class: 'mood-card-title', text: '\ud83d\udcc8 Mood over time' }),
+      el('div', { class: 'mood-sparkline-wrap' }),
+      (() => { const wrap = el('div', { class: 'mood-sparkline-wrap' }); wrap.innerHTML = sparklineSvg; return wrap; })()
+    ]) : el('div');
 
     return el('div', { class: 'library-rail' }, [
       el('div', { class: 'sidebar-head' }, [
@@ -4998,8 +6037,11 @@ export function createApp(mount) {
           el('div', { class: 'library-stat' }, [el('div', { class: 'library-value', text: String(snapshot.letterCount) }), el('div', { class: 'library-label', text: 'Letters' })]),
           el('div', { class: 'library-stat' }, [el('div', { class: 'library-value', text: String(snapshot.recipeCount) }), el('div', { class: 'library-label', text: 'Recipes' })])
         ]),
+        streakCard,
+        sparklineCard,
         el('div', { class: 'mood-card' }, [
           el('div', { class: 'mood-card-title', text: 'Little highlights' }),
+          el('div', { class: 'mood-stat-row' }, [el('span', { class: 'detail-label', text: 'Starred entries' }), el('span', { class: 'mood-stat-value', text: String(state.vault.entries.filter(e => e.starred).length) })]),
           el('div', { class: 'mood-stat-row' }, [el('span', { class: 'detail-label', text: 'Pinned notes' }), el('span', { class: 'mood-stat-value', text: String(snapshot.pinnedNotes) })]),
           el('div', { class: 'mood-stat-row' }, [el('span', { class: 'detail-label', text: 'Sent letters' }), el('span', { class: 'mood-stat-value', text: String(snapshot.sentLetters) })]),
           el('div', { class: 'mood-stat-row' }, [el('span', { class: 'detail-label', text: 'Future letters' }), el('span', { class: 'mood-stat-value', text: String(snapshot.futureLetters) })]),
@@ -5695,7 +6737,7 @@ export function createApp(mount) {
       type: 'text',
       'data-focus-key': `entry:${selected.id}:recipeCategory`,
       value: selected.recipeCategory || '',
-      placeholder: 'Recipe category'
+      placeholder: 'e.g. Dinner, Baking, Snack'
     });
 
     const prepTimeInput = el('input', {
@@ -5703,7 +6745,23 @@ export function createApp(mount) {
       type: 'text',
       'data-focus-key': `entry:${selected.id}:prepTime`,
       value: selected.prepTime || '',
-      placeholder: 'Prep time'
+      placeholder: 'e.g. 15 min'
+    });
+
+    const cookTimeInput = el('input', {
+      class: 'meta-textarea',
+      type: 'text',
+      'data-focus-key': `entry:${selected.id}:cookTime`,
+      value: selected.cookTime || '',
+      placeholder: 'e.g. 30 min'
+    });
+
+    const totalTimeInput = el('input', {
+      class: 'meta-textarea',
+      type: 'text',
+      'data-focus-key': `entry:${selected.id}:totalTime`,
+      value: selected.totalTime || '',
+      placeholder: 'e.g. 45 min'
     });
 
     const servingsInput = el('input', {
@@ -5711,22 +6769,184 @@ export function createApp(mount) {
       type: 'text',
       'data-focus-key': `entry:${selected.id}:servings`,
       value: selected.servings || '',
-      placeholder: 'Servings'
+      placeholder: 'e.g. 4'
     });
 
-    const ingredientsInput = el('textarea', {
+    const cuisineInput = el('input', {
       class: 'meta-textarea',
-      'data-focus-key': `entry:${selected.id}:ingredients`,
-      placeholder: 'One ingredient per line'
+      type: 'text',
+      'data-focus-key': `entry:${selected.id}:cuisine`,
+      value: selected.cuisine || '',
+      placeholder: 'e.g. Italian, Mexican, Thai'
     });
-    ingredientsInput.value = lineListText(selected.ingredients || []);
 
-    const stepsInput = el('textarea', {
+    const sourceInput = el('input', {
       class: 'meta-textarea',
-      'data-focus-key': `entry:${selected.id}:steps`,
-      placeholder: 'One step per line'
+      type: 'text',
+      'data-focus-key': `entry:${selected.id}:source`,
+      value: selected.source || '',
+      placeholder: 'e.g. Grandma\'s recipe, cookbook p.42'
     });
-    stepsInput.value = lineListText(selected.steps || []);
+
+    const DIFFICULTY_OPTIONS = ['', 'Easy', 'Medium', 'Hard', 'Expert'];
+    const difficultySelect = el('select', {
+      class: 'meta-textarea',
+      'data-focus-key': `entry:${selected.id}:difficulty`
+    }, DIFFICULTY_OPTIONS.map(v => el('option', { value: v, text: v || 'Difficulty…' })));
+    difficultySelect.value = selected.difficulty || '';
+
+    const DIETARY_CHIP_OPTIONS = ['Vegetarian', 'Vegan', 'Gluten-free', 'Dairy-free', 'Nut-free', 'Keto', 'Paleo', 'Low-carb'];
+    const dietaryTagsWrap = (() => {
+      let active = new Set(selected.dietaryTags || []);
+      const wrap = el('div', { class: 'dietary-chips-row', 'data-focus-key': `entry:${selected.id}:dietaryTags` });
+      const refresh = () => {
+        wrap.replaceChildren();
+        DIETARY_CHIP_OPTIONS.forEach(tag => {
+          const chip = el('button', {
+            class: `dietary-chip ${active.has(tag) ? 'active' : ''}`,
+            type: 'button',
+            onclick: () => {
+              if (active.has(tag)) active.delete(tag); else active.add(tag);
+              const entry = getSelectedEntry();
+              if (entry) { entry.dietaryTags = [...active]; persistVault(); }
+              refresh();
+            }
+          }, [el('span', { text: tag })]);
+          wrap.append(chip);
+        });
+      };
+      refresh();
+      return wrap;
+    })();
+
+    const nutritionNotesInput = el('textarea', {
+      class: 'meta-textarea',
+      rows: 2,
+      'data-focus-key': `entry:${selected.id}:nutritionNotes`,
+      placeholder: 'Optional nutrition notes (calories, protein, etc.)'
+    });
+    nutritionNotesInput.value = selected.nutritionNotes || '';
+
+    // ── Interactive ingredient builder ──────────────────────────────────
+    const UNIT_OPTIONS = ['', 'cup', 'cups', 'tbsp', 'tsp', 'oz', 'lb', 'g', 'kg', 'ml', 'l', 'pinch', 'handful', 'can', 'piece', 'slice', 'to taste'];
+
+    let ingredientRows = (() => {
+      const raw = selected.ingredients || [];
+      if (!raw.length) return [{ amount: '', unit: '', name: '' }];
+      return raw.map(item => {
+        if (typeof item === 'object' && item !== null) return { amount: item.amount || '', unit: item.unit || '', name: item.name || '' };
+        const s = String(item).trim();
+        const m = s.match(/^([\d\/\.\s]+)?\s*([a-zA-Z]+)?\s+(.+)$/);
+        if (m) return { amount: (m[1] || '').trim(), unit: (m[2] || '').trim(), name: (m[3] || s).trim() };
+        return { amount: '', unit: '', name: s };
+      });
+    })();
+
+    const ingredientsList = el('div', { class: 'recipe-ingredients-list' });
+
+    const saveIngredients = () => {
+      const entry = getSelectedEntry();
+      if (entry) { entry.ingredients = ingredientRows.filter(r => r.name.trim()); persistVault(); }
+    };
+
+    const renderIngredientRows = () => {
+      ingredientsList.replaceChildren();
+      ingredientRows.forEach((row, idx) => {
+        const amtIn = el('input', { class: 'ingr-amount', type: 'text', placeholder: 'Qty', value: row.amount });
+        amtIn.oninput = () => { ingredientRows[idx].amount = amtIn.value; saveIngredients(); };
+
+        const unitSel = el('select', { class: 'ingr-unit' },
+          UNIT_OPTIONS.map(u => el('option', { value: u, text: u || '—' }))
+        );
+        unitSel.value = row.unit || '';
+        unitSel.onchange = () => { ingredientRows[idx].unit = unitSel.value; saveIngredients(); };
+
+        const nameIn = el('input', { class: 'ingr-name', type: 'text', placeholder: 'Ingredient name…', value: row.name });
+        nameIn.oninput = () => { ingredientRows[idx].name = nameIn.value; saveIngredients(); };
+        nameIn.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            ingredientRows.splice(idx + 1, 0, { amount: '', unit: '', name: '' });
+            renderIngredientRows();
+            const nextRow = ingredientsList.children[idx + 1];
+            nextRow?.querySelector('.ingr-name')?.focus();
+          }
+        });
+
+        const removeBtn = el('button', {
+          class: 'ingr-remove-btn', type: 'button', title: 'Remove',
+          onclick: () => {
+            if (ingredientRows.length > 1) { ingredientRows.splice(idx, 1); renderIngredientRows(); saveIngredients(); }
+            else { ingredientRows[0] = { amount: '', unit: '', name: '' }; renderIngredientRows(); saveIngredients(); }
+          }
+        }, [el('span', { text: '×' })]);
+
+        ingredientsList.append(el('div', { class: 'ingr-row' }, [amtIn, unitSel, nameIn, removeBtn]));
+      });
+    };
+    renderIngredientRows();
+
+    const addIngredientBtn = el('button', {
+      class: 'btn ghost small-btn recipe-add-btn', type: 'button',
+      onclick: () => { ingredientRows.push({ amount: '', unit: '', name: '' }); renderIngredientRows(); setTimeout(() => ingredientsList.lastChild?.querySelector('.ingr-name')?.focus(), 0); }
+    }, [el('span', { class: 'btn-ic', text: '+' }), el('span', { text: 'Add ingredient' })]);
+
+    const ingredientsInput = el('div', { class: 'recipe-builder-block', 'data-focus-key': `entry:${selected.id}:ingredients` }, [ingredientsList, addIngredientBtn]);
+
+    // ── Interactive step builder ───────────────────────────────────────
+    let stepRows = (() => {
+      const raw = selected.steps || [];
+      if (!raw.length || (raw.length === 1 && !raw[0])) return [''];
+      return raw.map(s => (typeof s === 'string' ? s : String(s)));
+    })();
+
+    const stepsList = el('div', { class: 'recipe-steps-list' });
+
+    const saveSteps = () => {
+      const entry = getSelectedEntry();
+      if (entry) { entry.steps = stepRows.filter(s => s.trim()); persistVault(); }
+    };
+
+    const renderStepRows = () => {
+      stepsList.replaceChildren();
+      stepRows.forEach((step, idx) => {
+        const numLabel = el('div', { class: 'step-num', text: String(idx + 1) });
+        const stepTa = el('textarea', {
+          class: 'step-textarea',
+          placeholder: `Step ${idx + 1}…`,
+          rows: 2
+        });
+        stepTa.value = step;
+        stepTa.oninput = () => { stepRows[idx] = stepTa.value; saveSteps(); };
+        stepTa.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            stepRows.splice(idx + 1, 0, '');
+            renderStepRows();
+            const nextRow = stepsList.children[idx + 1];
+            nextRow?.querySelector('.step-textarea')?.focus();
+          }
+        });
+
+        const removeBtn = el('button', {
+          class: 'ingr-remove-btn', type: 'button', title: 'Remove step',
+          onclick: () => {
+            if (stepRows.length > 1) { stepRows.splice(idx, 1); renderStepRows(); saveSteps(); }
+            else { stepRows[0] = ''; renderStepRows(); saveSteps(); }
+          }
+        }, [el('span', { text: '×' })]);
+
+        stepsList.append(el('div', { class: 'step-row' }, [numLabel, stepTa, removeBtn]));
+      });
+    };
+    renderStepRows();
+
+    const addStepBtn = el('button', {
+      class: 'btn ghost small-btn recipe-add-btn', type: 'button',
+      onclick: () => { stepRows.push(''); renderStepRows(); setTimeout(() => stepsList.lastChild?.querySelector('.step-textarea')?.focus(), 0); }
+    }, [el('span', { class: 'btn-ic', text: '+' }), el('span', { text: 'Add step' })]);
+
+    const stepsInput = el('div', { class: 'recipe-builder-block', 'data-focus-key': `entry:${selected.id}:steps` }, [stepsList, addStepBtn]);
 
     // ── Rich WYSIWYG editor ────────────────────────────────────────────────────
     const richEditorPlaceholder = selected.moduleType === 'note'
@@ -5735,7 +6955,9 @@ export function createApp(mount) {
         ? 'Write the words you want this person, future self, or memory to hold.'
         : selected.moduleType === 'recipe'
           ? 'Add little serving notes, family memories, or substitutions.'
-          : 'Write anything… it stays with you.';
+          : selected.moduleType === 'resolution'
+            ? 'Add any extra reflections, context, or notes here…'
+            : 'Write anything… it stays with you.';
 
     const richEditor = el('div', {
       class: 'rich-editor',
@@ -6097,25 +7319,216 @@ export function createApp(mount) {
 
     if (selected.moduleType === 'recipe') {
       insightChips.unshift(el('div', { class: 'insight-chip', text: selected.recipeCategory || 'Recipe' }));
-      insightChips.push(el('div', { class: 'insight-chip', text: selected.prepTime || 'Prep time soon' }));
-      insightChips.push(el('div', { class: 'insight-chip', text: selected.servings ? `${selected.servings} servings` : 'Servings soon' }));
+      if (selected.difficulty) insightChips.push(el('div', { class: 'insight-chip', text: selected.difficulty }));
+      insightChips.push(el('div', { class: 'insight-chip', text: selected.prepTime || 'Set prep time' }));
+      insightChips.push(el('div', { class: 'insight-chip', text: selected.servings ? `${selected.servings} servings` : 'Set servings' }));
+      if (selected.cuisine) insightChips.push(el('div', { class: 'insight-chip', text: selected.cuisine }));
 
+      // \u2500\u2500 Recipe metadata grid \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
       detailCards.push(
-        el('label', { class: 'detail-card' }, [
-          el('span', { class: 'detail-label', text: 'Recipe category' }),
-          recipeCategoryInput
+        el('div', { class: 'recipe-meta-grid detail-card detail-card-wide' }, [
+          el('div', { class: 'recipe-meta-section' }, [
+            el('div', { class: 'recipe-meta-title', text: '\ud83c\udf7d\ufe0f Recipe Details' }),
+            el('div', { class: 'recipe-meta-row' }, [
+              el('label', { class: 'recipe-meta-field' }, [el('span', { class: 'detail-label', text: 'Category' }), recipeCategoryInput]),
+              el('label', { class: 'recipe-meta-field' }, [el('span', { class: 'detail-label', text: 'Cuisine' }), cuisineInput]),
+              el('label', { class: 'recipe-meta-field' }, [el('span', { class: 'detail-label', text: 'Difficulty' }), difficultySelect]),
+              el('label', { class: 'recipe-meta-field' }, [el('span', { class: 'detail-label', text: 'Servings' }), servingsInput]),
+            ]),
+            el('div', { class: 'recipe-meta-row' }, [
+              el('label', { class: 'recipe-meta-field' }, [el('span', { class: 'detail-label', text: '\u23f1 Prep time' }), prepTimeInput]),
+              el('label', { class: 'recipe-meta-field' }, [el('span', { class: 'detail-label', text: '\ud83d\udd25 Cook time' }), cookTimeInput]),
+              el('label', { class: 'recipe-meta-field' }, [el('span', { class: 'detail-label', text: '\u23f0 Total time' }), totalTimeInput]),
+              el('label', { class: 'recipe-meta-field' }, [el('span', { class: 'detail-label', text: '\ud83d\udcdd Source / Inspiration' }), sourceInput]),
+            ]),
+          ]),
+          el('div', { class: 'recipe-meta-section' }, [
+            el('div', { class: 'recipe-meta-title', text: '\ud83c\udf3f Dietary Info' }),
+            dietaryTagsWrap,
+            el('div', { style: 'margin-top:10px' }, [
+              el('div', { class: 'detail-label', text: 'Nutrition notes (optional)' }),
+              nutritionNotesInput
+            ])
+          ])
         ]),
-        el('label', { class: 'detail-card detail-card-wide' }, [
-          el('span', { class: 'detail-label', text: 'Ingredients' }),
+
+        // \u2500\u2500 Ingredients \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+        el('div', { class: 'detail-card detail-card-wide recipe-section-card' }, [
+          el('div', { class: 'recipe-section-header' }, [
+            el('span', { class: 'recipe-section-icon', text: '\ud83e\uded9' }),
+            el('span', { class: 'recipe-section-title', text: 'Ingredients' }),
+            el('span', { class: 'recipe-section-hint', text: 'Press Enter to add the next ingredient' })
+          ]),
           ingredientsInput
         ]),
-        el('label', { class: 'detail-card detail-card-wide' }, [
-          el('span', { class: 'detail-label', text: 'Steps' }),
+
+        // \u2500\u2500 Steps \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+        el('div', { class: 'detail-card detail-card-wide recipe-section-card' }, [
+          el('div', { class: 'recipe-section-header' }, [
+            el('span', { class: 'recipe-section-icon', text: '\ud83d\udccb' }),
+            el('span', { class: 'recipe-section-title', text: 'Instructions' }),
+            el('span', { class: 'recipe-section-hint', text: 'Press Enter to add the next step' })
+          ]),
           stepsInput
         ]),
+
+        // ── Story / notes ──────────────────────────────────────────────────────
         el('label', { class: 'detail-card detail-card-wide' }, [
-          el('span', { class: 'detail-label', text: 'Recipe story or occasion' }),
+          el('span', { class: 'detail-label', text: '\ud83d\udc9c Recipe story, occasion, or memories' }),
           aboutInput
+        ])
+      );
+    }
+
+    // ── Resolution builder ───────────────────────────────────────────────────
+    if (selected.moduleType === 'resolution') {
+      const STATUS_OPTIONS = [['open', '\ud83d\udd34 Open'], ['in-progress', '\ud83d\udfe1 In Progress'], ['resolved', '\u2705 Resolved']];
+
+      const mkResField = (key, label, placeholder, rows = 2) => {
+        const ta = el('textarea', {
+          class: 'res-field',
+          rows,
+          placeholder,
+          'data-focus-key': `entry:${selected.id}:${key}`
+        });
+        ta.value = selected[key] || '';
+        ta.addEventListener('input', () => {
+          const entry = getSelectedEntry();
+          if (entry) { entry[key] = ta.value; persistVault(); }
+        });
+        return el('div', { class: 'res-block' }, [
+          el('div', { class: 'res-label', text: label }),
+          ta
+        ]);
+      };
+
+      const mkResInput = (key, label, placeholder) => {
+        const inp = el('input', {
+          class: 'res-input',
+          type: 'text',
+          placeholder,
+          'data-focus-key': `entry:${selected.id}:${key}`,
+          value: selected[key] || ''
+        });
+        inp.addEventListener('input', () => {
+          const entry = getSelectedEntry();
+          if (entry) { entry[key] = inp.value; persistVault(); }
+        });
+        return el('div', { class: 'res-block' }, [
+          el('div', { class: 'res-label', text: label }),
+          inp
+        ]);
+      };
+
+      const statusSelect = el('select', {
+        class: 'res-status-select',
+        'data-focus-key': `entry:${selected.id}:resolutionStatus`,
+        onchange: (e) => {
+          const entry = getSelectedEntry();
+          if (entry) { entry.resolutionStatus = e.target.value; persistVault(); render(false); }
+        }
+      }, STATUS_OPTIONS.map(([v, l]) => el('option', { value: v, text: l })));
+      statusSelect.value = selected.resolutionStatus || 'open';
+
+      // De-escalation steps builder
+      let deSteps = Array.isArray(selected.deEscalationSteps) && selected.deEscalationSteps.length
+        ? [...selected.deEscalationSteps]
+        : [''];
+      const deStepsList = el('div', { class: 'recipe-steps-list' });
+      const saveDeSteps = () => {
+        const entry = getSelectedEntry();
+        if (entry) { entry.deEscalationSteps = deSteps.filter(s => s.trim()); persistVault(); }
+      };
+      const renderDeSteps = () => {
+        deStepsList.replaceChildren();
+        deSteps.forEach((step, idx) => {
+          const numLabel = el('div', { class: 'step-num', text: String(idx + 1) });
+          const stepTa = el('textarea', { class: 'step-textarea', rows: 1, placeholder: `e.g. Take 5 deep breaths\u2026` });
+          stepTa.value = step;
+          stepTa.oninput = () => { deSteps[idx] = stepTa.value; saveDeSteps(); };
+          stepTa.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              deSteps.splice(idx + 1, 0, '');
+              renderDeSteps();
+              deStepsList.children[idx + 1]?.querySelector('.step-textarea')?.focus();
+            }
+          });
+          const removeBtn = el('button', {
+            class: 'ingr-remove-btn', type: 'button', title: 'Remove',
+            onclick: () => {
+              if (deSteps.length > 1) { deSteps.splice(idx, 1); renderDeSteps(); saveDeSteps(); }
+              else { deSteps[0] = ''; renderDeSteps(); saveDeSteps(); }
+            }
+          }, [el('span', { text: '\u00d7' })]);
+          deStepsList.append(el('div', { class: 'step-row' }, [numLabel, stepTa, removeBtn]));
+        });
+      };
+      renderDeSteps();
+      const addDeStepBtn = el('button', {
+        class: 'btn ghost small-btn recipe-add-btn', type: 'button',
+        onclick: () => { deSteps.push(''); renderDeSteps(); setTimeout(() => deStepsList.lastChild?.querySelector('.step-textarea')?.focus(), 0); }
+      }, [el('span', { class: 'btn-ic', text: '+' }), el('span', { text: 'Add step' })]);
+
+      insightChips.unshift(el('div', { class: `insight-chip res-status-chip res-status-${selected.resolutionStatus || 'open'}`, text: STATUS_OPTIONS.find(([v]) => v === (selected.resolutionStatus || 'open'))?.[1] || '\ud83d\udd34 Open' }));
+      if (selected.triggerPerson) insightChips.push(el('div', { class: 'insight-chip', text: `Triggered by ${selected.triggerPerson}` }));
+
+      detailCards.push(
+        // Status + Trigger identification
+        el('div', { class: 'detail-card detail-card-wide res-card' }, [
+          el('div', { class: 'res-section-title', text: '\ud83c\udfaf Trigger Identification' }),
+          el('div', { class: 'res-status-row' }, [
+            el('div', { class: 'res-label', text: 'Status' }),
+            statusSelect
+          ]),
+          el('div', { class: 'res-two-col' }, [
+            mkResInput('triggerName', '\ud83c\udff7\ufe0f Trigger name', 'e.g. Feeling Ignored, Sudden Rejection\u2026'),
+            mkResInput('triggerPerson', '\ud83d\udc64 Who triggered you', 'Name or relationship (partner, friend, boss\u2026)')
+          ]),
+          mkResField('triggerDescription', '\ud83d\udcac What happened?', 'Describe the situation \u2014 what happened, who was involved, when and where\u2026', 3)
+        ]),
+
+        // Emotional & physical response
+        el('div', { class: 'detail-card detail-card-wide res-card' }, [
+          el('div', { class: 'res-section-title', text: '\u26a1 Your Response' }),
+          el('div', { class: 'res-two-col' }, [
+            mkResField('emotionalResponse', '\ud83d\udc94 Emotional response', 'e.g. Anxiety, anger, sadness, jealousy\u2026'),
+            mkResField('physicalResponse', '\ud83e\udec0 Physical response', 'e.g. Tight chest, heart racing, nausea\u2026')
+          ]),
+          mkResField('thoughtPatterns', '\ud83e\udde0 Thought patterns', 'What thoughts immediately followed? e.g. "They don\u2019t care about me"\u2026')
+        ]),
+
+        // Behavior & root cause
+        el('div', { class: 'detail-card detail-card-wide res-card' }, [
+          el('div', { class: 'res-section-title', text: '\ud83d\udd0d Understanding the Pattern' }),
+          el('div', { class: 'res-two-col' }, [
+            mkResField('defaultReaction', '\ud83d\udea8 Default reaction (be honest)', 'What you usually do \u2014 lash out, shut down, overthink\u2026'),
+            mkResField('rootCause', '\ud83c\udf31 Root cause (if known)', 'Where this comes from \u2014 past trauma, abandonment, trust issues\u2026')
+          ])
+        ]),
+
+        // Healthy resolution
+        el('div', { class: 'detail-card detail-card-wide res-card' }, [
+          el('div', { class: 'res-section-title', text: '\u2728 Healthy Resolution' }),
+          mkResField('desiredResponse', '\u2705 Desired response', 'What you WANT to do instead \u2014 pause, ask calmly, step away\u2026', 2),
+          el('div', { class: 'res-block' }, [
+            el('div', { class: 'res-label', text: '\ud83d\uddd3\ufe0f De-escalation steps (press Enter to add next)' }),
+            el('div', { class: 'recipe-builder-block' }, [deStepsList, addDeStepBtn])
+          ])
+        ]),
+
+        // Communication & support
+        el('div', { class: 'detail-card detail-card-wide res-card' }, [
+          el('div', { class: 'res-section-title', text: '\ud83d\udcac Communication & Support' }),
+          mkResField('communicationPlan', '\ud83d\udcac Communication plan', 'How to express your needs calmly: "When X happens, I feel Y, can you Z?"\u2026', 2),
+          mkResField('supportNeeded', '\ud83e\udd1d Support needed (optional)', 'What others can do to help \u2014 reassurance, space, patience\u2026', 2)
+        ]),
+
+        // Resolution statement
+        el('div', { class: 'detail-card detail-card-wide res-card res-statement-card' }, [
+          el('div', { class: 'res-section-title', text: '\ud83d\udcdc My Resolution Statement' }),
+          el('div', { class: 'res-statement-hint', text: 'A short commitment that ties it all together. Write it in first person.' }),
+          mkResField('resolutionStatement', '', 'e.g. When I feel ignored, I will pause, avoid reacting immediately, and communicate calmly instead of assuming the worst.', 3)
         ])
       );
     }
@@ -6167,12 +7580,25 @@ export function createApp(mount) {
       : el('div');
 
     const footerSummary = selected.moduleType === 'recipe'
-      ? `${selected.recipeCategory || 'Recipe'} • ${selected.prepTime || 'Prep time soon'} • ${formatPrettyDate(selected.date)}`
+      ? [
+          selected.recipeCategory || 'Recipe',
+          selected.difficulty || '',
+          selected.prepTime ? `⏱ ${selected.prepTime}` : '',
+          selected.cookTime ? `🔥 ${selected.cookTime}` : '',
+          selected.servings ? `${selected.servings} servings` : '',
+          formatPrettyDate(selected.date)
+        ].filter(Boolean).join(' • ')
       : selected.moduleType === 'letter'
         ? `${LETTER_KIND_OPTIONS.find(([key]) => key === selected.letterKind)?.[1] || 'Letter'} • ${selected.recipient || 'No recipient yet'} • ${formatPrettyDate(selected.date)}`
         : selected.moduleType === 'note'
           ? `Note • ${selected.folder || 'General'} • ${formatPrettyDate(selected.date)}`
-          : `${entryTypeLabel(selected.entryType)} • ${selected.privacyLevel || 'private'} • ${formatPrettyDate(selected.date)}`;
+          : selected.moduleType === 'resolution'
+            ? [
+                selected.resolutionStatus === 'resolved' ? '✅ Resolved' : selected.resolutionStatus === 'in-progress' ? '🟡 In Progress' : '🔴 Open',
+                selected.triggerPerson ? `Triggered by ${selected.triggerPerson}` : '',
+                formatPrettyDate(selected.date)
+              ].filter(Boolean).join(' • ')
+            : `${entryTypeLabel(selected.entryType)} • ${selected.privacyLevel || 'private'} • ${formatPrettyDate(selected.date)}`;
 
     const card = el('div', { class: 'editor-card' }, [
       el('div', { class: 'editor-head' }, [
@@ -6202,6 +7628,17 @@ export function createApp(mount) {
           el('button', { class: 'btn ghost foot-icon-btn', type: 'button', title: 'Share', onclick: () => renderShareOverlay(selected) }, [
             el('span', { text: '🔗' })
           ]),
+          el('button', {
+            class: 'btn ghost foot-icon-btn', type: 'button', title: 'Copy link to entry',
+            onclick: async () => {
+              const url = `${location.origin}${location.pathname}#entry-${selected.id}`;
+              try {
+                await navigator.clipboard.writeText(url);
+                showToast('Link copied to clipboard!');
+              } catch { showToast('Could not copy link'); }
+            }
+          }, [el('span', { text: '\ud83d\udd17' })]),
+          el('button', { class: 'btn ghost foot-icon-btn', type: 'button', title: 'Keyboard shortcuts (Ctrl+/)', onclick: () => renderShortcutsOverlay() }, [el('span', { text: '⌨️' })]),
           el('button', { class: 'btn ghost foot-icon-btn', type: 'button', title: 'Comments', onclick: () => renderCommentsOverlay(selected) }, [
             el('span', { text: '💬' })
           ]),
@@ -6474,6 +7911,16 @@ export function createApp(mount) {
         if (e.key === ',') {
           e.preventDefault();
           if (state.unlocked) { state.showAccountOverlay = true; render(false); }
+        }
+        if (e.key === '/' || e.key === '?') {
+          e.preventDefault();
+          if (state.unlocked) renderShortcutsOverlay();
+        }
+        if (e.shiftKey) {
+          if (e.key === 'N') { e.preventDefault(); if (state.unlocked) createEntry('quick'); }
+          if (e.key === 'L') { e.preventDefault(); if (state.unlocked) createLetter(); }
+          if (e.key === 'R') { e.preventDefault(); if (state.unlocked) createRecipe(); }
+          if (e.key === 'G') { e.preventDefault(); if (state.unlocked) createEntry('gratitude'); }
         }
       }
     });

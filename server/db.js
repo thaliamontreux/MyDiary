@@ -1121,4 +1121,166 @@ export async function getUserRecoveryCodes(userId) {
   return rows[0] || null;
 }
 
+// ── Recent registrations ──────────────────────────────────────────────────────
+export async function getRecentRegistrations(limit = 10) {
+  ensurePool();
+  const [rows] = await pool.query(
+    `SELECT id, email, username, first_name, is_admin, tos_accepted_at, created_at
+     FROM users ORDER BY created_at DESC LIMIT ?`,
+    [limit]
+  );
+  return rows;
+}
+
+// ── Invite codes ──────────────────────────────────────────────────────────────
+async function ensureInviteCodesTable() {
+  ensurePool();
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS invite_codes (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      code VARCHAR(64) UNIQUE NOT NULL,
+      created_by INT NOT NULL,
+      used_by INT DEFAULT NULL,
+      max_uses INT DEFAULT 1,
+      use_count INT DEFAULT 0,
+      expires_at DATETIME DEFAULT NULL,
+      note VARCHAR(255) DEFAULT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+}
+
+export async function createInviteCode(createdBy, { code, maxUses = 1, expiresAt = null, note = null }) {
+  await ensureInviteCodesTable();
+  await pool.query(
+    'INSERT INTO invite_codes (code, created_by, max_uses, expires_at, note) VALUES (?, ?, ?, ?, ?)',
+    [code, createdBy, maxUses, expiresAt || null, note || null]
+  );
+  return getInviteCode(code);
+}
+
+export async function getInviteCode(code) {
+  await ensureInviteCodesTable();
+  const [rows] = await pool.query(
+    'SELECT * FROM invite_codes WHERE code = ? LIMIT 1',
+    [code]
+  );
+  return rows[0] || null;
+}
+
+export async function listInviteCodes(limit = 50) {
+  await ensureInviteCodesTable();
+  const [rows] = await pool.query(
+    `SELECT ic.*, u.email AS created_by_email, ub.email AS used_by_email
+     FROM invite_codes ic
+     LEFT JOIN users u ON ic.created_by = u.id
+     LEFT JOIN users ub ON ic.used_by = ub.id
+     ORDER BY ic.created_at DESC LIMIT ?`,
+    [limit]
+  );
+  return rows;
+}
+
+export async function revokeInviteCode(id) {
+  await ensureInviteCodesTable();
+  const [result] = await pool.query('DELETE FROM invite_codes WHERE id = ? LIMIT 1', [id]);
+  return result.affectedRows > 0;
+}
+
+// ── Site Settings (key-value store) ───────────────────────────────────────────
+async function ensureSiteSettingsTable() {
+  ensurePool();
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS site_settings (
+      key_name VARCHAR(128) PRIMARY KEY,
+      value_data LONGTEXT,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+}
+
+export async function getSiteSetting(key) {
+  await ensureSiteSettingsTable();
+  const [rows] = await pool.query(
+    'SELECT value_data, updated_at FROM site_settings WHERE key_name = ? LIMIT 1',
+    [key]
+  );
+  return rows[0] || null;
+}
+
+export async function upsertSiteSetting(key, value) {
+  await ensureSiteSettingsTable();
+  await pool.query(
+    'INSERT INTO site_settings (key_name, value_data) VALUES (?, ?) ON DUPLICATE KEY UPDATE value_data = ?, updated_at = CURRENT_TIMESTAMP',
+    [key, value, value]
+  );
+}
+
+export async function getAllSiteSettings() {
+  await ensureSiteSettingsTable();
+  const [rows] = await pool.query('SELECT key_name, value_data, updated_at FROM site_settings ORDER BY key_name ASC');
+  return rows;
+}
+
+// ── Admin: cross-user audit logs ──────────────────────────────────────────────
+export async function adminListAuditLogs(limit = 100, userId = null) {
+  ensurePool();
+  if (userId) {
+    const [rows] = await pool.query(
+      `SELECT al.id, al.user_id, u.email, al.action, al.detail, al.ip_address, al.created_at
+       FROM audit_logs al LEFT JOIN users u ON al.user_id = u.id
+       WHERE al.user_id = ?
+       ORDER BY al.created_at DESC LIMIT ?`,
+      [userId, limit]
+    );
+    return rows;
+  }
+  const [rows] = await pool.query(
+    `SELECT al.id, al.user_id, u.email, al.action, al.detail, al.ip_address, al.created_at
+     FROM audit_logs al LEFT JOIN users u ON al.user_id = u.id
+     ORDER BY al.created_at DESC LIMIT ?`,
+    [limit]
+  );
+  return rows;
+}
+
+// ── Admin: rich stats ─────────────────────────────────────────────────────────
+export async function getAdminStats() {
+  ensurePool();
+  const [[{ totalUsers }]] = await pool.query('SELECT COUNT(*) AS totalUsers FROM users');
+  const [[{ adminUsers }]] = await pool.query('SELECT COUNT(*) AS adminUsers FROM users WHERE is_admin = 1');
+  const [[{ tosAcceptedUsers }]] = await pool.query('SELECT COUNT(*) AS tosAcceptedUsers FROM users WHERE tos_accepted_at IS NOT NULL');
+  const [[{ newUsersToday }]] = await pool.query("SELECT COUNT(*) AS newUsersToday FROM users WHERE DATE(created_at) = CURDATE()");
+  const [[{ newUsersWeek }]] = await pool.query("SELECT COUNT(*) AS newUsersWeek FROM users WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
+  const [[{ newUsersMonth }]] = await pool.query("SELECT COUNT(*) AS newUsersMonth FROM users WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)");
+  const [[{ totalAuditEvents }]] = await pool.query('SELECT COUNT(*) AS totalAuditEvents FROM audit_logs');
+  const [[{ activeToday }]] = await pool.query("SELECT COUNT(DISTINCT user_id) AS activeToday FROM audit_logs WHERE DATE(created_at) = CURDATE()");
+  const [[{ with2fa }]] = await pool.query('SELECT COUNT(*) AS with2fa FROM user_totp WHERE enabled = 1');
+
+  // Recent signups per day (last 7 days)
+  const [dailySignups] = await pool.query(`
+    SELECT DATE(created_at) AS day, COUNT(*) AS count
+    FROM users
+    WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+    GROUP BY DATE(created_at)
+    ORDER BY day ASC
+  `);
+
+  // Top audit actions
+  const [topActions] = await pool.query(`
+    SELECT action, COUNT(*) AS count
+    FROM audit_logs
+    GROUP BY action
+    ORDER BY count DESC
+    LIMIT 10
+  `);
+
+  return {
+    totalUsers, adminUsers, tosAcceptedUsers,
+    newUsersToday, newUsersWeek, newUsersMonth,
+    totalAuditEvents, activeToday, with2fa,
+    dailySignups, topActions
+  };
+}
+
 export { pool };

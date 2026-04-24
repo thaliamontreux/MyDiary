@@ -270,9 +270,90 @@ export async function adminDeleteUser(token, userId) {
 export async function adminGetSiteSummary(token) {
   return request('/api/admin/site-summary', {
     method: 'GET',
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export async function adminGetStats(token) {
+  return request('/api/admin/stats', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export async function adminGetAuditLogs(token, limit = 100, userId = null) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (userId) params.set('userId', String(userId));
+  return request(`/api/admin/audit-logs?${params.toString()}`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export async function adminGetSiteSettings(token) {
+  return request('/api/admin/site-settings', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export async function adminSaveSiteSettings(token, payload) {
+  return request('/api/admin/site-settings', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function adminResetUserPassword(token, userId, newPassword) {
+  return request(`/api/admin/users/${encodeURIComponent(userId)}/reset-password`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ newPassword })
+  });
+}
+
+export async function adminSuspendUser(token, userId, suspended) {
+  return request(`/api/admin/users/${encodeURIComponent(userId)}/suspend`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ suspended })
+  });
+}
+
+export async function adminGetRecentRegistrations(token, limit = 10) {
+  return request(`/api/admin/recent-registrations?limit=${limit}`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export async function adminListInviteCodes(token) {
+  return request('/api/admin/invite-codes', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export async function adminCreateInviteCode(token, payload) {
+  return request('/api/admin/invite-codes', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function adminRevokeInviteCode(token, id) {
+  return request(`/api/admin/invite-codes/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export async function getUserStats(token) {
+  return request('/api/user/stats', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` }
   });
 }
 

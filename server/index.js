@@ -58,7 +58,16 @@ import {
   getUserRecoveryCodes,
   selfUpdateUserProfile,
   saveUserTheme,
-  saveUserThemesJson
+  saveUserThemesJson,
+  getSiteSetting,
+  upsertSiteSetting,
+  getAllSiteSettings,
+  adminListAuditLogs,
+  getAdminStats,
+  getRecentRegistrations,
+  createInviteCode,
+  listInviteCodes,
+  revokeInviteCode
 } from './db.js';
 import { requireAuth, signAuthToken } from './auth.js';
 import { log, logError, requestLogger } from './logger.js';
@@ -482,13 +491,161 @@ app.delete('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) =
 app.get('/api/admin/site-summary', requireAuth, requireAdmin, async (req, res) => {
   try {
     const summary = await getSiteSummary();
+    const announcementRow = await getSiteSetting('announcement');
+    const maintenanceRow = await getSiteSetting('maintenance_mode');
+    const registrationRow = await getSiteSetting('registration_enabled');
+    const siteNameRow = await getSiteSetting('site_name');
+    const defaultLoginThemeRow = await getSiteSetting('default_login_theme');
     res.json({
       ...summary,
-      nodeEnv: process.env.NODE_ENV || 'development'
+      nodeEnv: process.env.NODE_ENV || 'development',
+      announcement: announcementRow?.value_data || '',
+      maintenanceMode: maintenanceRow?.value_data === 'true',
+      registrationEnabled: registrationRow?.value_data !== 'false',
+      siteName: siteNameRow?.value_data || 'My Secret Diary',
+      defaultLoginTheme: defaultLoginThemeRow?.value_data || 'trans-pride-dark'
     });
   } catch (error) {
     logError('admin_site_summary_failed', error, { requestId: req.requestId, adminId: req.user?.id });
     res.status(500).json({ error: 'Failed to load site summary' });
+  }
+});
+
+app.get('/api/admin/stats', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const stats = await getAdminStats();
+    res.json(stats);
+  } catch (error) {
+    logError('admin_stats_failed', error, { requestId: req.requestId, adminId: req.user?.id });
+    res.status(500).json({ error: 'Failed to load stats' });
+  }
+});
+
+app.get('/api/admin/audit-logs', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(500, Number(req.query.limit) || 100);
+    const userId = req.query.userId ? Number(req.query.userId) : null;
+    const logs = await adminListAuditLogs(limit, userId || null);
+    res.json({ logs });
+  } catch (error) {
+    logError('admin_audit_logs_failed', error, { requestId: req.requestId, adminId: req.user?.id });
+    res.status(500).json({ error: 'Failed to load audit logs' });
+  }
+});
+
+app.get('/api/admin/site-settings', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const rows = await getAllSiteSettings();
+    const settings = {};
+    for (const r of rows) settings[r.key_name] = r.value_data;
+    res.json({ settings });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load settings' });
+  }
+});
+
+app.post('/api/admin/site-settings', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const allowed = ['announcement', 'maintenance_mode', 'registration_enabled', 'site_name', 'default_login_theme', 'motd'];
+    const body = req.body || {};
+    for (const key of allowed) {
+      if (body[key] !== undefined) {
+        await upsertSiteSetting(key, String(body[key]));
+      }
+    }
+    await createAuditLog(req.user.id, 'admin_site_settings_updated', JSON.stringify(Object.keys(body)), req.ip);
+    res.json({ ok: true });
+  } catch (error) {
+    logError('admin_site_settings_failed', error, { requestId: req.requestId, adminId: req.user?.id });
+    res.status(500).json({ error: 'Failed to save settings' });
+  }
+});
+
+app.post('/api/admin/users/:id/reset-password', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const targetId = Number(req.params.id);
+    if (!Number.isFinite(targetId) || targetId <= 0) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+    const newPassword = String(req.body?.newPassword || '');
+    if (newPassword.length < 10) {
+      return res.status(400).json({ error: 'New password must be at least 10 characters' });
+    }
+    const user = await findUserById(targetId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const hash = await bcrypt.hash(newPassword, 12);
+    await upsertUserPassword(targetId, hash);
+    await createAuditLog(req.user.id, 'admin_reset_user_password', String(targetId), req.ip);
+    res.json({ ok: true });
+  } catch (error) {
+    logError('admin_reset_password_failed', error, { requestId: req.requestId, adminId: req.user?.id });
+    res.status(500).json({ error: 'Failed to reset password' });
+  }
+});
+
+app.get('/api/admin/recent-registrations', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const limit = Math.min(20, Number(req.query.limit) || 10);
+    const rows = await getRecentRegistrations(limit);
+    res.json({ users: rows });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load registrations' });
+  }
+});
+
+app.get('/api/admin/invite-codes', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const codes = await listInviteCodes(50);
+    res.json({ codes });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load invite codes' });
+  }
+});
+
+app.post('/api/admin/invite-codes', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const maxUses = Math.max(1, Math.min(100, Number(req.body?.maxUses) || 1));
+    const note = String(req.body?.note || '').trim().slice(0, 255);
+    const daysValid = Number(req.body?.daysValid) || 0;
+    const expiresAt = daysValid > 0
+      ? new Date(Date.now() + daysValid * 86400000).toISOString().slice(0, 19).replace('T', ' ')
+      : null;
+    const code = crypto.randomBytes(12).toString('base64url');
+    const invite = await createInviteCode(req.user.id, { code, maxUses, expiresAt, note });
+    await createAuditLog(req.user.id, 'admin_invite_code_created', code, req.ip);
+    res.status(201).json({ invite });
+  } catch (error) {
+    logError('admin_invite_create_failed', error, { requestId: req.requestId, adminId: req.user?.id });
+    res.status(500).json({ error: 'Failed to create invite code' });
+  }
+});
+
+app.delete('/api/admin/invite-codes/:id', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id) || id <= 0) return res.status(400).json({ error: 'Invalid ID' });
+    const ok = await revokeInviteCode(id);
+    if (!ok) return res.status(404).json({ error: 'Invite code not found' });
+    await createAuditLog(req.user.id, 'admin_invite_code_revoked', String(id), req.ip);
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to revoke invite code' });
+  }
+});
+
+app.post('/api/admin/users/:id/suspend', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const targetId = Number(req.params.id);
+    if (!Number.isFinite(targetId) || targetId <= 0) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+    const suspended = Boolean(req.body?.suspended);
+    await upsertSiteSetting(`suspended_user_${targetId}`, suspended ? 'true' : 'false');
+    await createAuditLog(req.user.id, suspended ? 'admin_user_suspended' : 'admin_user_unsuspended', String(targetId), req.ip);
+    res.json({ ok: true, suspended });
+  } catch (error) {
+    logError('admin_suspend_user_failed', error, { requestId: req.requestId, adminId: req.user?.id });
+    res.status(500).json({ error: 'Failed to update suspension' });
   }
 });
 
@@ -1223,6 +1380,26 @@ app.delete('/api/themes/:id', requireAuth, async (req, res) => {
   } catch (err) {
     logError('theme_delete_failed', err, { userId: req.user?.id });
     res.status(500).json({ error: 'Failed to delete theme: ' + err.message });
+  }
+});
+
+// ── User Stats (server-side metadata only, vault stats computed client-side) ──
+app.get('/api/user/stats', requireAuth, async (req, res) => {
+  try {
+    const user = await findUserById(req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const logs = await listAuditLogs(req.user.id, 200);
+    const loginCount = logs.filter(l => l.action === 'login').length;
+    const lastLogin = logs.find(l => l.action === 'login')?.created_at || null;
+    res.json({
+      memberSince: user.created_at,
+      loginCount,
+      lastLogin,
+      email: user.email,
+      username: user.username
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load stats' });
   }
 });
 
