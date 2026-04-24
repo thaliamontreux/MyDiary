@@ -86,9 +86,10 @@ function el(tag, attrs = {}, children = []) {
     if (k === 'class') node.className = v;
     else if (k === 'text') node.textContent = v;
     else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2), v);
+    else if (typeof v === 'boolean') { if (v) node.setAttribute(k, ''); }
     else node.setAttribute(k, v);
   }
-  for (const c of children) node.append(c);
+  for (const c of children) { if (c != null && c !== false) node.append(c); }
   return node;
 }
 
@@ -3597,7 +3598,7 @@ export function createApp(mount) {
       tabContent
     ]);
 
-    return el('div', { class: 'account-overlay' }, [card]);
+    return el('div', { class: 'admin-overlay' }, [card]);
   }
 
   function renderSiteManagerOverlay() {
@@ -4220,12 +4221,13 @@ export function createApp(mount) {
         } catch (e) { showToast(e?.message || 'Could not copy'); }
       }}, [el('span', { class: 'btn-ic', text: '⧉' }), el('span', { text: 'Copy key' })]);
 
-      const [recentLogs, setRecentLogs] = useState([]);
-      useEffect(() => {
+      if (!state._auditLogsLoaded) {
+        state._auditLogsLoaded = true;
         getAuditLogs(state.auth.token, 8)
-          .then(d => setRecentLogs(d.logs || []))
+          .then(d => { state._auditLogs = d.logs || []; render(false); })
           .catch(() => {});
-      }, []);
+      }
+      const recentLogs = state._auditLogs || [];
 
       const ACTION_ICONS = { login: '🟢', login_failed: '🔴', register: '✨', profile_updated: '✏️', '2fa_enabled': '🔐', password_changed: '🔑', recovery_codes_regenerated: '🔑' };
       const logRows = recentLogs.map(l =>
@@ -4243,15 +4245,15 @@ export function createApp(mount) {
             el('div', { class: 'cp-section-title', text: 'Login & Access' }),
             el('div', { class: 'cp-row' }, [
               el('div', {}, [el('div', { class: 'cp-row-label', text: 'Password' }), el('div', { class: 'cp-row-hint', text: 'Change your login password' })]),
-              el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => { const o = renderPasswordChangeOverlay(); root.append(o); } }, [el('span', { class: 'btn-ic', text: '✎' }), el('span', { text: 'Change password' })])
+              el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => { const o = renderPasswordChangeOverlay(); document.body.append(o); } }, [el('span', { class: 'btn-ic', text: '✎' }), el('span', { text: 'Change password' })])
             ]),
             el('div', { class: 'cp-row' }, [
               el('div', {}, [el('div', { class: 'cp-row-label', text: 'Two-factor auth' }), el('div', { class: 'cp-row-hint', text: 'TOTP authenticator app' })]),
-              el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderTwoFactorOverlay() }, [el('span', { class: 'btn-ic', text: '🔐' }), el('span', { text: 'Manage 2FA' })])
+              el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => showToast('Two-factor authentication — coming soon') }, [el('span', { class: 'btn-ic', text: '🔐' }), el('span', { text: 'Manage 2FA' })])
             ]),
             el('div', { class: 'cp-row' }, [
               el('div', {}, [el('div', { class: 'cp-row-label', text: 'Recovery codes' }), el('div', { class: 'cp-row-hint', text: 'Backup access codes' })]),
-              el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderRecoveryCodesOverlay() }, [el('span', { class: 'btn-ic', text: '🔑' }), el('span', { text: 'Manage codes' })])
+              el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => showToast('Recovery codes — coming soon') }, [el('span', { class: 'btn-ic', text: '🔑' }), el('span', { text: 'Manage codes' })])
             ]),
             el('div', { class: 'cp-row' }, [
               el('div', {}, [el('div', { class: 'cp-row-label', text: 'Signed in as' }), el('div', { class: 'cp-row-hint', text: user.email })]),
@@ -4269,7 +4271,7 @@ export function createApp(mount) {
           el('div', { class: 'cp-row-hint', text: 'Your last 8 security events on this account.' }),
           ...(recentLogs.length ? logRows : [el('div', { class: 'cp-row-hint', text: 'No recent activity recorded.' })]),
           el('div', { style: 'margin-top:8px' }, [
-            el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => renderAuditLogOverlay() }, [el('span', { class: 'btn-ic', text: '📋' }), el('span', { text: 'View full activity log' })])
+            el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => { state.showAccountOverlay = false; state.showUserManagerOverlay = false; state.showEncryptionKey = false; state.showAccountOverlay = true; state.ui.accountTab = 'stats'; render(false); } }, [el('span', { class: 'btn-ic', text: '📋' }), el('span', { text: 'View full activity log' })])
           ])
         ])
       ]);
@@ -4537,7 +4539,7 @@ export function createApp(mount) {
     const closeBtn = el('button', {
       class: 'btn ghost small-btn cp-close-btn',
       type: 'button',
-      onclick: () => { state.showAccountOverlay = false; state.showEncryptionKey = false; render(false); }
+      onclick: () => { state.showAccountOverlay = false; state.showEncryptionKey = false; state._auditLogsLoaded = false; state._auditLogs = null; render(false); }
     }, [el('span', { class: 'btn-ic', text: '✕' }), el('span', { text: 'Close' })]);
 
     const card = el('div', { class: 'account-card', style: 'position:relative' }, [
@@ -5954,7 +5956,7 @@ export function createApp(mount) {
     );
 
     // Remove any existing overlays before adding new ones to avoid duplicates
-    root.querySelectorAll('.agreement-overlay, .account-overlay').forEach((node) => node.remove());
+    root.querySelectorAll('.agreement-overlay, .account-overlay, .admin-overlay').forEach((node) => node.remove());
 
     const tosOverlay = renderAgreementOverlay();
     if (tosOverlay) {
@@ -6130,26 +6132,14 @@ export function createApp(mount) {
     // Get all entry dates from the vault
     const entries = state.vault?.entries || [];
     const entryDates = new Map();
-    console.log('Calendar debug: total entries:', entries.length);
-    entries.forEach((e, i) => {
+    entries.forEach((e) => {
       const normalized = normalizeEntry(e);
       const d = normalized.date;
-      console.log(`Calendar debug: entry ${i} moduleType:`, normalized.moduleType, 'date:', d, 'type:', typeof d);
       if (d && typeof d === 'string') {
-        const key = d.substring(0, 10); // YYYY-MM-DD
-        console.log(`Calendar debug: entry ${i} -> key:`, key);
+        const key = d.substring(0, 10);
         entryDates.set(key, (entryDates.get(key) || 0) + 1);
-      } else {
-        console.log(`Calendar debug: entry ${i} SKIPPED - no valid date`);
       }
     });
-    console.log('Calendar debug: unique dates map:', Array.from(entryDates.entries()));
-    console.log('Calendar debug: current view:', year, month + 1); // month is 0-indexed
-    // Check for entries in current month
-    const currentMonthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
-    console.log('Calendar debug: looking for prefix:', currentMonthPrefix);
-    const entriesInCurrentMonth = Array.from(entryDates.keys()).filter(k => k.startsWith(currentMonthPrefix));
-    console.log('Calendar debug: entries in current month:', entriesInCurrentMonth);
 
     // Build calendar grid
     const firstDay = new Date(year, month, 1);
@@ -6163,7 +6153,7 @@ export function createApp(mount) {
     // Year selector (2020-2050)
     const yearOptions = [];
     for (let y = 2020; y <= 2050; y++) {
-      yearOptions.push(el('option', { value: y, selected: y === year }, [el('span', { text: y })]));
+      yearOptions.push(el('option', { value: String(y), text: String(y) }));
     }
     const yearSelect = el('select', {
       class: 'calendar-year-select',
@@ -6172,6 +6162,7 @@ export function createApp(mount) {
         render();
       }
     }, yearOptions);
+    yearSelect.value = String(year);
 
     // Month navigation
     const prevMonthBtn = el('button', {
@@ -8217,22 +8208,16 @@ export function createApp(mount) {
         return;
       }
 
-      console.log('Loading voice memos, count:', memos.length);
       for (let i = 0; i < memos.length; i++) {
         const memo = memos[i];
-        console.log('Voice memo', i, 'memo object:', memo);
         const memoId = memo.blobId || memo.id;
-        console.log('Voice memo', i, 'memoId:', memoId, 'blobId:', memo.blobId, 'id:', memo.id);
 
         // Load from cache or IndexedDB
         let dataUrl = voiceBlobCache.get(memoId);
-        console.log('Voice memo', i, 'cache hit:', !!dataUrl);
         let loadError = false;
         if (!dataUrl) {
           try {
-            console.log('Voice memo', i, 'fetching from IndexedDB...');
             dataUrl = await getVoiceBlob(memoId);
-            console.log('Voice memo', i, 'IndexedDB result:', dataUrl ? 'found (' + dataUrl.length + ' chars)' : 'not found');
             if (dataUrl) voiceBlobCache.set(memoId, dataUrl);
           } catch (e) {
             console.error('Failed to load voice memo', i, ':', e);
@@ -8243,7 +8228,6 @@ export function createApp(mount) {
         const audio = dataUrl
           ? el('audio', { controls: '', src: dataUrl, class: 'voice-audio', preload: 'metadata' })
           : el('span', { class: 'tiny', text: loadError ? '(recording unavailable)' : '(loading...)' });
-        console.log('Voice memo', i, 'rendering:', dataUrl ? 'audio player' : (loadError ? 'unavailable' : 'loading'));
 
         const removeBtn = el('button', {
           class: 'btn mini ghost',
@@ -8596,6 +8580,7 @@ export function createApp(mount) {
 
   // ── Calendar Overlay ─────────────────────────────────────────────────────────
   function renderCalendarOverlay() {
+    document.querySelectorAll('.overlay-backdrop').forEach(n => n.remove());
     const overlay = el('div', { class: 'overlay-backdrop' });
     const fmtMon = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     let currentMonth = state.calendarMonth || fmtMon(new Date());
