@@ -2492,19 +2492,22 @@ export function createApp(mount) {
                   onclick: (e) => { e.stopPropagation(); handleDeleteTheme(theme.id, theme.name); }
                 }, [el('span', { text: '🗑' })])
               : null;
-            return el('div', {
-              class: `theme-card ${isActive ? 'active' : ''}`,
-              onclick: () => applyTheme(theme.id)
-            }, [
+            const imageUrl = theme.image?.startsWith('/') ? theme.image : `/${theme.image}`;
+            return el('div', { class: `theme-card ${isActive ? 'active' : ''}` }, [
               el('div', { class: 'theme-preview-wrap' }, [
                 el('div', {
                   class: 'theme-preview',
-                  style: `background-image: url('${theme.image}')`
+                  style: `background-image: url('${imageUrl}')`
                 }),
                 ...(deleteBtn ? [deleteBtn] : [])
               ]),
-              el('span', { class: 'theme-card-name', text: theme.name }),
-              el('span', { class: 'theme-card-mode', text: theme.mode })
+              el('div', { class: 'theme-card-info' }, [
+                el('span', { class: 'theme-card-name', text: theme.name }),
+                el('span', { class: 'theme-card-mode', text: theme.mode })
+              ]),
+              isActive
+                ? el('button', { class: 'btn small-btn', type: 'button', disabled: true }, [el('span', { text: '✓ Current Theme' })])
+                : el('button', { class: 'btn small-btn', type: 'button', onclick: () => applyTheme(theme.id) }, [el('span', { text: 'Use This Theme' })])
             ]);
           })
         )
@@ -3183,16 +3186,19 @@ export function createApp(mount) {
                     onclick: (e) => { e.stopPropagation(); handleDeleteTheme(theme.id, theme.name); }
                   }, [el('span', { text: '🗑' })])
                 : null;
-              return el('div', {
-                class: `theme-card ${isDefault ? 'active' : ''}`,
-                onclick: () => saveDefaultTheme(theme.id)
-              }, [
+              const imageUrl = theme.image?.startsWith('/') ? theme.image : `/${theme.image}`;
+              return el('div', { class: `theme-card ${isDefault ? 'active' : ''}` }, [
                 el('div', { class: 'theme-preview-wrap' }, [
-                  el('div', { class: 'theme-preview', style: `background-image: url('${theme.image}')` }),
+                  el('div', { class: 'theme-preview', style: `background-image: url('${imageUrl}')` }),
                   ...(deleteBtn ? [deleteBtn] : [])
                 ]),
-                el('span', { class: 'theme-card-name', text: theme.name }),
-                el('span', { class: 'theme-card-mode', text: isDefault ? '✓ Default Login Theme' : theme.mode })
+                el('div', { class: 'theme-card-info' }, [
+                  el('span', { class: 'theme-card-name', text: theme.name }),
+                  el('span', { class: 'theme-card-mode', text: isDefault ? '✓ Default Login Theme' : theme.mode })
+                ]),
+                isDefault
+                  ? el('button', { class: 'btn small-btn', type: 'button', disabled: true }, [el('span', { text: '✓ Current Default' })])
+                  : el('button', { class: 'btn small-btn', type: 'button', onclick: () => saveDefaultTheme(theme.id) }, [el('span', { text: 'Use This One' })])
               ]);
             })
           )
@@ -4512,6 +4518,11 @@ export function createApp(mount) {
               ))
             ]),
           ])
+        ]),
+        el('div', { class: 'cp-section', style: 'margin-top: 24px;' }, [
+          el('div', { class: 'cp-section-title', text: '🎨 Theme' }),
+          el('div', { class: 'cp-row-hint', text: 'Choose your diary background theme.' }),
+          el('div', { style: 'margin-top: 12px;' }, [renderAccountThemeSection()])
         ])
       ]);
     }

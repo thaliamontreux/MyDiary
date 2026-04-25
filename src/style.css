@@ -1791,6 +1791,52 @@ body::before {
   background: linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.05));
 }
 
+.theme-card .theme-preview-wrap {
+  position: relative;
+  margin-bottom: 10px;
+}
+
+.theme-card .theme-preview {
+  height: 120px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.10);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.theme-card .theme-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.theme-card .theme-card-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.theme-card .theme-card-mode {
+  font-size: 12px;
+  opacity: 0.7;
+  text-transform: capitalize;
+}
+
+.theme-card .theme-delete-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0,0,0,0.6);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .theme-preview {
   height: 76px;
   border-radius: 14px;
