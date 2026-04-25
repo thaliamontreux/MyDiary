@@ -4492,6 +4492,62 @@ export function createApp(mount) {
       const DENSITY_OPTIONS = [['compact', 'Compact'], ['normal', 'Normal'], ['comfortable', 'Comfortable']];
       const FONT_SIZE_OPTIONS = [['small', 'Small'], ['medium', 'Medium'], ['large', 'Large']];
 
+      // Load themes for user selection
+      const currentTheme = state.auth.user?.theme || 'trans-pride-dark';
+      if (!state._accountThemesLoaded) {
+        state._accountThemesLoaded = true;
+        state._accountAvailableThemes = [];
+        fetch('/api/themes')
+          .then(r => r.json())
+          .then(data => { state._accountAvailableThemes = data.themes || []; render(false); })
+          .catch(() => { state._accountAvailableThemes = []; render(false); });
+      }
+      const availableThemes = state._accountAvailableThemes || [];
+
+      const applyUserTheme = async (themeId) => {
+        document.documentElement.setAttribute('data-theme', themeId);
+        try {
+          await fetch('/api/user/theme', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ theme: themeId })
+          });
+          state.auth.user.theme = themeId;
+          showToast(`Theme changed to ${themeId}`);
+        } catch (e) {
+          showToast('Theme applied locally but not saved');
+        }
+        render(false);
+      };
+
+      const BUILTIN_THEMES = new Set([
+        'trans-pride-dark','elegant-dark','support-dark','abstract-dark','community-dark',
+        'flowing-rivers-dark','journey-dark','abstract-shapes-dark','strength-dark','constellation-night',
+        'trans-pride-light','blooming-light','support-light','abstract-light','community-light',
+        'sunrise-hope','journey-light','soft-abstract-light','pride-light','modern-abstract-light'
+      ]);
+
+      const themeGrid = availableThemes.length > 0
+        ? el('div', { class: 'theme-selector', style: 'margin-top: 12px;' },
+            availableThemes.map(theme => {
+              const isActive = currentTheme === theme.id;
+              const imageUrl = theme.image?.startsWith('/') ? theme.image : `/${theme.image}`;
+              return el('div', { class: `theme-card ${isActive ? 'active' : ''}` }, [
+                el('div', { class: 'theme-preview-wrap' }, [
+                  el('div', { class: 'theme-preview', style: `background-image: url('${imageUrl}')` })
+                ]),
+                el('div', { class: 'theme-card-info' }, [
+                  el('span', { class: 'theme-card-name', text: theme.name }),
+                  el('span', { class: 'theme-card-mode', text: theme.mode })
+                ]),
+                isActive
+                  ? el('button', { class: 'btn small-btn', type: 'button', disabled: true }, [el('span', { text: '✓ Current Theme' })])
+                  : el('button', { class: 'btn small-btn', type: 'button', onclick: () => applyUserTheme(theme.id) }, [el('span', { text: 'Use This Theme' })])
+              ]);
+            })
+          )
+        : el('div', { class: 'cp-row-hint', text: 'Loading themes…' });
+
       return el('div', { class: 'cp-body' }, [
         el('div', { class: 'cp-two-col' }, [
           el('div', { class: 'cp-section' }, [
@@ -4504,9 +4560,9 @@ export function createApp(mount) {
             ]),
           ]),
           el('div', { class: 'cp-section' }, [
-            el('div', { class: 'cp-section-title', text: 'Layout & Text' }),
+            el('div', { class: 'cp-section-title', text: 'Density' }),
             el('div', { class: 'cp-row' }, [
-              el('div', {}, [el('div', { class: 'cp-row-label', text: 'UI density' }), el('div', { class: 'cp-row-hint', text: 'Spacing between elements' })]),
+              el('div', {}, [el('div', { class: 'cp-row-label', text: 'Interface density' }), el('div', { class: 'cp-row-hint', text: 'How compact the UI feels' })]),
               el('div', { class: 'setting-pill-row' }, DENSITY_OPTIONS.map(([val, label]) =>
                 el('button', { class: `pill ${(ui.density || 'normal') === val ? 'active' : ''}`, type: 'button', onclick: () => updateUiPrefs({ density: val }) }, [el('span', { text: label })])
               ))
@@ -4521,8 +4577,8 @@ export function createApp(mount) {
         ]),
         el('div', { class: 'cp-section', style: 'margin-top: 24px;' }, [
           el('div', { class: 'cp-section-title', text: '🎨 Theme' }),
-          el('div', { class: 'cp-row-hint', text: 'Choose your diary background theme.' }),
-          el('div', { style: 'margin-top: 12px;' }, [renderAccountThemeSection()])
+          el('div', { class: 'cp-row-hint', text: `Current: ${currentTheme}. Choose your diary background theme below.` }),
+          themeGrid
         ])
       ]);
     }
