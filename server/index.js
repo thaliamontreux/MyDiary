@@ -145,6 +145,12 @@ app.use((err, _req, res, next) => {
   next(err);
 });
 
+// Serve theme assets (backgrounds, optional CSS) from ../themes
+const THEMES_DIR = path.resolve(DIST_DIR, '..', 'themes');
+if (fs.existsSync(THEMES_DIR)) {
+  app.use('/themes', express.static(THEMES_DIR, { maxAge: '1h' }));
+}
+
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, uptime: process.uptime() });
 });
