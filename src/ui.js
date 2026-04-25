@@ -3107,19 +3107,21 @@ export function createApp(mount) {
       if (!state._themesTabLoaded) {
         state._themesTabLoaded = true;
         state._availableThemes = [];
+        state._themesLoadError = false;
         fetch('themes.json')
-          .then(r => r.json())
-          .then(data => { state._availableThemes = data.themes || []; render(false); })
-          .catch(() => { state._availableThemes = []; render(false); });
+          .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+          .then(data => { state._availableThemes = data.themes || []; state._themesLoadError = false; render(false); })
+          .catch(err => { console.error('[ThemesTab] Failed to load themes:', err); state._availableThemes = []; state._themesLoadError = true; render(false); });
       }
       const availableThemes = state._availableThemes || [];
       const defaultLoginTheme = state.adminSiteSummary?.defaultLoginTheme || 'trans-pride-dark';
 
       const refreshThemes = () => {
+        state._themesLoadError = false;
         fetch('themes.json')
-          .then(r => r.json())
-          .then(d => { state._availableThemes = d.themes || []; render(false); })
-          .catch(() => {});
+          .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+          .then(d => { state._availableThemes = d.themes || []; state._themesLoadError = false; render(false); })
+          .catch(err => { console.error('[ThemesTab] Refresh failed:', err); state._themesLoadError = true; render(false); });
       };
 
       const saveDefaultTheme = async (themeId) => {
@@ -3194,7 +3196,12 @@ export function createApp(mount) {
               ]);
             })
           )
-        : el('div', { class: 'cp-row-hint', text: 'Loading themes…' });
+        : state._themesLoadError
+          ? el('div', { class: 'cp-row-hint error', style: 'color:#e74c3c;' }, [
+              'Failed to load themes. ',
+              el('button', { class: 'btn ghost small-btn', type: 'button', onclick: refreshThemes }, [el('span', { text: 'Retry' })])
+            ])
+          : el('div', { class: 'cp-row-hint', text: 'Loading themes…' });
 
       return el('div', { class: 'cp-body' }, [
         el('div', { class: 'cp-section' }, [
@@ -3772,7 +3779,7 @@ export function createApp(mount) {
         state._auditTabLoaded = false; state._auditTabLogs = null; state._auditTabFilter = '';
         state._announcementsSettingsLoaded = false;
         state._inviteCodesLoaded = false; state._inviteCodes = null; state._inviteForm = null;
-        state._themesTabLoaded = false; state._availableThemes = null;
+        state._themesTabLoaded = false; state._availableThemes = null; state._themesLoadError = false;
         state._usersTabSearch = ''; state._usersTabAdminsOnly = false;
         state._mailTabLoaded = false; state._mailSettings = null;
         render(false);
