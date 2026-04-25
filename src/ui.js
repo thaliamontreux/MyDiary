@@ -2388,7 +2388,7 @@ export function createApp(mount) {
     if (!state._accountThemesLoaded) {
       state._accountThemesLoaded = true;
       state._accountAvailableThemes = [];
-      fetch('themes.json')
+      fetch('/api/themes')
         .then(r => r.json())
         .then(data => { state._accountAvailableThemes = data.themes || []; render(false); })
         .catch(() => { state._accountAvailableThemes = []; render(false); });
@@ -2396,7 +2396,7 @@ export function createApp(mount) {
     const availableThemes = state._accountAvailableThemes || [];
 
     const refreshThemes = () => {
-      fetch('themes.json')
+      fetch('/api/themes')
         .then(r => r.json())
         .then(data => { state._accountAvailableThemes = data.themes || []; render(false); })
         .catch(() => {});
@@ -3108,7 +3108,7 @@ export function createApp(mount) {
         state._themesTabLoaded = true;
         state._availableThemes = [];
         state._themesLoadError = false;
-        fetch('themes.json')
+        fetch('/api/themes')
           .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
           .then(data => { state._availableThemes = data.themes || []; state._themesLoadError = false; render(false); })
           .catch(err => { console.error('[ThemesTab] Failed to load themes:', err); state._availableThemes = []; state._themesLoadError = true; render(false); });
@@ -3118,7 +3118,7 @@ export function createApp(mount) {
 
       const refreshThemes = () => {
         state._themesLoadError = false;
-        fetch('themes.json')
+        fetch('/api/themes')
           .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
           .then(d => { state._availableThemes = d.themes || []; state._themesLoadError = false; render(false); })
           .catch(err => { console.error('[ThemesTab] Refresh failed:', err); state._themesLoadError = true; render(false); });

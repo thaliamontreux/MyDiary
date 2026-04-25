@@ -1377,6 +1377,27 @@ app.post('/api/user/theme', requireAuth, async (req, res) => {
   }
 });
 
+// ── Get Themes List ─────────────────────────────────────────────────────────────
+app.get('/api/themes', async (req, res) => {
+  try {
+    const themesJsonPath = path.resolve(DIST_DIR, '..', 'themes.json');
+    let themesData = { themes: [] };
+    try {
+      themesData = JSON.parse(await fsp.readFile(themesJsonPath, 'utf8'));
+    } catch {
+      // Fallback: try to read from database if file doesn't exist
+      const themesJson = await getUserThemesJson?.();
+      if (themesJson) {
+        try { themesData = JSON.parse(themesJson); } catch { /* ok */ }
+      }
+    }
+    res.json(themesData);
+  } catch (err) {
+    logError('themes_load_failed', err);
+    res.status(500).json({ error: 'Failed to load themes' });
+  }
+});
+
 // ── Theme Upload (ZIP) ────────────────────────────────────────────────────────
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
