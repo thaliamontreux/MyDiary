@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import multer from 'multer';
 import AdmZip from 'adm-zip';
+import nodemailer from 'nodemailer';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -67,7 +68,10 @@ import {
   getRecentRegistrations,
   createInviteCode,
   listInviteCodes,
-  revokeInviteCode
+  revokeInviteCode,
+  markUserTosAccepted,
+  getMailSettings,
+  saveMailSettings
 } from './db.js';
 import { requireAuth, signAuthToken } from './auth.js';
 import { log, logError, requestLogger } from './logger.js';
@@ -558,6 +562,97 @@ app.post('/api/admin/site-settings', requireAuth, requireAdmin, async (req, res)
   } catch (error) {
     logError('admin_site_settings_failed', error, { requestId: req.requestId, adminId: req.user?.id });
     res.status(500).json({ error: 'Failed to save settings' });
+  }
+});
+
+// ── Mail Settings ──────────────────────────────────────────────────────────────
+app.get('/api/admin/mail-settings', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const settings = await getMailSettings();
+    res.json({ settings });
+  } catch (error) {
+    logError('admin_mail_settings_get_failed', error, { requestId: req.requestId });
+    res.status(500).json({ error: 'Failed to load mail settings' });
+  }
+});
+
+app.post('/api/admin/mail-settings', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const settings = await saveMailSettings({
+      host: String(body.host || ''),
+      port: Number(body.port || 587),
+      secure: Boolean(body.secure),
+      username: String(body.username || ''),
+      password: String(body.password || ''),
+      verifyCert: body.verifyCert !== false
+    });
+    await createAuditLog(req.user.id, 'admin_mail_settings_updated', body.host || 'unknown', req.ip);
+    res.json({ settings });
+  } catch (error) {
+    logError('admin_mail_settings_save_failed', error, { requestId: req.requestId });
+    res.status(500).json({ error: 'Failed to save mail settings' });
+  }
+});
+
+app.post('/api/admin/mail-test-connection', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const config = {
+      host: String(body.host || ''),
+      port: Number(body.port || 587),
+      secure: Boolean(body.secure),
+      auth: {
+        user: String(body.username || ''),
+        pass: String(body.password || '')
+      },
+      tls: {
+        rejectUnauthorized: body.verifyCert !== false
+      }
+    };
+
+    const transporter = nodemailer.createTransport(config);
+    await transporter.verify();
+    res.json({ ok: true, message: 'Connection successful' });
+  } catch (error) {
+    logError('admin_mail_test_connection_failed', error, { requestId: req.requestId });
+    res.status(400).json({ ok: false, error: error.message || 'Connection failed' });
+  }
+});
+
+app.post('/api/admin/mail-send-test', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const toEmail = String(body.to || '').trim();
+    if (!toEmail) return res.status(400).json({ error: 'Recipient email required' });
+
+    const config = {
+      host: String(body.host || ''),
+      port: Number(body.port || 587),
+      secure: Boolean(body.secure),
+      auth: {
+        user: String(body.username || ''),
+        pass: String(body.password || '')
+      },
+      tls: {
+        rejectUnauthorized: body.verifyCert !== false
+      }
+    };
+
+    const transporter = nodemailer.createTransport(config);
+    await transporter.sendMail({
+      from: `"MyDiary Test" <${config.auth.user || 'noreply@example.com'}>`,
+      to: toEmail,
+      subject: 'Test Email from MyDiary',
+      text: 'This is a test email from your MyDiary admin panel.\n\nIf you received this, your mail settings are configured correctly!',
+      html: '<p>This is a test email from your <strong>MyDiary</strong> admin panel.</p><p>If you received this, your mail settings are configured correctly!</p>'
+    });
+
+    await createAuditLog(req.user.id, 'admin_mail_test_sent', toEmail, req.ip);
+    res.json({ ok: true, message: 'Test email sent successfully' });
+  } catch (error) {
+    logError('admin_mail_send_test_failed', error, { requestId: req.requestId });
+    res.status(400).json({ ok: false, error: error.message || 'Failed to send test email' });
   }
 });
 

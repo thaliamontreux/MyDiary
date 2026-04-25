@@ -1283,4 +1283,35 @@ export async function getAdminStats() {
   };
 }
 
+// ── Mail Settings (stored in site_settings) ───────────────────────────────────
+const MAIL_SETTINGS_KEYS = ['mail_host', 'mail_port', 'mail_secure', 'mail_username', 'mail_password', 'mail_verify_cert'];
+
+export async function getMailSettings() {
+  await ensureSiteSettingsTable();
+  const settings = {};
+  for (const key of MAIL_SETTINGS_KEYS) {
+    const row = await getSiteSetting(key);
+    if (row) settings[key] = row.value_data;
+  }
+  return {
+    host: settings.mail_host || '',
+    port: parseInt(settings.mail_port || '587', 10),
+    secure: settings.mail_secure === 'true',
+    username: settings.mail_username || '',
+    password: settings.mail_password || '',
+    verifyCert: settings.mail_verify_cert !== 'false'
+  };
+}
+
+export async function saveMailSettings({ host, port, secure, username, password, verifyCert }) {
+  await ensureSiteSettingsTable();
+  await upsertSiteSetting('mail_host', String(host || ''));
+  await upsertSiteSetting('mail_port', String(port || 587));
+  await upsertSiteSetting('mail_secure', String(secure === true || secure === 'true'));
+  await upsertSiteSetting('mail_username', String(username || ''));
+  await upsertSiteSetting('mail_password', String(password || ''));
+  await upsertSiteSetting('mail_verify_cert', String(verifyCert !== false && verifyCert !== 'false'));
+  return getMailSettings();
+}
+
 export { pool };

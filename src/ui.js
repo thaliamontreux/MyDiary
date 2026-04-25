@@ -2383,19 +2383,28 @@ export function createApp(mount) {
     if (!state.auth.user) return el('div');
 
     const currentTheme = state.auth.user?.theme || 'trans-pride-dark';
-    const [availableThemes, setAvailableThemes] = useState([]);
 
-    // Load themes from JSON
-    useEffect(() => {
+    // Load themes from JSON once per session
+    if (!state._accountThemesLoaded) {
+      state._accountThemesLoaded = true;
+      state._accountAvailableThemes = [];
       fetch('themes.json')
         .then(r => r.json())
-        .then(data => setAvailableThemes(data.themes || []))
-        .catch(() => setAvailableThemes([]));
-    }, []);
+        .then(data => { state._accountAvailableThemes = data.themes || []; render(false); })
+        .catch(() => { state._accountAvailableThemes = []; render(false); });
+    }
+    const availableThemes = state._accountAvailableThemes || [];
+
+    const refreshThemes = () => {
+      fetch('themes.json')
+        .then(r => r.json())
+        .then(data => { state._accountAvailableThemes = data.themes || []; render(false); })
+        .catch(() => {});
+    };
 
     const applyTheme = async (themeId) => {
       document.documentElement.setAttribute('data-theme', themeId);
-      
+
       // Save to user settings
       try {
         await fetch('/api/user/theme', {
@@ -2424,16 +2433,14 @@ export function createApp(mount) {
         showToast('Uploading theme...');
         const res = await fetch('/api/themes/upload', {
           method: 'POST',
+          headers: { Authorization: `Bearer ${state.auth.token}` },
           body: formData
         });
-        
+
         if (res.ok) {
           const data = await res.json();
           showToast(`Theme "${data.themeName}" installed!`);
-          // Refresh themes list
-          fetch('themes.json')
-            .then(r => r.json())
-            .then(data => setAvailableThemes(data.themes || []));
+          refreshThemes();
         } else {
           showToast('Failed to install theme');
         }
@@ -2456,10 +2463,7 @@ export function createApp(mount) {
             state.auth.user.theme = 'trans-pride-dark';
             document.documentElement.setAttribute('data-theme', 'trans-pride-dark');
           }
-          // Refresh the themes list
-          fetch('themes.json')
-            .then(r => r.json())
-            .then(data => setAvailableThemes(data.themes || []));
+          refreshThemes();
         } else {
           showToast('Failed to remove theme');
         }
@@ -2861,12 +2865,13 @@ export function createApp(mount) {
         ])
       ) : [el('div', { class: 'cp-row-hint', text: state.adminSiteSummaryLoading ? 'Loading…' : 'No data yet.' })];
 
-      const [recentUsers, setRecentUsers] = useState([]);
-      useEffect(() => {
+      if (!state._recentUsersLoaded) {
+        state._recentUsersLoaded = true;
         adminGetRecentRegistrations(state.auth.token, 8)
-          .then(d => setRecentUsers(d.users || []))
+          .then(d => { state._recentUsers = d.users || []; render(false); })
           .catch(() => {});
-      }, []);
+      }
+      const recentUsers = state._recentUsers || [];
 
       const recentRows = recentUsers.map(u =>
         el('div', { class: 'cp-row', style: 'cursor:pointer', onclick: () => {
@@ -2936,8 +2941,8 @@ export function createApp(mount) {
     // ── Tab: Users ────────────────────────────────────────────────────────
     function buildUsersTab() {
       const allRows = state.adminUsers || [];
-      const [userSearch, setUserSearch] = useState('');
-      const [showAdminsOnly, setShowAdminsOnly] = useState(false);
+      const userSearch = state._usersTabSearch || '';
+      const showAdminsOnly = state._usersTabAdminsOnly || false;
 
       const rows = allRows.filter(u => {
         if (showAdminsOnly && !u.isAdmin) return false;
@@ -2948,13 +2953,13 @@ export function createApp(mount) {
 
       const searchBox = el('input', {
         class: 'lock-input', placeholder: '🔍 Search by email or username…',
-        value: userSearch, oninput: (e) => setUserSearch(e.target.value),
+        value: userSearch, oninput: (e) => { state._usersTabSearch = e.target.value; render(false); },
         style: 'margin-bottom:6px;'
       });
       const adminFilterBtn = el('button', {
         class: `pill ${showAdminsOnly ? 'active' : ''}`, type: 'button',
         style: 'margin-bottom:8px;',
-        onclick: () => setShowAdminsOnly(!showAdminsOnly)
+        onclick: () => { state._usersTabAdminsOnly = !showAdminsOnly; render(false); }
       }, [el('span', { text: '🛡️ Admins only' })]);
 
       const userList = el('div', { class: 'cp-split-list' }, [
@@ -3099,15 +3104,23 @@ export function createApp(mount) {
 
     // ── Tab: Themes ───────────────────────────────────────────────────────
     function buildThemesTab() {
-      const [availableThemes, setAvailableThemes] = useState([]);
-      const [defaultLoginTheme, setDefaultLoginTheme] = useState(state.adminSiteSummary?.defaultLoginTheme || 'trans-pride-dark');
-
-      useEffect(() => {
+      if (!state._themesTabLoaded) {
+        state._themesTabLoaded = true;
+        state._availableThemes = [];
         fetch('themes.json')
           .then(r => r.json())
-          .then(data => setAvailableThemes(data.themes || []))
-          .catch(() => setAvailableThemes([]));
-      }, []);
+          .then(data => { state._availableThemes = data.themes || []; render(false); })
+          .catch(() => { state._availableThemes = []; render(false); });
+      }
+      const availableThemes = state._availableThemes || [];
+      const defaultLoginTheme = state.adminSiteSummary?.defaultLoginTheme || 'trans-pride-dark';
+
+      const refreshThemes = () => {
+        fetch('themes.json')
+          .then(r => r.json())
+          .then(d => { state._availableThemes = d.themes || []; render(false); })
+          .catch(() => {});
+      };
 
       const saveDefaultTheme = async (themeId) => {
         try {
@@ -3116,8 +3129,9 @@ export function createApp(mount) {
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.auth.token}` },
             body: JSON.stringify({ defaultLoginTheme: themeId })
           });
-          setDefaultLoginTheme(themeId);
+          if (state.adminSiteSummary) state.adminSiteSummary.defaultLoginTheme = themeId;
           showToast(`Default login theme set to "${themeId}"`);
+          render(false);
         } catch (e) { showToast('Failed to save default theme'); }
       };
 
@@ -3131,7 +3145,7 @@ export function createApp(mount) {
           if (res.ok) {
             const data = await res.json();
             showToast(`Theme "${data.themeName}" installed!`);
-            fetch('themes.json').then(r => r.json()).then(d => setAvailableThemes(d.themes || []));
+            refreshThemes();
           } else { showToast('Failed to install theme'); }
         } catch (e) { showToast('Upload failed: ' + e.message); }
       };
@@ -3142,7 +3156,7 @@ export function createApp(mount) {
           const res = await fetch(`/api/themes/${encodeURIComponent(themeId)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${state.auth.token}` } });
           if (res.ok) {
             showToast(`Theme "${themeName}" removed`);
-            fetch('themes.json').then(r => r.json()).then(d => setAvailableThemes(d.themes || []));
+            refreshThemes();
           } else { showToast('Failed to remove theme'); }
         } catch (e) { showToast('Error: ' + e.message); }
       };
@@ -3202,13 +3216,14 @@ export function createApp(mount) {
 
     // ── Tab: Analytics ────────────────────────────────────────────────────
     function buildAnalyticsTab() {
-      const [stats, setStats] = useState(null);
-      const [loading, setLoading] = useState(true);
-      useEffect(() => {
+      if (!state._adminStatsLoaded) {
+        state._adminStatsLoaded = true;
         adminGetStats(state.auth.token)
-          .then(s => { setStats(s); setLoading(false); })
-          .catch(() => setLoading(false));
-      }, []);
+          .then(s => { state._adminStats = s; render(false); })
+          .catch(() => { state._adminStats = null; render(false); });
+      }
+      const stats = state._adminStats;
+      const loading = !state._adminStatsLoaded || (state._adminStatsLoaded && stats === undefined);
 
       if (loading) return el('div', { class: 'cp-body' }, [el('div', { class: 'cp-row-hint', text: 'Loading analytics…' })]);
       if (!stats)  return el('div', { class: 'cp-body' }, [el('div', { class: 'cp-row-hint', text: 'Could not load analytics.' })]);
@@ -3266,19 +3281,23 @@ export function createApp(mount) {
 
     // ── Tab: Audit Log ─────────────────────────────────────────────────────
     function buildAuditTab() {
-      const [logs, setLogs] = useState(null);
-      const [filterUser, setFilterUser] = useState('');
-      const [limit, setLimit] = useState(100);
+      if (!state._auditTabLimit) state._auditTabLimit = 100;
+      const limit = state._auditTabLimit;
+      const filterUser = state._auditTabFilter || '';
 
-      useEffect(() => {
+      if (!state._auditTabLoaded || state._auditTabLoadedLimit !== limit) {
+        state._auditTabLoaded = true;
+        state._auditTabLoadedLimit = limit;
+        state._auditTabLogs = null;
         adminGetAuditLogs(state.auth.token, limit)
-          .then(d => setLogs(d.logs || []))
-          .catch(() => setLogs([]));
-      }, [limit]);
+          .then(d => { state._auditTabLogs = d.logs || []; render(false); })
+          .catch(() => { state._auditTabLogs = []; render(false); });
+      }
+      const logs = state._auditTabLogs;
 
       const searchInput = el('input', {
         class: 'lock-input', placeholder: 'Filter by email or action…', value: filterUser,
-        oninput: (e) => setFilterUser(e.target.value)
+        oninput: (e) => { state._auditTabFilter = e.target.value; render(false); }
       });
 
       const filtered = (logs || []).filter(l =>
@@ -3301,7 +3320,7 @@ export function createApp(mount) {
       );
 
       const limitBtns = [50, 100, 250, 500].map(n =>
-        el('button', { class: `pill ${limit === n ? 'active' : ''}`, type: 'button', onclick: () => setLimit(n) }, [el('span', { text: String(n) })])
+        el('button', { class: `pill ${limit === n ? 'active' : ''}`, type: 'button', onclick: () => { state._auditTabLimit = n; state._auditTabLoaded = false; render(false); } }, [el('span', { text: String(n) })])
       );
 
       return el('div', { class: 'cp-body' }, [
@@ -3339,12 +3358,12 @@ export function createApp(mount) {
         rows: '3'
       });
 
-      const [motd, setMotd] = useState('');
-      useEffect(() => {
+      if (!state._announcementsSettingsLoaded) {
+        state._announcementsSettingsLoaded = true;
         adminGetSiteSettings(state.auth.token)
           .then(d => { motdIn.value = d.settings?.motd || ''; })
           .catch(() => {});
-      }, []);
+      }
 
       const status = el('div', { class: 'lock-status', text: '' });
 
@@ -3390,12 +3409,12 @@ export function createApp(mount) {
     // ── Tab: Site Settings ────────────────────────────────────────────────
     function buildSiteSettingsTab() {
       const summary = state.adminSiteSummary || {};
-      const [settings, setSettings] = useState({
+      const settings = {
         siteName: summary.siteName || 'My Secret Diary',
         maintenanceMode: summary.maintenanceMode || false,
         registrationEnabled: summary.registrationEnabled !== false,
         defaultLoginTheme: summary.defaultLoginTheme || 'trans-pride-dark'
-      });
+      };
 
       const siteNameIn = el('input', { class: 'lock-input', value: settings.siteName, placeholder: 'Site name' });
 
@@ -3462,47 +3481,207 @@ export function createApp(mount) {
       ]);
     }
 
+    // ── Tab: Mail Settings ────────────────────────────────────────────────
+    function buildMailTab() {
+      if (!state._mailTabLoaded) {
+        state._mailTabLoaded = true;
+        state._mailSettings = { host: '', port: 587, secure: false, username: '', password: '', verifyCert: true };
+        state._mailTestStatus = null;
+        state._mailTestRecipient = '';
+        fetch('/api/admin/mail-settings', { headers: { Authorization: `Bearer ${state.auth.token}` } })
+          .then(r => r.json())
+          .then(d => { state._mailSettings = d.settings || state._mailSettings; render(false); })
+          .catch(() => { render(false); });
+      }
+      const s = state._mailSettings || { host: '', port: 587, secure: false, username: '', password: '', verifyCert: true };
+
+      const hostInput = el('input', { class: 'lock-input', placeholder: 'smtp.example.com', value: s.host, oninput: (e) => { s.host = e.target.value; } });
+      const portInput = el('input', { class: 'lock-input', type: 'number', value: String(s.port || 587), oninput: (e) => { s.port = parseInt(e.target.value, 10) || 587; } });
+      const secureSelect = el('select', { class: 'lock-input', value: s.secure ? 'smtps' : 'smtp' }, [
+        el('option', { value: 'smtp', text: 'SMTP (STARTTLS, port 587)' }),
+        el('option', { value: 'smtps', text: 'SMTPS (SSL/TLS, port 465)' })
+      ]);
+      secureSelect.value = s.secure ? 'smtps' : 'smtp';
+      const usernameInput = el('input', { class: 'lock-input', placeholder: 'username or email', value: s.username, oninput: (e) => { s.username = e.target.value; } });
+      const passwordInput = el('input', { class: 'lock-input', type: 'password', placeholder: 'password', value: s.password, oninput: (e) => { s.password = e.target.value; } });
+      const verifyCertToggle = el('button', {
+        class: `toggle-chip ${s.verifyCert ? 'active' : ''}`,
+        type: 'button',
+        onclick: () => { s.verifyCert = !s.verifyCert; render(false); }
+      }, [el('span', { text: s.verifyCert ? '✓ Verify SSL Certificate' : '⚠️ Skip Certificate Verify' })]);
+
+      const statusMsg = state._mailTestStatus
+        ? el('div', { class: `lock-status ${state._mailTestStatus.ok ? 'success' : 'error'}`, text: state._mailTestStatus.message })
+        : el('div', { class: 'lock-status', text: '' });
+
+      const saveBtn = el('button', { class: 'btn small-btn', type: 'button', onclick: async () => {
+        statusMsg.textContent = 'Saving…';
+        try {
+          const payload = {
+            host: s.host,
+            port: s.port,
+            secure: secureSelect.value === 'smtps',
+            username: s.username,
+            password: s.password,
+            verifyCert: s.verifyCert
+          };
+          const res = await fetch('/api/admin/mail-settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.auth.token}` },
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+          if (res.ok) {
+            state._mailSettings = data.settings;
+            state._mailTestStatus = { ok: true, message: 'Settings saved successfully' };
+          } else {
+            state._mailTestStatus = { ok: false, message: data.error || 'Failed to save' };
+          }
+          render(false);
+        } catch (e) {
+          state._mailTestStatus = { ok: false, message: e.message || 'Network error' };
+          render(false);
+        }
+      }}, [el('span', { class: 'btn-ic', text: '💾' }), el('span', { text: 'Save Settings' })]);
+
+      const testConnBtn = el('button', { class: 'btn ghost small-btn', type: 'button', onclick: async () => {
+        statusMsg.textContent = 'Testing connection…';
+        try {
+          const payload = {
+            host: s.host,
+            port: s.port,
+            secure: secureSelect.value === 'smtps',
+            username: s.username,
+            password: s.password,
+            verifyCert: s.verifyCert
+          };
+          const res = await fetch('/api/admin/mail-test-connection', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.auth.token}` },
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+          state._mailTestStatus = { ok: data.ok, message: data.message || data.error || 'Unknown result' };
+          render(false);
+        } catch (e) {
+          state._mailTestStatus = { ok: false, message: e.message || 'Network error' };
+          render(false);
+        }
+      }}, [el('span', { text: 'Test Connection' })]);
+
+      const testEmailInput = el('input', {
+        class: 'lock-input',
+        type: 'email',
+        placeholder: 'test@example.com',
+        value: state._mailTestRecipient || '',
+        oninput: (e) => { state._mailTestRecipient = e.target.value; }
+      });
+
+      const sendTestBtn = el('button', { class: 'btn ghost small-btn', type: 'button', onclick: async () => {
+        const to = state._mailTestRecipient || '';
+        if (!to) { state._mailTestStatus = { ok: false, message: 'Please enter a recipient email' }; render(false); return; }
+        statusMsg.textContent = 'Sending test email…';
+        try {
+          const payload = {
+            host: s.host,
+            port: s.port,
+            secure: secureSelect.value === 'smtps',
+            username: s.username,
+            password: s.password,
+            verifyCert: s.verifyCert,
+            to: to
+          };
+          const res = await fetch('/api/admin/mail-send-test', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${state.auth.token}` },
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+          state._mailTestStatus = { ok: data.ok, message: data.message || data.error || 'Unknown result' };
+          render(false);
+        } catch (e) {
+          state._mailTestStatus = { ok: false, message: e.message || 'Network error' };
+          render(false);
+        }
+      }}, [el('span', { text: 'Send Test Email' })]);
+
+      return el('div', { class: 'cp-body' }, [
+        el('div', { class: 'cp-section' }, [
+          el('div', { class: 'cp-section-title', text: 'Outgoing Mail (SMTP) Settings' }),
+          el('div', { class: 'cp-row-hint', text: 'Configure SMTP settings for sending emails from the application.' }),
+          el('div', { class: 'cp-row', style: 'gap:12px;flex-wrap:wrap' }, [
+            el('div', { style: 'flex:1;min-width:200px' }, [el('div', { class: 'cp-row-label', text: 'SMTP Host' }), hostInput]),
+            el('div', { style: 'width:120px' }, [el('div', { class: 'cp-row-label', text: 'Port' }), portInput]),
+            el('div', { style: 'width:180px' }, [el('div', { class: 'cp-row-label', text: 'Connection' }), secureSelect])
+          ]),
+          el('div', { class: 'cp-row', style: 'gap:12px;flex-wrap:wrap' }, [
+            el('div', { style: 'flex:1;min-width:200px' }, [el('div', { class: 'cp-row-label', text: 'Username' }), usernameInput]),
+            el('div', { style: 'flex:1;min-width:200px' }, [el('div', { class: 'cp-row-label', text: 'Password' }), passwordInput])
+          ]),
+          el('div', { class: 'cp-row', style: 'marginTop:8px' }, [verifyCertToggle])
+        ]),
+        el('div', { class: 'cp-section' }, [
+          el('div', { class: 'cp-section-title', text: 'Test Configuration' }),
+          el('div', { class: 'cp-row', style: 'gap:10px;align-items:flex-end' }, [
+            el('div', { style: 'flex:1' }, [el('div', { class: 'cp-row-label', text: 'Send test email to' }), testEmailInput]),
+            sendTestBtn,
+            testConnBtn,
+            saveBtn
+          ]),
+          statusMsg
+        ])
+      ]);
+    }
+
     // ── Tab: Invitations ──────────────────────────────────────────────────
     function buildInvitationsTab() {
-      const [codes, setCodes] = useState(null);
-      const [noteIn, setNoteIn] = useState('');
-      const [maxUses, setMaxUses] = useState(1);
-      const [daysValid, setDaysValid] = useState(0);
-      const [creating, setCreating] = useState(false);
-      const [copied, setCopied] = useState(null);
+      if (!state._inviteCodesLoaded) {
+        state._inviteCodesLoaded = true;
+        adminListInviteCodes(state.auth.token)
+          .then(d => { state._inviteCodes = d.codes || []; render(false); })
+          .catch(() => { state._inviteCodes = []; render(false); });
+      }
+      const codes = state._inviteCodes ?? null;
+      if (!state._inviteForm) state._inviteForm = { noteIn: '', maxUses: 1, daysValid: 0, creating: false, copied: null };
+      const form = state._inviteForm;
 
-      const loadCodes = () => adminListInviteCodes(state.auth.token)
-        .then(d => setCodes(d.codes || []))
-        .catch(() => setCodes([]));
-
-      useEffect(() => { loadCodes(); }, []);
+      const reloadCodes = () => {
+        state._inviteCodesLoaded = false;
+        state._inviteCodes = null;
+        adminListInviteCodes(state.auth.token)
+          .then(d => { state._inviteCodes = d.codes || []; state._inviteCodesLoaded = true; render(false); })
+          .catch(() => { state._inviteCodes = []; state._inviteCodesLoaded = true; render(false); });
+      };
 
       const noteInput = el('input', {
         class: 'lock-input', placeholder: 'Note (optional) — e.g. "For Alice"',
-        value: noteIn, oninput: (e) => setNoteIn(e.target.value)
+        value: form.noteIn, oninput: (e) => { form.noteIn = e.target.value; }
       });
-      const maxUsesSelect = el('select', { class: 'lock-input', style: 'width:auto', onchange: (e) => setMaxUses(Number(e.target.value)) },
+      const maxUsesSelect = el('select', { class: 'lock-input', style: 'width:auto', onchange: (e) => { form.maxUses = Number(e.target.value); } },
         [1,2,5,10,25,50].map(n => el('option', { value: String(n), text: `${n} use${n>1?'s':''}` }))
       );
-      const expirySelect = el('select', { class: 'lock-input', style: 'width:auto', onchange: (e) => setDaysValid(Number(e.target.value)) },
+      maxUsesSelect.value = String(form.maxUses);
+      const expirySelect = el('select', { class: 'lock-input', style: 'width:auto', onchange: (e) => { form.daysValid = Number(e.target.value); } },
         [[0,'Never expires'],[1,'1 day'],[3,'3 days'],[7,'7 days'],[30,'30 days']].map(([v,l]) => el('option', { value: String(v), text: l }))
       );
+      expirySelect.value = String(form.daysValid);
 
       const createBtn = el('button', { class: 'btn small-btn', type: 'button', onclick: async () => {
-        setCreating(true);
+        form.creating = true; render(false);
         try {
-          await adminCreateInviteCode(state.auth.token, { note: noteIn, maxUses, daysValid });
-          setNoteIn(''); await loadCodes();
+          await adminCreateInviteCode(state.auth.token, { note: form.noteIn, maxUses: form.maxUses, daysValid: form.daysValid });
+          form.noteIn = ''; reloadCodes();
           showToast('Invite code created');
         } catch (e) { showToast(e?.message || 'Failed'); }
-        finally { setCreating(false); }
-      }}, [el('span', { class: 'btn-ic', text: creating ? '⏳' : '✚' }), el('span', { text: 'Generate code' })]);
+        finally { form.creating = false; }
+      }}, [el('span', { class: 'btn-ic', text: form.creating ? '⏳' : '✚' }), el('span', { text: 'Generate code' })]);
 
       const copyCode = async (code) => {
         try {
           await navigator.clipboard.writeText(code);
-          setCopied(code);
-          setTimeout(() => setCopied(null), 2000);
+          form.copied = code;
+          render(false);
+          setTimeout(() => { form.copied = null; render(false); }, 2000);
         } catch { showToast('Copy failed'); }
       };
 
@@ -3523,11 +3702,11 @@ export function createApp(mount) {
           ]),
           el('div', { class: 'invite-code-actions' }, [
             el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => copyCode(c.code) }, [
-              el('span', { text: copied === c.code ? '✓ Copied' : '⧉ Copy' })
+              el('span', { text: form.copied === c.code ? '✓ Copied' : '⧉ Copy' })
             ]),
             el('button', { class: 'btn danger ghost small-btn', type: 'button', onclick: async () => {
               if (!confirm('Revoke this invite code?')) return;
-              try { await adminRevokeInviteCode(state.auth.token, c.id); await loadCodes(); showToast('Revoked'); }
+              try { await adminRevokeInviteCode(state.auth.token, c.id); reloadCodes(); showToast('Revoked'); }
               catch (e) { showToast(e?.message || 'Failed'); }
             }}, [el('span', { text: '✕' })])
           ])
@@ -3560,6 +3739,7 @@ export function createApp(mount) {
       { id: 'invitations',    icon: '🎟️', label: 'Invitations' },
       { id: 'themes',         icon: '🎨', label: 'Themes' },
       { id: 'site-settings',  icon: '⚙️', label: 'Site Settings' },
+      { id: 'mail',           icon: '✉️', label: 'Mail Settings' },
     ];
 
     const tabBar = el('div', { class: 'cp-tabs' },
@@ -3578,12 +3758,25 @@ export function createApp(mount) {
     else if (activeTab === 'announcements') tabContent = buildAnnouncementsTab();
     else if (activeTab === 'invitations')   tabContent = buildInvitationsTab();
     else if (activeTab === 'themes')        tabContent = buildThemesTab();
+    else if (activeTab === 'mail')          tabContent = buildMailTab();
     else                                    tabContent = buildSiteSettingsTab();
 
     const closeBtn = el('button', {
       class: 'btn ghost small-btn cp-close-btn',
       type: 'button',
-      onclick: () => { state.showUserManagerOverlay = false; state.adminSelectedUserId = null; state.adminSelectedUser = null; render(false); }
+      onclick: () => {
+        state.showUserManagerOverlay = false;
+        state.adminSelectedUserId = null; state.adminSelectedUser = null;
+        state._recentUsersLoaded = false; state._recentUsers = null;
+        state._adminStatsLoaded = false; state._adminStats = undefined;
+        state._auditTabLoaded = false; state._auditTabLogs = null; state._auditTabFilter = '';
+        state._announcementsSettingsLoaded = false;
+        state._inviteCodesLoaded = false; state._inviteCodes = null; state._inviteForm = null;
+        state._themesTabLoaded = false; state._availableThemes = null;
+        state._usersTabSearch = ''; state._usersTabAdminsOnly = false;
+        state._mailTabLoaded = false; state._mailSettings = null;
+        render(false);
+      }
     }, [el('span', { class: 'btn-ic', text: '✕' }), el('span', { text: 'Close' })]);
 
     const card = el('div', { class: 'account-card', style: 'position:relative' }, [
@@ -4286,11 +4479,6 @@ export function createApp(mount) {
       const FONT_SIZE_OPTIONS = [['small', 'Small'], ['medium', 'Medium'], ['large', 'Large']];
 
       return el('div', { class: 'cp-body' }, [
-        el('div', { class: 'cp-section' }, [
-          el('div', { class: 'cp-section-title', text: 'Background Theme' }),
-          el('div', { class: 'cp-row-hint', text: 'Select a background theme for your diary. Your choice is saved to your account.' }),
-        ]),
-        renderAccountThemeSection(),
         el('div', { class: 'cp-two-col' }, [
           el('div', { class: 'cp-section' }, [
             el('div', { class: 'cp-section-title', text: 'Ambience' }),
@@ -4446,12 +4634,13 @@ export function createApp(mount) {
 
     // ── Tab: My Stats ─────────────────────────────────────────────────────
     function buildStatsTab() {
-      const [stats, setStats] = useState(null);
-      useEffect(() => {
-        getUserStats(state.auth.token)
-          .then(s => setStats(s))
-          .catch(() => setStats({}));
-      }, []);
+      if (!state._userStatsLoaded) {
+        state._userStatsLoaded = true;
+        getAuditLogs(state.auth.token, 1)
+          .then(() => {})
+          .catch(() => {});
+      }
+      const stats = state._userStats || null;
 
       const entries = state.vault?.entries || [];
       const wordCount = entries.reduce((sum, e) => {
@@ -4539,7 +4728,7 @@ export function createApp(mount) {
     const closeBtn = el('button', {
       class: 'btn ghost small-btn cp-close-btn',
       type: 'button',
-      onclick: () => { state.showAccountOverlay = false; state.showEncryptionKey = false; state._auditLogsLoaded = false; state._auditLogs = null; render(false); }
+      onclick: () => { state.showAccountOverlay = false; state.showEncryptionKey = false; state._auditLogsLoaded = false; state._auditLogs = null; state._userStatsLoaded = false; state._accountThemesLoaded = false; state._accountAvailableThemes = null; render(false); }
     }, [el('span', { class: 'btn-ic', text: '✕' }), el('span', { text: 'Close' })]);
 
     const card = el('div', { class: 'account-card', style: 'position:relative' }, [
@@ -8227,7 +8416,7 @@ export function createApp(mount) {
 
         const audio = dataUrl
           ? el('audio', { controls: '', src: dataUrl, class: 'voice-audio', preload: 'metadata' })
-          : el('span', { class: 'tiny', text: loadError ? '(recording unavailable)' : '(loading...)' });
+          : el('span', { class: 'tiny', text: '(recording unavailable — may have been cleared from this browser)' });
 
         const removeBtn = el('button', {
           class: 'btn mini ghost',
@@ -8434,9 +8623,9 @@ export function createApp(mount) {
           }
         }
 
-        const video = el('video', { controls: 'controls', class: 'video-clip', playsinline: 'playsinline' });
-        if (dataUrl) video.src = dataUrl;
-        else video.poster = ''; // Empty placeholder if blob missing
+        const videoEl = dataUrl
+          ? (() => { const v = el('video', { controls: 'controls', class: 'video-clip', playsinline: 'playsinline' }); v.src = dataUrl; return v; })()
+          : el('span', { class: 'tiny', text: '(video unavailable — may have been cleared from this browser)' });
 
         const removeBtn = el('button', {
           class: 'btn mini ghost',
@@ -8453,8 +8642,8 @@ export function createApp(mount) {
         }, [el('span', { text: 'Remove' })]);
 
         const clipEl = el('div', { class: 'video-clip-item' }, [
-          el('span', { class: 'tiny', text: dataUrl ? `Clip ${i + 1}` : `Clip ${i + 1} (loading…)` }),
-          video,
+          el('span', { class: 'tiny', text: `Clip ${i + 1}` }),
+          videoEl,
           removeBtn
         ]);
         clipList.append(clipEl);

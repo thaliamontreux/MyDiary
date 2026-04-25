@@ -543,7 +543,7 @@ body::before {
   color: var(--text);
 }
 
-.account-overlay {
+.account-overlay, .admin-overlay {
   position: fixed;
   inset: 0;
   display: flex;
@@ -682,7 +682,7 @@ body::before {
 @media (max-width: 700px) {
   .cp-two-col { grid-template-columns: 1fr; }
   .account-card { width: 100vw; height: 100vh; border-radius: 0; }
-  .account-overlay { padding: 0; }
+  .account-overlay, .admin-overlay { padding: 0; }
 }
 
 /* ── Admin split layout ───────────────────────────────────────────────────── */
