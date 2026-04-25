@@ -1380,18 +1380,29 @@ app.post('/api/user/theme', requireAuth, async (req, res) => {
 // ── Get Themes List ─────────────────────────────────────────────────────────────
 app.get('/api/themes', async (req, res) => {
   try {
-    const themesJsonPath = path.resolve(DIST_DIR, '..', 'themes.json');
-    let themesData = { themes: [] };
+    const themesDir = path.resolve(DIST_DIR, '..', 'themes');
+    const themes = [];
+
     try {
-      themesData = JSON.parse(await fsp.readFile(themesJsonPath, 'utf8'));
-    } catch {
-      // Fallback: try to read from database if file doesn't exist
-      const themesJson = await getUserThemesJson?.();
-      if (themesJson) {
-        try { themesData = JSON.parse(themesJson); } catch { /* ok */ }
+      const entries = await fsp.readdir(themesDir, { withFileTypes: true });
+      const themeDirs = entries.filter(e => e.isDirectory()).map(e => e.name);
+
+      for (const themeId of themeDirs) {
+        const themeJsonPath = path.join(themesDir, themeId, 'theme.json');
+        try {
+          const themeData = JSON.parse(await fsp.readFile(themeJsonPath, 'utf8'));
+          themes.push(themeData);
+        } catch (err) {
+          // Skip themes with missing/invalid theme.json
+          console.log(`Skipping theme ${themeId}: ${err.message}`);
+        }
       }
+    } catch (err) {
+      // Themes directory might not exist
+      console.log('Themes directory not found or empty:', err.message);
     }
-    res.json(themesData);
+
+    res.json({ themes });
   } catch (err) {
     logError('themes_load_failed', err);
     res.status(500).json({ error: 'Failed to load themes' });
