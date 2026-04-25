@@ -4472,6 +4472,7 @@ export function createApp(mount) {
 
     // ── Tab: Appearance ───────────────────────────────────────────────────
     function buildAppearanceTab() {
+      const ui = state.ui || {};
       const AMBIENCE_OPTIONS = [
         ['silent', '🔇 Silent'], ['gentle', '🎵 Gentle'], ['nature', '🌿 Nature'], ['rain', '🌧 Rain']
       ];
@@ -4485,7 +4486,7 @@ export function createApp(mount) {
             el('div', { class: 'cp-row' }, [
               el('div', {}, [el('div', { class: 'cp-row-label', text: 'Sound mood' }), el('div', { class: 'cp-row-hint', text: 'Background audio while writing' })]),
               el('div', { class: 'setting-pill-row' }, AMBIENCE_OPTIONS.map(([val, label]) =>
-                el('button', { class: `pill ${state.ui.ambience === val ? 'active' : ''}`, type: 'button', onclick: () => updateUiPrefs({ ambience: val }) }, [el('span', { text: label })])
+                el('button', { class: `pill ${ui.ambience === val ? 'active' : ''}`, type: 'button', onclick: () => updateUiPrefs({ ambience: val }) }, [el('span', { text: label })])
               ))
             ]),
           ]),
@@ -4494,13 +4495,13 @@ export function createApp(mount) {
             el('div', { class: 'cp-row' }, [
               el('div', {}, [el('div', { class: 'cp-row-label', text: 'UI density' }), el('div', { class: 'cp-row-hint', text: 'Spacing between elements' })]),
               el('div', { class: 'setting-pill-row' }, DENSITY_OPTIONS.map(([val, label]) =>
-                el('button', { class: `pill ${(state.ui.density || 'normal') === val ? 'active' : ''}`, type: 'button', onclick: () => updateUiPrefs({ density: val }) }, [el('span', { text: label })])
+                el('button', { class: `pill ${(ui.density || 'normal') === val ? 'active' : ''}`, type: 'button', onclick: () => updateUiPrefs({ density: val }) }, [el('span', { text: label })])
               ))
             ]),
             el('div', { class: 'cp-row' }, [
               el('div', {}, [el('div', { class: 'cp-row-label', text: 'Font size' }), el('div', { class: 'cp-row-hint', text: 'Base reading/writing size' })]),
               el('div', { class: 'setting-pill-row' }, FONT_SIZE_OPTIONS.map(([val, label]) =>
-                el('button', { class: `pill ${(state.ui.fontSize || 'medium') === val ? 'active' : ''}`, type: 'button', onclick: () => updateUiPrefs({ fontSize: val }) }, [el('span', { text: label })])
+                el('button', { class: `pill ${(ui.fontSize || 'medium') === val ? 'active' : ''}`, type: 'button', onclick: () => updateUiPrefs({ fontSize: val }) }, [el('span', { text: label })])
               ))
             ]),
           ])
@@ -4674,16 +4675,20 @@ export function createApp(mount) {
       const typeRows = Object.entries(typeCounts).sort((a,b) => b[1]-a[1]).map(([type, count]) => {
         const pct = entryCount > 0 ? Math.round((count / entryCount) * 100) : 0;
         return el('div', { class: 'admin-bar-row' }, [
-          el('div', { class: 'admin-bar-label', text: type }),
+          el('div', { class: 'admin-bar-label', text: type || '—' }),
           el('div', { class: 'admin-bar-track' }, [el('div', { class: 'admin-bar-fill', style: `width:${pct}%` })]),
           el('div', { class: 'admin-bar-count', text: String(count) })
         ]);
       });
 
+      // Ensure we have valid arrays for rendering
+      const safeVaultStatCards = vaultStatCards || [];
+      const safeTypeRows = typeRows || [];
+
       return el('div', { class: 'cp-body' }, [
         el('div', { class: 'cp-section' }, [
           el('div', { class: 'cp-section-title', text: 'Your Diary Stats' }),
-          el('div', { class: 'admin-stat-grid' }, vaultStatCards)
+          el('div', { class: 'admin-stat-grid' }, safeVaultStatCards)
         ]),
         el('div', { class: 'cp-two-col' }, [
           el('div', { class: 'cp-section' }, [
@@ -4694,7 +4699,7 @@ export function createApp(mount) {
           ]),
           el('div', { class: 'cp-section' }, [
             el('div', { class: 'cp-section-title', text: 'Entry Types Breakdown' }),
-            ...(typeRows.length ? typeRows : [el('div', { class: 'cp-row-hint', text: 'No typed entries yet.' })])
+            ...(safeTypeRows.length ? safeTypeRows : [el('div', { class: 'cp-row-hint', text: 'No typed entries yet.' })])
           ])
         ])
       ]);
@@ -4718,12 +4723,19 @@ export function createApp(mount) {
     );
 
     let tabContent;
-    if (activeTab === 'profile')         tabContent = buildProfileTab();
-    else if (activeTab === 'security')   tabContent = buildSecurityTab();
-    else if (activeTab === 'appearance') tabContent = buildAppearanceTab();
-    else if (activeTab === 'vaults')     tabContent = buildVaultsTab();
-    else if (activeTab === 'stats')      tabContent = buildStatsTab();
-    else                                 tabContent = buildPreferencesTab();
+    try {
+      if (activeTab === 'profile')         tabContent = buildProfileTab();
+      else if (activeTab === 'security')   tabContent = buildSecurityTab();
+      else if (activeTab === 'appearance') tabContent = buildAppearanceTab();
+      else if (activeTab === 'vaults')     tabContent = buildVaultsTab();
+      else if (activeTab === 'stats')      tabContent = buildStatsTab();
+      else                                 tabContent = buildPreferencesTab();
+    } catch (tabError) {
+      console.error('[AccountOverlay] Tab rendering error:', tabError);
+      tabContent = el('div', { class: 'cp-body' }, [
+        el('div', { class: 'lock-status error', text: 'Error loading tab content. Please try again.' })
+      ]);
+    }
 
     const closeBtn = el('button', {
       class: 'btn ghost small-btn cp-close-btn',
