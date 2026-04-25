@@ -4513,6 +4513,8 @@ export function createApp(mount) {
             body: JSON.stringify({ theme: themeId })
           });
           state.auth.user.theme = themeId;
+          // Save to localStorage so theme persists on reload
+          saveAuthSession({ token: state.auth.token, email: state.auth.email, user: state.auth.user });
           showToast(`Theme changed to ${themeId}`);
         } catch (e) {
           showToast('Theme applied locally but not saved');

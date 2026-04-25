@@ -492,6 +492,23 @@ app.delete('/api/admin/users/:id', requireAuth, requireAdmin, async (req, res) =
   }
 });
 
+// ── Public site settings (for login page theme) ──────────────────────────────
+app.get('/api/site-settings', async (req, res) => {
+  try {
+    const defaultLoginThemeRow = await getSiteSetting('default_login_theme');
+    const siteNameRow = await getSiteSetting('site_name');
+    const announcementRow = await getSiteSetting('announcement');
+    res.json({
+      defaultLoginTheme: defaultLoginThemeRow?.value_data || 'trans-pride-dark',
+      siteName: siteNameRow?.value_data || 'My Secret Diary',
+      announcement: announcementRow?.value_data || ''
+    });
+  } catch (err) {
+    logError('site_settings_failed', err);
+    res.status(500).json({ error: 'Failed to load site settings' });
+  }
+});
+
 app.get('/api/admin/site-summary', requireAuth, requireAdmin, async (req, res) => {
   try {
     const summary = await getSiteSummary();
