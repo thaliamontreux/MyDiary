@@ -3888,10 +3888,46 @@ export function createApp(mount) {
     // Use user's saved background theme if logged in, otherwise fall back to ui themeId
     const bgTheme = state.auth.user?.theme || state.ui.themeId;
     document.documentElement.dataset.theme = bgTheme;
+
+    // Load theme-specific CSS
+    loadThemeCSS(bgTheme);
+
     brandTitleNode.textContent = state.activeVaultSlot === 'decoy' ? 'My Secret Diary · decoy' : 'My Secret Diary';
     brandSubNode.textContent = state.activeVaultSlot === 'decoy'
       ? 'soft cover story, separate vault, same encryption'
       : 'private, pretty, and protected';
+  }
+
+  // Track currently loaded theme to avoid duplicate loads
+  let _currentThemeId = null;
+
+  function loadThemeCSS(themeId) {
+    if (!themeId || themeId === _currentThemeId) return;
+    _currentThemeId = themeId;
+
+    // Remove old theme stylesheets
+    document.querySelectorAll('link[data-theme-css]').forEach(el => el.remove());
+
+    // Don't load CSS for built-in themes (they're in style.css)
+    const BUILTIN_THEMES = new Set([
+      'dark', 'light',
+      'trans-pride-dark','elegant-dark','support-dark','abstract-dark','community-dark',
+      'flowing-rivers-dark','journey-dark','abstract-shapes-dark','strength-dark','constellation-night',
+      'trans-pride-light','blooming-light','support-light','abstract-light','community-light',
+      'sunrise-hope','journey-light','soft-abstract-light','pride-light','modern-abstract-light'
+    ]);
+
+    if (BUILTIN_THEMES.has(themeId)) {
+      // Built-in themes use CSS variables already in style.css
+      return;
+    }
+
+    // Load custom theme CSS from themes directory
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = `/themes/${themeId}/theme.css`;
+    link.setAttribute('data-theme-css', themeId);
+    document.head.appendChild(link);
   }
 
   function updateUiPrefs(patch) {
