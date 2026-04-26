@@ -16,8 +16,9 @@
   --radius: 14px;
   --radius2: 16px;
   --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-  /* Theme background image; overridden per theme by JS */
-  --bg-image: url('/girly-bg.svg');
+  /* Theme background image; set by JS to the active theme's background.
+     Default to none so we don't show the old SVG when a theme is active. */
+  --bg-image: none;
 }
 
 :root[data-theme='dark'],

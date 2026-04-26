@@ -3915,9 +3915,17 @@ export function createApp(mount) {
         const imageUrl = activeTheme.image.startsWith('/') ? activeTheme.image : `/${activeTheme.image}`;
         document.documentElement.style.setProperty('--bg-image', `url('${imageUrl}')`);
       }
-      // If we don't have metadata yet, keep whatever background was previously set
+      // If we don't have metadata yet, we'll fall back after the try/catch
     } catch {
-      // On any error, don't break rendering; just keep existing dataset/background
+      // On any error, don't break rendering; we'll fall back below
+    }
+
+    // Fallback: if we know the theme id but not its metadata, still point the
+    // background at /themes/<id>/background.webp so themes like "sunrise-hope"
+    // always show their correct image.
+    if (bgTheme) {
+      const fallbackBg = `/themes/${bgTheme}/background.webp`;
+      document.documentElement.style.setProperty('--bg-image', `url('${fallbackBg}')`);
     }
 
     brandTitleNode.textContent = state.activeVaultSlot === 'decoy' ? 'My Secret Diary · decoy' : 'My Secret Diary';

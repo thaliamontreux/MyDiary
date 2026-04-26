@@ -210,6 +210,14 @@ server {
         proxy_read_timeout 60s;
     }
 
+    # Theme backgrounds and assets
+    location /themes/ {
+        alias ${APP_DIR}/themes/;
+        expires 7d;
+        add_header Cache-Control "public, max-age=604800, immutable";
+        try_files $uri =404;
+    }
+
     location /assets/ {
         expires 7d;
         add_header Cache-Control "public, max-age=604800, immutable";
