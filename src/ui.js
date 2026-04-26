@@ -4564,16 +4564,15 @@ export function createApp(mount) {
 
       const applyUserTheme = async (themeId) => {
         try {
-          await fetch('/api/user/theme', {
+          const res = await fetch('/api/user/theme', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              Authorization: state.auth?.token ? `Bearer ${state.auth.token}` : undefined
+              Authorization: `Bearer ${state.auth.token}`
             },
             body: JSON.stringify({ theme: themeId })
           });
           state.auth.user.theme = themeId;
-          // Save to localStorage so theme persists on reload
           saveAuthSession({ token: state.auth.token, email: state.auth.email, user: state.auth.user });
           showToast(`Theme changed to ${themeId}`);
         } catch (e) {
@@ -6179,51 +6178,12 @@ export function createApp(mount) {
         el('button', {
           class: 'nav-item',
           type: 'button',
-          onclick: () => renderGoalsOverlay()
-        }, [
-          el('span', { class: 'nav-item-ic', text: '🎯' }),
-          el('span', { class: 'nav-item-label', text: 'Goals & milestones' })
-        ]),
-        el('button', {
-          class: 'nav-item',
-          type: 'button',
           onclick: () => renderReminderSettings()
         }, [
           el('span', { class: 'nav-item-ic', text: '🔔' }),
           el('span', { class: 'nav-item-label', text: 'Reminders' })
         ]),
-        el('button', {
-          class: 'nav-item',
-          type: 'button',
-          onclick: () => renderHabitOverlay()
-        }, [
-          el('span', { class: 'nav-item-ic', text: '✅' }),
-          el('span', { class: 'nav-item-label', text: 'Habit tracker' })
-        ]),
-        el('button', {
-          class: 'nav-item',
-          type: 'button',
-          onclick: () => renderCollabOverlay()
-        }, [
-          el('span', { class: 'nav-item-ic', text: '🤝' }),
-          el('span', { class: 'nav-item-label', text: 'Collaborative journals' })
-        ]),
-        el('button', {
-          class: 'nav-item',
-          type: 'button',
-          onclick: () => renderSocialFeedOverlay()
-        }, [
-          el('span', { class: 'nav-item-ic', text: '🌐' }),
-          el('span', { class: 'nav-item-label', text: 'Social feed' })
-        ]),
-        el('button', {
-          class: 'nav-item',
-          type: 'button',
-          onclick: () => renderExtensionGuide()
-        }, [
-          el('span', { class: 'nav-item-ic', text: '🧩' }),
-          el('span', { class: 'nav-item-label', text: 'Browser extension' })
-        ]),
+        // non-essential extras (goals, habits, collab, social feed, extension) removed to keep core app minimal
         el('button', {
           class: 'nav-item',
           type: 'button',
@@ -7969,13 +7929,11 @@ export function createApp(mount) {
             }
           }, [el('span', { text: '\ud83d\udd17' })]),
           el('button', { class: 'btn ghost foot-icon-btn', type: 'button', title: 'Keyboard shortcuts (Ctrl+/)', onclick: () => renderShortcutsOverlay() }, [el('span', { text: '⌨️' })]),
-          el('button', { class: 'btn ghost foot-icon-btn', type: 'button', title: 'Comments', onclick: () => renderCommentsOverlay(selected) }, [
-            el('span', { text: '💬' })
-          ]),
           el('button', { class: 'btn ghost foot-icon-btn', type: 'button', title: 'Health data', onclick: () => renderFitnessOverlay(selected) }, [
-            el('span', { text: '🏃' })
-          ]),
-          el('button', {
+            el('span', { text: '💓' })
+          ])
+        ])
+  el('button', {
             class: 'btn ghost foot-icon-btn', type: 'button', title: 'Add location',
             onclick: async () => {
               showToast('Getting location…');
@@ -8522,10 +8480,8 @@ export function createApp(mount) {
 
               const cur = getSelectedEntry();
               if (!cur) return;
-              // Only save metadata (id reference) to the vault
               const next = [...(cur.voiceMemos || []), {
                 id: blobId,
-                blobId, // reference to IndexedDB
                 duration: null,
                 createdAt: new Date().toISOString()
               }].slice(-8);
@@ -8544,7 +8500,6 @@ export function createApp(mount) {
       }
     }, [el('span', { class: 'btn-ic', text: voiceRecorderState.recording ? '⏹' : '🎙' }), el('span', { text: voiceRecorderState.recording ? 'Stop' : 'Record voice' })]);
 
-    // Render memo list with lazy-loaded voice data from IndexedDB
     const memoList = el('div', { class: 'voice-memo-list' });
 
     const loadAndRenderMemos = async () => {
@@ -8741,10 +8696,8 @@ export function createApp(mount) {
           return;
         }
 
-        // Only save metadata (id reference) to the vault
         const next = [...(cur.videoClips || []), {
           id: blobId,
-          blobId, // reference to IndexedDB
           createdAt: new Date().toISOString()
         }].slice(-4);
         updateSelected({ videoClips: next });
@@ -8792,7 +8745,6 @@ export function createApp(mount) {
 
     updateButtons();
 
-    // Render clip list with lazy-loaded video data from IndexedDB
     const clipList = el('div', { class: 'video-clip-list' });
 
     const loadAndRenderClips = async () => {
@@ -9566,128 +9518,6 @@ export function createApp(mount) {
     return overlay;
   }
 
-  // ── Goals & Milestones ────────────────────────────────────────────────────────
-  let sessionGoals = [];
-  function loadGoals() {
-    return sessionGoals;
-  }
-  function saveGoals(goals) {
-    sessionGoals = goals;
-  }
-
-  function renderGoalsOverlay() {
-    const overlay = el('div', { class: 'overlay-backdrop' });
-    let goals = loadGoals();
-
-    const MILESTONE_BADGES = [
-      { pct: 25, label: '25%', icon: '🌱' },
-      { pct: 50, label: 'Halfway!', icon: '⚡' },
-      { pct: 75, label: '75%', icon: '🔥' },
-      { pct: 100, label: 'Complete!', icon: '🏆' }
-    ];
-
-    const getBadge = (pct) => {
-      const earned = MILESTONE_BADGES.filter((b) => pct >= b.pct);
-      return earned.length ? earned[earned.length - 1] : null;
-    };
-
-    const refreshList = () => {
-      list.replaceChildren(...(goals.length ? goals.map((g) => {
-        const pct = Math.min(100, Math.round((g.current / Math.max(1, g.target)) * 100));
-        const badge = getBadge(pct);
-        const isComplete = pct >= 100;
-        const daysLeft = g.dueDate
-          ? Math.max(0, Math.ceil((new Date(g.dueDate) - new Date()) / 86400000))
-          : null;
-
-        const progressBar = el('div', { class: 'goal-progress-track' }, [
-          el('div', {
-            class: `goal-progress-bar${isComplete ? ' goal-complete' : ''}`,
-            style: `width:${pct}%`
-          })
-        ]);
-
-        const incBtn = el('button', {
-          class: 'btn mini ghost', type: 'button',
-          onclick: () => {
-            g.current = Math.min(g.target, g.current + 1);
-            saveGoals(goals); refreshList();
-            if (g.current === g.target) showToast(`🏆 Goal "${g.name}" complete!`);
-          }
-        }, [el('span', { text: '+1' })]);
-
-        const decBtn = el('button', {
-          class: 'btn mini ghost', type: 'button',
-          onclick: () => { g.current = Math.max(0, g.current - 1); saveGoals(goals); refreshList(); }
-        }, [el('span', { text: '−1' })]);
-
-        const delBtn = el('button', {
-          class: 'btn mini ghost', type: 'button',
-          onclick: () => { goals = goals.filter((x) => x.id !== g.id); saveGoals(goals); refreshList(); }
-        }, [el('span', { text: '✕' })]);
-
-        return el('div', { class: `goal-item${isComplete ? ' goal-item-complete' : ''}` }, [
-          el('div', { class: 'goal-item-header' }, [
-            badge ? el('span', { class: 'goal-badge', text: badge.icon }) : el('span'),
-            el('div', { class: 'goal-name', text: g.name }),
-            el('span', { class: 'goal-pct-label', text: `${pct}%` })
-          ]),
-          progressBar,
-          el('div', { class: 'goal-item-meta' }, [
-            el('span', { class: 'tiny', text: `${g.current.toLocaleString()} / ${g.target.toLocaleString()}` }),
-            daysLeft !== null
-              ? el('span', { class: `tiny ${daysLeft <= 3 ? 'goal-due-urgent' : ''}`, text: daysLeft === 0 ? '📅 Due today!' : `📅 ${daysLeft}d left` })
-              : el('span'),
-            badge ? el('span', { class: 'goal-badge-label', text: badge.label }) : el('span')
-          ]),
-          el('div', { class: 'goal-actions' }, [incBtn, decBtn, delBtn])
-        ]);
-      }) : [el('div', { class: 'tiny', text: 'No goals yet. Add one below!' })]));
-    };
-
-    const list = el('div', { class: 'goals-list' });
-    refreshList();
-
-    const nameInput = el('input', { type: 'text', class: 'lock-input', placeholder: 'Goal name (e.g. Write 30 entries)', style: 'font-size:13px' });
-    const targetInput = el('input', { type: 'number', class: 'date-input', placeholder: 'Target count', value: '30', min: '1', style: 'width:100px' });
-    const dueDateInput = el('input', { type: 'date', class: 'date-input', title: 'Due date (optional)' });
-
-    const addBtn = el('button', {
-      class: 'btn small-btn', type: 'button',
-      onclick: () => {
-        const name = nameInput.value.trim();
-        if (!name) return;
-        goals.push({
-          id: `goal-${Date.now()}`,
-          name,
-          target: Number(targetInput.value) || 30,
-          current: 0,
-          dueDate: dueDateInput.value || null,
-          createdAt: new Date().toISOString()
-        });
-        saveGoals(goals);
-        nameInput.value = '';
-        dueDateInput.value = '';
-        refreshList();
-        showToast('Goal added!');
-      }
-    }, [el('span', { text: '+ Add goal' })]);
-
-    const modal = el('div', { class: 'overlay-modal overlay-wide' }, [
-      el('div', { class: 'overlay-title', text: '🎯 Goals & Milestones' }),
-      el('div', { class: 'overlay-sub', text: 'Track what matters. Celebrate every step.' }),
-      list,
-      el('div', { class: 'goal-add-form' }, [
-        nameInput,
-        el('div', { class: 'goal-add-row' }, [targetInput, dueDateInput, addBtn])
-      ]),
-      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Close' })])
-    ]);
-    overlay.append(modal);
-    document.body.append(overlay);
-    return overlay;
-  }
-
   // ── Share Entry ───────────────────────────────────────────────────────────────
   function renderShareOverlay(entry) {
     if (!entry) return;
@@ -9744,212 +9574,6 @@ export function createApp(mount) {
     });
   }
 
-  // ── Habit Tracking ────────────────────────────────────────────────────────────
-  let sessionHabits = [];
-
-  function loadHabits() {
-    return sessionHabits;
-  }
-
-  function saveHabits(habits) {
-    sessionHabits = habits;
-  }
-
-  function renderHabitOverlay() {
-    const overlay = el('div', { class: 'overlay-backdrop' });
-    let habits = loadHabits();
-    const todayIso = isoDate();
-
-    // Build last-N-days array
-    const buildLastDays = (n) => {
-      const days = [];
-      for (let i = n - 1; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        days.push(d.toISOString().slice(0, 10));
-      }
-      return days;
-    };
-    const last28 = buildLastDays(28);
-    const last7 = buildLastDays(7);
-    const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-
-    const refreshHabits = () => {
-      habitList.replaceChildren(...(habits.length ? habits.map((h) => {
-        const completed = new Set(h.completedDates || []);
-        const completedToday = completed.has(todayIso);
-        const streak = calcHabitStreak(h.completedDates || []);
-        const rate = Math.round((last28.filter((d) => completed.has(d)).length / 28) * 100);
-
-        const checkBtn = el('button', {
-          class: `btn small-btn ${completedToday ? '' : 'ghost'}`, type: 'button',
-          onclick: () => {
-            if (!completedToday) {
-              h.completedDates = [...(h.completedDates || []), todayIso];
-            } else {
-              h.completedDates = (h.completedDates || []).filter((d) => d !== todayIso);
-            }
-            saveHabits(habits); refreshHabits();
-          }
-        }, [el('span', { text: completedToday ? '✓ Done today' : 'Mark done' })]);
-
-        const delBtn = el('button', {
-          class: 'btn mini ghost', type: 'button',
-          onclick: () => { habits = habits.filter((x) => x.id !== h.id); saveHabits(habits); refreshHabits(); }
-        }, [el('span', { text: '✕' })]);
-
-        // 7-day mini grid
-        const grid7 = el('div', { class: 'habit-week-grid' }, last7.map((d) => {
-          const done = completed.has(d);
-          const isToday = d === todayIso;
-          const dayOfWeek = new Date(d + 'T12:00:00').getDay();
-          return el('div', { class: `habit-day-cell${done ? ' done' : ''}${isToday ? ' today' : ''}`, title: d }, [
-            el('div', { class: 'habit-day-label', text: DAY_LABELS[dayOfWeek] }),
-            el('div', { class: 'habit-day-dot' })
-          ]);
-        }));
-
-        return el('div', { class: 'habit-item' }, [
-          el('div', { class: 'habit-item-header' }, [
-            el('div', { class: 'habit-name', text: h.name }),
-            el('div', { class: 'habit-stats' }, [
-              el('span', { class: 'habit-streak', text: `🔥 ${streak}` }),
-              el('span', { class: 'habit-rate', text: `${rate}% (28d)` })
-            ])
-          ]),
-          grid7,
-          el('div', { class: 'habit-actions' }, [checkBtn, delBtn])
-        ]);
-      }) : [el('div', { class: 'tiny', text: 'No habits yet. Add one below!' })]));
-    };
-
-    const habitList = el('div', { class: 'habits-list' });
-    refreshHabits();
-
-    const nameIn = el('input', { type: 'text', class: 'lock-input', placeholder: 'New habit (e.g. Meditate, Exercise, Read)', style: 'font-size:13px' });
-    const addBtn = el('button', {
-      class: 'btn small-btn', type: 'button',
-      onclick: () => {
-        const name = nameIn.value.trim();
-        if (!name) return;
-        habits.push({ id: `hab-${Date.now()}`, name, completedDates: [], createdAt: new Date().toISOString() });
-        saveHabits(habits);
-        nameIn.value = '';
-        refreshHabits();
-        showToast('Habit added!');
-      }
-    }, [el('span', { text: '+ Add habit' })]);
-
-    const modal = el('div', { class: 'overlay-modal overlay-wide' }, [
-      el('div', { class: 'overlay-title', text: '🌱 Habit Tracker' }),
-      el('div', { class: 'overlay-sub', text: 'Build daily habits. Track your 7-day streak at a glance.' }),
-      habitList,
-      el('div', { class: 'goal-add-row' }, [nameIn, addBtn]),
-      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Close' })])
-    ]);
-    overlay.append(modal);
-    document.body.append(overlay);
-    return overlay;
-  }
-
-  function calcHabitStreak(dates) {
-    if (!dates.length) return 0;
-    const sorted = [...dates].sort().reverse();
-    let streak = 0;
-    let cursor = new Date(isoDate());
-    for (const d of sorted) {
-      const dDate = new Date(d);
-      const diff = Math.round((cursor.getTime() - dDate.getTime()) / 86400000);
-      if (diff === 0 || diff === 1) { streak++; cursor = dDate; }
-      else break;
-    }
-    return streak;
-  }
-
-  // ── Collaborative Journals ─────────────────────────────────────────────────────
-  function renderCollabOverlay() {
-    const overlay = el('div', { class: 'overlay-backdrop' });
-    const modal = el('div', { class: 'overlay-modal' }, [
-      el('div', { class: 'overlay-title', text: 'Collaborative Journals' }),
-      el('div', { class: 'share-notice', text: 'Collaborative journals let you invite others to co-write a shared diary. This feature is coming soon — invite your collaborators by sharing your journal link below.' }),
-      el('div', { class: 'collab-invite-row' }, [
-        el('input', { type: 'text', class: 'lock-input', placeholder: 'Collaborator email', style: 'font-size:13px' }),
-        el('button', { class: 'btn small-btn', type: 'button', onclick: () => showToast('Invite sent! (Collaborative journals coming soon)') }, [el('span', { text: 'Invite' })])
-      ]),
-      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Close' })])
-    ]);
-    overlay.append(modal);
-    document.body.append(overlay);
-    return overlay;
-  }
-
-  // ── Comment System ─────────────────────────────────────────────────────────────
-  function renderCommentsOverlay(entry) {
-    if (!entry) return;
-    const overlay = el('div', { class: 'overlay-backdrop' });
-    let comments = [];
-
-    const listEl = el('div', { class: 'comments-list' });
-    const refreshComments = () => {
-      listEl.replaceChildren(...comments.map((c) => el('div', { class: 'comment-item' }, [
-        el('span', { class: 'comment-author', text: c.author || 'You' }),
-        el('span', { class: 'comment-time', text: new Date(c.createdAt).toLocaleString() }),
-        el('div', { class: 'comment-body', text: c.text })
-      ])));
-    };
-    refreshComments();
-
-    const textIn = el('textarea', { class: 'body-input', placeholder: 'Write a comment…', rows: '3', style: 'font-size:13px; min-height:60px' });
-    const submitBtn = el('button', {
-      class: 'btn small-btn',
-      type: 'button',
-      onclick: () => {
-        const text = textIn.value.trim();
-        if (!text) return;
-        comments.push({ id: `cmt-${Date.now()}`, author: state.auth?.user?.username || 'You', text, createdAt: new Date().toISOString() });
-        textIn.value = '';
-        refreshComments();
-      }
-    }, [el('span', { text: 'Post comment' })]);
-
-    const modal = el('div', { class: 'overlay-modal' }, [
-      el('div', { class: 'overlay-title', text: 'Comments' }),
-      listEl,
-      textIn,
-      submitBtn,
-      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Close' })])
-    ]);
-    overlay.append(modal);
-    document.body.append(overlay);
-    return overlay;
-  }
-
-  // ── Social Feed ────────────────────────────────────────────────────────────────
-  function renderSocialFeedOverlay() {
-    const overlay = el('div', { class: 'overlay-backdrop' });
-    const publicEntries = (state.vault?.entries || [])
-      .map(normalizeEntry)
-      .filter((e) => e.privacyLevel === 'shared')
-      .slice(0, 20);
-
-    const modal = el('div', { class: 'overlay-modal' }, [
-      el('div', { class: 'overlay-title', text: 'Public / Shared Feed' }),
-      el('div', { class: 'share-notice', text: 'Entries marked as "shared" privacy appear here as your personal public feed.' }),
-      el('div', { class: 'social-feed-list' }, publicEntries.length
-        ? publicEntries.map((e) => el('div', { class: 'social-feed-item', onclick: async () => { await selectEntry(e.id); overlay.remove(); } }, [
-          el('div', { class: 'feed-item-title', text: e.title || 'Untitled' }),
-          el('div', { class: 'feed-item-preview', text: summarizeBody(e.body) }),
-          el('div', { class: 'feed-item-meta', text: e.date || '' })
-        ]))
-        : [el('div', { class: 'tiny', text: 'No shared entries yet. Set an entry\'s privacy to "Shared" to see it here.' })]
-      ),
-      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Close' })])
-    ]);
-    overlay.append(modal);
-    document.body.append(overlay);
-    return overlay;
-  }
-
   // ── Biometric Unlock ───────────────────────────────────────────────────────────
   async function tryBiometricUnlock() {
     if (!state.deviceAuth.supported || !state.deviceAuth.platformAuthenticator) {
@@ -9973,32 +9597,6 @@ export function createApp(mount) {
         showToast('Biometric authentication failed.');
       }
     }
-  }
-
-  // ── Browser Extension Quick-Capture Overlay ────────────────────────────────────
-  function renderExtensionGuide() {
-    const overlay = el('div', { class: 'overlay-backdrop' });
-    const modal = el('div', { class: 'overlay-modal' }, [
-      el('div', { class: 'overlay-title', text: 'Browser Extension — Quick Capture' }),
-      el('div', { class: 'share-notice', text: 'Install the MyDiary browser extension to quickly capture thoughts from any webpage. The extension bookmarklet below can be dragged to your bookmarks bar as a quick workaround.' }),
-      el('div', { class: 'extension-step' }, [
-        el('div', { class: 'extension-step-num', text: '1' }),
-        el('div', { text: 'Drag this to your bookmarks bar:' }),
-        el('a', {
-          class: 'extension-bookmarklet',
-          href: `javascript:(function(){window.open('${window.location.origin}?prompt='+encodeURIComponent(window.getSelection().toString()||document.title),'_blank');})();`,
-          text: '📖 Save to Diary'
-        })
-      ]),
-      el('div', { class: 'extension-step' }, [
-        el('div', { class: 'extension-step-num', text: '2' }),
-        el('div', { text: 'When browsing, click the bookmarklet to open MyDiary with the selected text pre-filled as a new entry prompt.' })
-      ]),
-      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: () => overlay.remove() }, [el('span', { text: 'Close' })])
-    ]);
-    overlay.append(modal);
-    document.body.append(overlay);
-    return overlay;
   }
 
   // ── Calendar Sync Guide ────────────────────────────────────────────────────────
