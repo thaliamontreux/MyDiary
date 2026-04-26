@@ -377,6 +377,51 @@ export async function saveVaultToServer(token, slot = 'primary', payload) {
   });
 }
 
+// Encrypted media blobs (voice + video)
+export async function uploadVoiceMedia(token, payload) {
+  return request('/api/media/voice', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function getVoiceMedia(token, id) {
+  return request(`/api/media/voice/${encodeURIComponent(id)}`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export async function deleteVoiceMedia(token, id) {
+  return request(`/api/media/voice/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export async function uploadVideoMedia(token, payload) {
+  return request('/api/media/video', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function getVideoMedia(token, id) {
+  return request(`/api/media/video/${encodeURIComponent(id)}`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
+export async function deleteVideoMedia(token, id) {
+  return request(`/api/media/video/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` }
+  });
+}
+
 export async function acceptTerms(token) {
   return request('/api/auth/accept-tos', {
     method: 'POST',
