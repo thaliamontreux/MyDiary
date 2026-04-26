@@ -1055,6 +1055,16 @@ app.get('/api/vaults', requireAuth, async (req, res) => {
       await createUserVaultSlot(req.user.id, 'primary', 'Main diary', null);
       slots = await listUserVaultSlots(req.user.id);
     }
+
+    // Sort primary first, then by updated_at ascending (done in Node to avoid DB sort buffer issues)
+    slots.sort((a, b) => {
+      if (a.slot_name === 'primary' && b.slot_name !== 'primary') return -1;
+      if (b.slot_name === 'primary' && a.slot_name !== 'primary') return 1;
+      const aTime = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+      const bTime = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+      return aTime - bTime;
+    });
+
     res.json({ vaults: slots.map(slotToPublic) });
   } catch (error) {
     logError('vaults_list_failed', error, { requestId: req.requestId, userId: req.user?.id });

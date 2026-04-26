@@ -614,8 +614,7 @@ export async function listUserVaultSlots(userId) {
             (vault_data IS NOT NULL) AS has_data,
             updated_at
      FROM user_vaults
-     WHERE user_id = ?
-     ORDER BY slot_name = 'primary' DESC, updated_at ASC`,
+     WHERE user_id = ?`,
     [userId]
   );
   return rows;
