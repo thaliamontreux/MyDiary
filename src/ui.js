@@ -3,7 +3,9 @@ import {
   createNewVaultSalt,
   deriveVaultKey,
   ensureSodiumReady,
-  isoDate
+  isoDate,
+  encryptJson,
+  decryptJson
 } from './crypto.js';
 import {
   createEmptyVault,
@@ -4231,6 +4233,7 @@ export function createApp(mount) {
 
   async function persistVault() {
     const payload = encryptVault(state.vault, state.key);
+    // Keep only in-memory mirror; server is now the source of truth.
     saveEncryptedVault(payload, state.activeVaultSlot);
     try {
       await syncVaultToServer(payload);
@@ -4963,6 +4966,9 @@ export function createApp(mount) {
 
     const key = await deriveVaultKey(password, state.meta.salt);
 
+    // For password-only mode, we rely on whatever encrypted payload is in
+    // memory (possibly seeded from a previous session). There is no longer any
+    // persistent browser storage; if nothing is present we start empty.
     const encryptedPayload = loadEncryptedVault(state.activeVaultSlot);
     let vault;
     try {
@@ -5023,9 +5029,9 @@ export function createApp(mount) {
     const localMeta = loadVaultMeta(state.activeVaultSlot) || null;
     const localPayload = loadEncryptedVault(state.activeVaultSlot) || null;
 
-    // Prefer the server copy when it exists; otherwise fall back to the local
-    // encrypted vault so entries created before registration or while offline
-    // are not lost.
+    // Prefer the server copy when it exists; otherwise fall back to any
+    // in-memory encrypted vault that might have been seeded from an older
+    // session. No new data is ever written to persistent browser storage.
     const chosenMeta = remoteMeta || localMeta;
     const chosenPayload = remotePayload || localPayload;
 
@@ -5060,17 +5066,14 @@ export function createApp(mount) {
       // No vault yet anywhere: create a fresh starter vault for this slot
       state.vault = state.activeVaultSlot === 'decoy' ? createDecoyStarterVault() : createEmptyVault();
       const payload = encryptVault(state.vault, state.key);
-      saveEncryptedVault(payload, state.activeVaultSlot);
       await saveVaultToServer(state.auth.token, state.activeVaultSlot, {
         meta: state.meta,
         data: payload
       });
     } else {
-      // Persist whatever we just decrypted locally for faster future unlocks
-      saveEncryptedVault(chosenPayload, state.activeVaultSlot);
-
       // If the data only existed locally, push it to the server now so it
-      // follows the account on future devices/logins.
+      // follows the account on future devices/logins. The in-memory mirror is
+      // kept up to date via persistVault().
       if (!remotePayload && localPayload) {
         await saveVaultToServer(state.auth.token, state.activeVaultSlot, {
           meta: state.meta,
@@ -8502,11 +8505,13 @@ export function createApp(mount) {
               });
               // Encrypt and upload to the server; no persistent browser storage.
               try {
+                if (!state.key) throw new Error('Vault is locked');
+                const encryptedPayload = encryptJson({ dataUrl }, state.key);
                 await uploadVoiceMedia(state.auth.token, {
                   id: blobId,
                   vaultSlot: state.activeVaultSlot,
                   entryId: getSelectedEntry()?.id || null,
-                  payload: { dataUrl }
+                  payload: encryptedPayload
                 });
                 voiceBlobCache.set(blobId, dataUrl);
               } catch (e) {
@@ -8553,13 +8558,23 @@ export function createApp(mount) {
         const memo = memos[i];
         const memoId = memo.blobId || memo.id;
 
-        // Load from cache or server
+        // Load from cache or server (decrypting with the vault key)
         let dataUrl = voiceBlobCache.get(memoId);
         let loadError = false;
         if (!dataUrl) {
           try {
             const resp = await getVoiceMedia(state.auth.token, memoId);
-            dataUrl = resp?.payload?.dataUrl || null;
+            const payload = resp?.payload || null;
+            if (payload && state.key) {
+              try {
+                // New format: encrypted JSON wrapper
+                const decrypted = decryptJson(payload, state.key);
+                dataUrl = decrypted?.dataUrl || null;
+              } catch {
+                // Legacy format: plain { dataUrl } stored on the server
+                dataUrl = payload.dataUrl || null;
+              }
+            }
             if (dataUrl) voiceBlobCache.set(memoId, dataUrl);
           } catch (e) {
             console.error('Failed to load voice memo', i, ':', e);
@@ -8695,11 +8710,13 @@ export function createApp(mount) {
 
         // Encrypt and upload to the server; no persistent browser storage.
         try {
+          if (!state.key) throw new Error('Vault is locked');
+          const encryptedPayload = encryptJson({ dataUrl }, state.key);
           await uploadVideoMedia(state.auth.token, {
             id: blobId,
             vaultSlot: state.activeVaultSlot,
             entryId: cur.id,
-            payload: { dataUrl }
+            payload: encryptedPayload
           });
           videoBlobCache.set(blobId, dataUrl);
         } catch (e) {
@@ -8770,12 +8787,21 @@ export function createApp(mount) {
         const clip = clips[i];
         const clipId = clip.blobId || clip.id;
 
-        // Load from cache or IndexedDB
+        // Load from cache or server, decrypting with the vault key
         let dataUrl = videoBlobCache.get(clipId);
         if (!dataUrl) {
           try {
             const resp = await getVideoMedia(state.auth.token, clipId);
-            dataUrl = resp?.payload?.dataUrl || null;
+            const payload = resp?.payload || null;
+            if (payload && state.key) {
+              try {
+                const decrypted = decryptJson(payload, state.key);
+                dataUrl = decrypted?.dataUrl || null;
+              } catch {
+                // Legacy format: plain { dataUrl }
+                dataUrl = payload.dataUrl || null;
+              }
+            }
             if (dataUrl) videoBlobCache.set(clipId, dataUrl);
           } catch (e) {
             console.error('[VideoClip] Failed to load blob', clipId, e);
