@@ -9859,4 +9859,3 @@ export function createApp(mount) {
     const idx = new Date().getDate() % prompts.length;
     return prompts[idx];
   }
-}
