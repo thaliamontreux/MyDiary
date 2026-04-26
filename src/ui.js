@@ -8573,6 +8573,20 @@ export function createApp(mount) {
               } catch {
                 // Legacy format: plain { dataUrl } stored on the server
                 dataUrl = payload.dataUrl || null;
+                // Transparently migrate to encrypted payload on the server
+                if (dataUrl) {
+                  try {
+                    const encryptedPayload = encryptJson({ dataUrl }, state.key);
+                    await uploadVoiceMedia(state.auth.token, {
+                      id: memoId,
+                      vaultSlot: state.activeVaultSlot,
+                      entryId: getSelectedEntry()?.id || null,
+                      payload: encryptedPayload
+                    });
+                  } catch (mErr) {
+                    console.error('Failed to migrate legacy voice memo', memoId, mErr);
+                  }
+                }
               }
             }
             if (dataUrl) voiceBlobCache.set(memoId, dataUrl);
@@ -8800,6 +8814,19 @@ export function createApp(mount) {
               } catch {
                 // Legacy format: plain { dataUrl }
                 dataUrl = payload.dataUrl || null;
+                if (dataUrl) {
+                  try {
+                    const encryptedPayload = encryptJson({ dataUrl }, state.key);
+                    await uploadVideoMedia(state.auth.token, {
+                      id: clipId,
+                      vaultSlot: state.activeVaultSlot,
+                      entryId: clip.id,
+                      payload: encryptedPayload
+                    });
+                  } catch (mErr) {
+                    console.error('Failed to migrate legacy video clip', clipId, mErr);
+                  }
+                }
               }
             }
             if (dataUrl) videoBlobCache.set(clipId, dataUrl);
@@ -9540,11 +9567,12 @@ export function createApp(mount) {
   }
 
   // ── Goals & Milestones ────────────────────────────────────────────────────────
+  let sessionGoals = [];
   function loadGoals() {
-    try { return JSON.parse(localStorage.getItem('diary.goals') || '[]'); } catch { return []; }
+    return sessionGoals;
   }
   function saveGoals(goals) {
-    localStorage.setItem('diary.goals', JSON.stringify(goals));
+    sessionGoals = goals;
   }
 
   function renderGoalsOverlay() {
@@ -9717,14 +9745,14 @@ export function createApp(mount) {
   }
 
   // ── Habit Tracking ────────────────────────────────────────────────────────────
-  const HABIT_STORAGE_KEY = 'diary.habits';
+  let sessionHabits = [];
 
   function loadHabits() {
-    try { return JSON.parse(localStorage.getItem(HABIT_STORAGE_KEY) || '[]'); } catch { return []; }
+    return sessionHabits;
   }
 
   function saveHabits(habits) {
-    localStorage.setItem(HABIT_STORAGE_KEY, JSON.stringify(habits));
+    sessionHabits = habits;
   }
 
   function renderHabitOverlay() {
@@ -9859,9 +9887,7 @@ export function createApp(mount) {
   function renderCommentsOverlay(entry) {
     if (!entry) return;
     const overlay = el('div', { class: 'overlay-backdrop' });
-    const COMMENTS_KEY = `diary.comments.${entry.id}`;
     let comments = [];
-    try { comments = JSON.parse(localStorage.getItem(COMMENTS_KEY) || '[]'); } catch { comments = []; }
 
     const listEl = el('div', { class: 'comments-list' });
     const refreshComments = () => {
@@ -9881,7 +9907,6 @@ export function createApp(mount) {
         const text = textIn.value.trim();
         if (!text) return;
         comments.push({ id: `cmt-${Date.now()}`, author: state.auth?.user?.username || 'You', text, createdAt: new Date().toISOString() });
-        localStorage.setItem(COMMENTS_KEY, JSON.stringify(comments));
         textIn.value = '';
         refreshComments();
       }

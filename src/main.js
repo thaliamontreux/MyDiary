@@ -4,37 +4,17 @@ import { createApp } from './ui.js';
 // Fetch and apply default login theme before app initialization
 async function initApp() {
   try {
-    // Try to load saved user theme first (for returning logged-in users)
-    const savedAuth = localStorage.getItem('diary.auth');
-    let userTheme = null;
-    if (savedAuth) {
-      try {
-        const auth = JSON.parse(savedAuth);
-        userTheme = auth.user?.theme;
-      } catch { /* ignore */ }
+    // Fetch default login theme from admin settings
+    const res = await fetch('/api/site-settings');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.defaultLoginTheme) {
+        document.documentElement.setAttribute('data-theme', data.defaultLoginTheme);
+        const bg = `themes/${data.defaultLoginTheme}/background.webp`;
+        document.documentElement.style.setProperty('--bg-image', `url('/${bg}')`);
+      }
     }
-
-    // If no user theme, fetch default login theme from admin settings
-    if (!userTheme) {
-      try {
-        const res = await fetch('/api/site-settings');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.defaultLoginTheme) {
-            document.documentElement.setAttribute('data-theme', data.defaultLoginTheme);
-            // Use default theme background on initial load
-            const bg = `themes/${data.defaultLoginTheme}/background.webp`;
-            document.documentElement.style.setProperty('--bg-image', `url('/${bg}')`);
-          }
-        }
-      } catch { /* ignore - will use default theme */ }
-    } else {
-      // Apply user's saved theme
-      document.documentElement.setAttribute('data-theme', userTheme);
-      const bg = `themes/${userTheme}/background.webp`;
-      document.documentElement.style.setProperty('--bg-image', `url('/${bg}')`);
-    }
-  } catch { /* ignore errors during theme init */ }
+  } catch { /* ignore - will use default theme */ }
 
   // Now initialize the app
   try {
