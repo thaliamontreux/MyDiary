@@ -67,10 +67,8 @@ html, body {
 }
 
 body {
-  /* Soft themed background plus the girly SVG image */
-  background:
-    linear-gradient(180deg, var(--bg1), var(--bg2));
-  /* Use theme-specific image if provided */
+  /* Solid fallback color; main background is the theme WebP image */
+  background-color: var(--bg1);
   background-image: var(--bg-image);
   background-size: cover;
   background-position: center center;
