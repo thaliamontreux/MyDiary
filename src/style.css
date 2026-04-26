@@ -4710,3 +4710,27 @@ body::before {
 :root[data-theme='dark'] .calendar-day.has-entry:hover .entry-dot {
   background: #fff;
 }
+
+:root[data-theme='dark'] .weekday-label {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+:root[data-theme=dark] .calendar-year-select {
+    background: #ffffff1a;
+    border-color: #fff3;
+    color: #fff
+}
+
+:root[data-theme=dark] .entry-dot {
+    background: #fffc
+}
+
+:root[data-theme=dark] .calendar-day.has-entry:hover .entry-dot {
+    background: #fff
+}
+
+/* Final override: let the theme WebP background show by removing any
+   remaining overlay background on body::before. */
+body::before {
+  background: none !important;
+}
