@@ -3912,25 +3912,21 @@ export function createApp(mount) {
       // If loading the per-theme stylesheet fails, ignore and continue with base styles.
     }
 
-    // Map full theme id (e.g. "journey-light") onto base light/dark palette
-    let baseMode = 'dark';
+    // Determine base light/dark palette from the user's preference
+    // controlled by the top-right toggle (state.ui.themeId).
+    const baseMode = state.ui.themeId === 'light' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = baseMode;
+    root.dataset.theme = baseMode;
+
+    // Use theme metadata only to look up the background image; do not let it
+    // override the user's light/dark preference.
     try {
       const allThemes = [
         ...(state._availableThemes || []),
         ...(state._accountAvailableThemes || [])
       ];
       const activeTheme = allThemes.find(t => t.id === bgTheme);
-      const modeFromTheme = activeTheme?.mode;
-      if (modeFromTheme === 'light' || modeFromTheme === 'dark') {
-        baseMode = modeFromTheme;
-      } else if (bgTheme && /light$/i.test(bgTheme)) {
-        baseMode = 'light';
-      }
 
-      // Apply base palette for CSS variables
-      document.documentElement.dataset.theme = baseMode;
-
-      // If we know the theme image, update the background image variable
       if (activeTheme && activeTheme.image) {
         const imageUrl = activeTheme.image.startsWith('/') ? activeTheme.image : `/${activeTheme.image}`;
         document.documentElement.style.setProperty('--bg-image', `url('${imageUrl}')`);
