@@ -2409,7 +2409,10 @@ export function createApp(mount) {
       try {
         await fetch('/api/user/theme', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: state.auth?.token ? `Bearer ${state.auth.token}` : undefined
+          },
           body: JSON.stringify({ theme: themeId })
         });
         state.auth.user.theme = themeId;
@@ -3885,23 +3888,36 @@ export function createApp(mount) {
     root.dataset.comfort = state.ui.comfortMode ? 'on' : 'off';
     root.dataset.kid = state.ui.kidMode ? 'on' : 'off';
     root.dataset.vault = state.activeVaultSlot;
-    // Use user's saved background theme if logged in, otherwise fall back to ui themeId
-    const bgTheme = state.auth.user?.theme || state.ui.themeId;
-    document.documentElement.dataset.theme = bgTheme;
 
-    // Update background image for the active theme if we know it
+    // Resolve the active background theme id (per-user theme wins over base ui theme)
+    const bgTheme = state.auth.user?.theme || state.ui.themeId;
+
+    // Map full theme id (e.g. "journey-light") onto base light/dark palette
+    let baseMode = 'dark';
     try {
-      const allThemes = state._availableThemes || state._accountAvailableThemes || [];
+      const allThemes = [
+        ...(state._availableThemes || []),
+        ...(state._accountAvailableThemes || [])
+      ];
       const activeTheme = allThemes.find(t => t.id === bgTheme);
+      const modeFromTheme = activeTheme?.mode;
+      if (modeFromTheme === 'light' || modeFromTheme === 'dark') {
+        baseMode = modeFromTheme;
+      } else if (bgTheme && /light$/i.test(bgTheme)) {
+        baseMode = 'light';
+      }
+
+      // Apply base palette for CSS variables
+      document.documentElement.dataset.theme = baseMode;
+
+      // If we know the theme image, update the background image variable
       if (activeTheme && activeTheme.image) {
         const imageUrl = activeTheme.image.startsWith('/') ? activeTheme.image : `/${activeTheme.image}`;
         document.documentElement.style.setProperty('--bg-image', `url('${imageUrl}')`);
-      } else {
-        // Fall back to default girly background
-        document.documentElement.style.setProperty('--bg-image', `url('/girly-bg.svg')`);
       }
+      // If we don't have metadata yet, keep whatever background was previously set
     } catch {
-      // On any error, don't break rendering; just keep default background
+      // On any error, don't break rendering; just keep existing dataset/background
     }
 
     brandTitleNode.textContent = state.activeVaultSlot === 'decoy' ? 'My Secret Diary · decoy' : 'My Secret Diary';
@@ -4521,11 +4537,13 @@ export function createApp(mount) {
       const availableThemes = state._accountAvailableThemes || [];
 
       const applyUserTheme = async (themeId) => {
-        document.documentElement.setAttribute('data-theme', themeId);
         try {
           await fetch('/api/user/theme', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: state.auth?.token ? `Bearer ${state.auth.token}` : undefined
+            },
             body: JSON.stringify({ theme: themeId })
           });
           state.auth.user.theme = themeId;
@@ -4535,6 +4553,8 @@ export function createApp(mount) {
         } catch (e) {
           showToast('Theme applied locally but not saved');
         }
+        // Re-apply theme with updated user theme + metadata
+        applyTheme();
         render(false);
       };
 
