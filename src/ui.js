@@ -3892,6 +3892,26 @@ export function createApp(mount) {
     // Resolve the active background theme id (per-user theme wins over base ui theme)
     const bgTheme = state.auth.user?.theme || state.ui.themeId;
 
+    // Dynamically load per-theme CSS overrides from /themes/<id>/theme.css
+    try {
+      if (bgTheme) {
+        const head = document.head || document.getElementsByTagName('head')[0];
+        let link = document.getElementById('diary-theme-css');
+        const href = `/themes/${bgTheme}/theme.css`;
+        if (!link) {
+          link = document.createElement('link');
+          link.id = 'diary-theme-css';
+          link.rel = 'stylesheet';
+          head.appendChild(link);
+        }
+        if (link.href !== location.origin + href) {
+          link.href = href;
+        }
+      }
+    } catch {
+      // If loading the per-theme stylesheet fails, ignore and continue with base styles.
+    }
+
     // Map full theme id (e.g. "journey-light") onto base light/dark palette
     let baseMode = 'dark';
     try {

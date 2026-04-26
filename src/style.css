@@ -4727,6 +4727,46 @@ body::before {
     background: #fff
 }
 
+/* Global surface opacity: make menus, boxes, and popups nearly opaque.
+   Theme-specific overrides can adjust colors via /themes/<id>/theme.css. */
+.sidebar,
+.library-rail,
+.mood-rail,
+.scrapbook-rail,
+.memory-rail,
+.privacy-rail,
+.editor-card,
+.account-card,
+.signup-card,
+.agreement-card,
+.overlay-modal,
+.theme-rail,
+.calendar-view,
+.calendar-card,
+.advanced-search-panel {
+  background-color: var(--card-bg, rgba(15, 23, 42, 0.95));
+  border-color: var(--card-border, rgba(148, 163, 184, 0.35));
+}
+
+:root[data-theme='light'] .sidebar,
+:root[data-theme='light'] .library-rail,
+:root[data-theme='light'] .mood-rail,
+:root[data-theme='light'] .scrapbook-rail,
+:root[data-theme='light'] .memory-rail,
+:root[data-theme='light'] .privacy-rail,
+:root[data-theme='light'] .editor-card,
+:root[data-theme='light'] .account-card,
+:root[data-theme='light'] .signup-card,
+:root[data-theme='light'] .agreement-card,
+:root[data-theme='light'] .overlay-modal,
+:root[data-theme='light'] .theme-rail,
+:root[data-theme='light'] .calendar-view,
+:root[data-theme='light'] .calendar-card,
+:root[data-theme='light'] .advanced-search-panel {
+  background-color: var(--card-bg, rgba(255, 255, 255, 0.95));
+  border-color: var(--card-border, rgba(15, 23, 42, 0.08));
+}
+
 /* Final override: let the theme WebP background show by removing any
    remaining overlay background on body::before. */
 body::before {

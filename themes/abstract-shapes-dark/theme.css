@@ -1,0 +1,6 @@
+/* abstract-shapes-dark theme surfaces */
+:root[data-theme='dark'],
+.app-shell[data-theme='dark'] {
+  --card-bg: rgba(15, 23, 42, 0.95);
+  --card-border: rgba(148, 163, 184, 0.45);
+}

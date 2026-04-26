@@ -1,0 +1,27 @@
+:root,
+.app-shell {
+  /* Default: cards/rails/popups are nearly opaque (max 5% transparency) */
+  --card-bg: rgba(15, 23, 42, 0.95);
+  --card-border: rgba(148, 163, 184, 0.35);
+}
+
+/* Apply to common surfaces using CSS variables so themes can override per-id */
+.sidebar,
+.library-rail,
+.mood-rail,
+.scrapbook-rail,
+.memory-rail,
+.privacy-rail,
+.editor-card,
+.account-card,
+.signup-card,
+.agreement-card,
+.overlay-modal,
+.overlay-backdrop .overlay-modal,
+.theme-rail,
+.calendar-view,
+.calendar-card,
+.advanced-search-panel {
+  background-color: var(--card-bg, rgba(15, 23, 42, 0.95));
+  border-color: var(--card-border, rgba(148, 163, 184, 0.35));
+}

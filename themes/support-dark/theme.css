@@ -1,0 +1,6 @@
+/* support-dark theme surfaces */
+:root[data-theme='dark'],
+.app-shell[data-theme='dark'] {
+  --card-bg: rgba(17, 24, 39, 0.96);
+  --card-border: rgba(148, 163, 184, 0.45);
+}
