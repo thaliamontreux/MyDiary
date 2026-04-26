@@ -7927,13 +7927,12 @@ export function createApp(mount) {
                 showToast('Link copied to clipboard!');
               } catch { showToast('Could not copy link'); }
             }
-          }, [el('span', { text: '\ud83d\udd17' })]),
+          }, [el('span', { text: '🔗' })]),
           el('button', { class: 'btn ghost foot-icon-btn', type: 'button', title: 'Keyboard shortcuts (Ctrl+/)', onclick: () => renderShortcutsOverlay() }, [el('span', { text: '⌨️' })]),
           el('button', { class: 'btn ghost foot-icon-btn', type: 'button', title: 'Health data', onclick: () => renderFitnessOverlay(selected) }, [
             el('span', { text: '💓' })
-          ])
-        ])
-  el('button', {
+          ]),
+          el('button', {
             class: 'btn ghost foot-icon-btn', type: 'button', title: 'Add location',
             onclick: async () => {
               showToast('Getting location…');
@@ -9859,3 +9858,4 @@ export function createApp(mount) {
     const idx = new Date().getDate() % prompts.length;
     return prompts[idx];
   }
+}
