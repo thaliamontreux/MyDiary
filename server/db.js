@@ -702,6 +702,57 @@ export async function upsertVault(userId, slot, vaultMeta, vaultData) {
   );
 }
 
+// Encrypted media blobs (voice + video)
+export async function upsertMediaBlob({
+  id,
+  userId,
+  vaultSlot,
+  entryId,
+  mediaType,
+  payload
+}) {
+  ensurePool();
+  await pool.query(
+    `INSERT INTO user_media_blobs (id, user_id, vault_slot, entry_id, media_type, payload)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE
+       user_id = VALUES(user_id),
+       vault_slot = VALUES(vault_slot),
+       entry_id = VALUES(entry_id),
+       media_type = VALUES(media_type),
+       payload = VALUES(payload)`,
+    [
+      id,
+      userId,
+      vaultSlot,
+      entryId != null ? entryId : null,
+      mediaType,
+      JSON.stringify(payload ?? null)
+    ]
+  );
+}
+
+export async function getMediaBlob(id, userId, mediaType) {
+  ensurePool();
+  const [rows] = await pool.query(
+    `SELECT id, payload
+     FROM user_media_blobs
+     WHERE id = ? AND user_id = ? AND media_type = ?
+     LIMIT 1`,
+    [id, userId, mediaType]
+  );
+  return rows[0] || null;
+}
+
+export async function deleteMediaBlob(id, userId, mediaType) {
+  ensurePool();
+  const [result] = await pool.query(
+    'DELETE FROM user_media_blobs WHERE id = ? AND user_id = ? AND media_type = ? LIMIT 1',
+    [id, userId, mediaType]
+  );
+  return result.affectedRows > 0;
+}
+
 export async function pingDatabase() {
   ensurePool();
   await pool.query('SELECT 1');
