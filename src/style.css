@@ -19,6 +19,8 @@
   /* Theme background image; set by JS to the active theme's background.
      Default to none so we don't show the old SVG when a theme is active. */
   --bg-image: none;
+  /* Lock/login card background (light mode default: almost solid white) */
+  --lock-bg: rgba(255, 255, 255, 0.97);
 }
 
 :root[data-theme='dark'],
@@ -38,6 +40,8 @@
   --danger: #f97373;
   --shadow: 0 18px 40px rgba(15, 23, 42, 0.75);
   --shadow2: 0 14px 30px rgba(15, 23, 42, 0.7);
+  /* Dark-mode lock/login card: nearly solid dark for maximum readability */
+  --lock-bg: rgba(15, 23, 42, 0.97);
 }
 
 * { box-sizing: border-box; }
@@ -2565,7 +2569,8 @@ body::before {
 
 .lock-card {
   width: min(440px, 94vw);
-  background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.07));
+  /* Use theme-aware, nearly opaque background for maximum readability */
+  background: var(--lock-bg);
   border: 1px solid var(--border);
   border-radius: 26px;
   box-shadow: var(--shadow);
