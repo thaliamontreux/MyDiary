@@ -235,8 +235,8 @@ export async function decryptVaultOrThrow(encryptedPayload, key) {
   if (!encryptedPayload) return createEmptyVault();
   const vault = decryptJson(encryptedPayload, key);
   if (!vault || !Array.isArray(vault.entries)) return createEmptyVault();
-  // Migrate any old inline blobs to IndexedDB
-  await migrateInlineBlobsToIndexedDB(vault);
+  // Legacy inline media blobs (voice/video) are now migrated to the server
+  // on-demand from the UI layer; no browser storage (IndexedDB) is touched here.
   return vault;
 }
 

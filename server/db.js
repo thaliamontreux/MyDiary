@@ -246,6 +246,20 @@ export async function initializeDatabase() {
   `);
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_media_blobs (
+      id VARCHAR(128) PRIMARY KEY,
+      user_id BIGINT UNSIGNED NOT NULL,
+      vault_slot VARCHAR(32) NOT NULL,
+      entry_id BIGINT UNSIGNED DEFAULT NULL,
+      media_type ENUM('voice', 'video') NOT NULL,
+      payload JSON NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT fk_media_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      KEY idx_media_user_slot (user_id, vault_slot, media_type)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
       name VARCHAR(128) NOT NULL UNIQUE,

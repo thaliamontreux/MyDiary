@@ -17,13 +17,6 @@ import {
   saveVaultMeta,
   safeMemzeroKey,
   wipeAllData,
-  saveVideoBlob,
-  getVideoBlob,
-  deleteVideoBlob,
-  saveVoiceBlob,
-  getVoiceBlob,
-  deleteVoiceBlob,
-  migrateInlineBlobsToIndexedDB,
   loadAuthSession,
   saveAuthSession,
   clearAuthSession
@@ -77,7 +70,13 @@ import {
   setup2fa,
   saveRecoveryCodes,
   getRecoveryStatus,
-  updateProfile
+  updateProfile,
+  uploadVoiceMedia,
+  getVoiceMedia,
+  deleteVoiceMedia,
+  uploadVideoMedia,
+  getVideoMedia,
+  deleteVideoMedia
 } from './api.js';
 
 function el(tag, attrs = {}, children = []) {
@@ -8462,7 +8461,7 @@ export function createApp(mount) {
 
   // ── Voice Memos ──────────────────────────────────────────────────────────────
   const voiceRecorderState = { mediaRecorder: null, chunks: [], recording: false };
-  // In-memory cache for voice blob URLs (loaded from IndexedDB)
+  // In-memory cache for decrypted voice blob URLs (per-session only)
   const voiceBlobCache = new Map();
 
   function renderVoiceMemoUI(entry) {
@@ -8494,7 +8493,6 @@ export function createApp(mount) {
               if (blob.size === 0) { showToast('Recording failed - no audio data captured.'); return; }
               if (blob.size > 10 * 1024 * 1024) { showToast('Recording too large (max 10MB).'); return; }
 
-              // Save large blob to IndexedDB (not in the vault to avoid localStorage limit)
               const blobId = `vm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
               const dataUrl = await new Promise((res, rej) => {
                 const reader = new FileReader();
@@ -8502,12 +8500,18 @@ export function createApp(mount) {
                 reader.onerror = rej;
                 reader.readAsDataURL(blob);
               });
+              // Encrypt and upload to the server; no persistent browser storage.
               try {
-                await saveVoiceBlob(blobId, dataUrl);
+                await uploadVoiceMedia(state.auth.token, {
+                  id: blobId,
+                  vaultSlot: state.activeVaultSlot,
+                  entryId: getSelectedEntry()?.id || null,
+                  payload: { dataUrl }
+                });
                 voiceBlobCache.set(blobId, dataUrl);
               } catch (e) {
-                showToast('Failed to save voice memo to storage');
-                console.error('saveVoiceBlob error:', e);
+                showToast('Failed to save voice memo to server');
+                console.error('uploadVoiceMedia error:', e);
                 return;
               }
 
@@ -8549,12 +8553,13 @@ export function createApp(mount) {
         const memo = memos[i];
         const memoId = memo.blobId || memo.id;
 
-        // Load from cache or IndexedDB
+        // Load from cache or server
         let dataUrl = voiceBlobCache.get(memoId);
         let loadError = false;
         if (!dataUrl) {
           try {
-            dataUrl = await getVoiceBlob(memoId);
+            const resp = await getVoiceMedia(state.auth.token, memoId);
+            dataUrl = resp?.payload?.dataUrl || null;
             if (dataUrl) voiceBlobCache.set(memoId, dataUrl);
           } catch (e) {
             console.error('Failed to load voice memo', i, ':', e);
@@ -8572,8 +8577,8 @@ export function createApp(mount) {
           onclick: async () => {
             const cur = getSelectedEntry();
             if (!cur) return;
-            // Remove from IndexedDB and cache
-            try { await deleteVoiceBlob(memoId); } catch (e) { /* ignore */ }
+            // Remove from server and cache
+            try { await deleteVoiceMedia(state.auth.token, memoId); } catch (e) { /* ignore */ }
             voiceBlobCache.delete(memoId);
             // Remove reference from entry
             updateSelected({ voiceMemos: (cur.voiceMemos || []).filter((m) => (m.blobId || m.id) !== memoId) });
@@ -8599,7 +8604,7 @@ export function createApp(mount) {
   // ── Video Recordings ─────────────────────────────────────────────────────────
   const videoRecorderState = { mediaRecorder: null, chunks: [], recording: false, stream: null, previewStream: null };
 
-  // In-memory cache for video blob URLs (loaded from IndexedDB)
+  // In-memory cache for decrypted video blob URLs (per-session only)
   const videoBlobCache = new Map();
 
   function renderVideoUI(entry) {
@@ -8688,13 +8693,18 @@ export function createApp(mount) {
 
         const blobId = `vc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-        // Save large blob to IndexedDB (not in the vault to avoid localStorage limit)
+        // Encrypt and upload to the server; no persistent browser storage.
         try {
-          await saveVideoBlob(blobId, dataUrl);
+          await uploadVideoMedia(state.auth.token, {
+            id: blobId,
+            vaultSlot: state.activeVaultSlot,
+            entryId: cur.id,
+            payload: { dataUrl }
+          });
           videoBlobCache.set(blobId, dataUrl);
         } catch (e) {
-          showToast('Failed to store video blob.');
-          console.error('[VideoRecord IDB]', e);
+          showToast('Failed to store video on server.');
+          console.error('[VideoRecord upload]', e);
           statusText.textContent = '';
           updateButtons();
           return;
@@ -8764,7 +8774,8 @@ export function createApp(mount) {
         let dataUrl = videoBlobCache.get(clipId);
         if (!dataUrl) {
           try {
-            dataUrl = await getVideoBlob(clipId);
+            const resp = await getVideoMedia(state.auth.token, clipId);
+            dataUrl = resp?.payload?.dataUrl || null;
             if (dataUrl) videoBlobCache.set(clipId, dataUrl);
           } catch (e) {
             console.error('[VideoClip] Failed to load blob', clipId, e);
@@ -8781,8 +8792,8 @@ export function createApp(mount) {
           onclick: async () => {
             const cur = getSelectedEntry();
             if (!cur) return;
-            // Remove from IndexedDB and cache
-            try { await deleteVideoBlob(clipId); } catch (e) { /* ignore */ }
+            // Remove from server and cache
+            try { await deleteVideoMedia(state.auth.token, clipId); } catch (e) { /* ignore */ }
             videoBlobCache.delete(clipId);
             // Remove reference from entry
             updateSelected({ videoClips: (cur.videoClips || []).filter((c) => c.id !== clip.id) });

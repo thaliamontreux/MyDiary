@@ -71,7 +71,10 @@ import {
   revokeInviteCode,
   markUserTosAccepted,
   getMailSettings,
-  saveMailSettings
+  saveMailSettings,
+  upsertMediaBlob,
+  getMediaBlob,
+  deleteMediaBlob
 } from './db.js';
 import { requireAuth, signAuthToken } from './auth.js';
 import { log, logError, requestLogger } from './logger.js';
@@ -135,7 +138,7 @@ app.use((req, res, next) => {
 });
 
 app.use('/api', apiRateLimiter);
-app.use(express.json({ limit: '5mb' }));
+app.use(express.json({ limit: '80mb' }));
 
 app.use((err, _req, res, next) => {
   if (err?.type === 'entity.too.large') {
@@ -161,6 +164,97 @@ app.get('/api/ready', async (_req, res) => {
     res.json({ ok: true });
   } catch {
     res.status(503).json({ ok: false, error: 'Database unavailable' });
+  }
+});
+
+// ── Encrypted media blobs (voice + video) ─────────────────────────────────────
+
+function normalizeMediaType(type) {
+  if (type === 'voice' || type === 'video') return type;
+  return null;
+}
+
+app.post('/api/media/:type', requireAuth, async (req, res) => {
+  try {
+    const mediaType = normalizeMediaType(req.params.type);
+    if (!mediaType) {
+      res.status(400).json({ error: 'Invalid media type' });
+      return;
+    }
+
+    const id = String(req.body?.id || '').trim();
+    const vaultSlot = String(req.body?.vaultSlot || 'primary');
+    const entryId = req.body?.entryId != null ? Number(req.body.entryId) : null;
+    const payload = req.body?.payload;
+
+    if (!id || !payload) {
+      res.status(400).json({ error: 'id and payload are required' });
+      return;
+    }
+
+    await upsertMediaBlob({
+      id,
+      userId: req.user.id,
+      vaultSlot,
+      entryId: Number.isFinite(entryId) && entryId > 0 ? entryId : null,
+      mediaType,
+      payload
+    });
+
+    res.json({ ok: true, id });
+  } catch (err) {
+    logError('media_save_failed', err, { userId: req.user?.id, type: req.params.type });
+    res.status(500).json({ error: 'Failed to save media' });
+  }
+});
+
+app.get('/api/media/:type/:id', requireAuth, async (req, res) => {
+  try {
+    const mediaType = normalizeMediaType(req.params.type);
+    if (!mediaType) {
+      res.status(400).json({ error: 'Invalid media type' });
+      return;
+    }
+    const id = String(req.params.id || '').trim();
+    if (!id) {
+      res.status(400).json({ error: 'Media id is required' });
+      return;
+    }
+
+    const item = await getMediaBlob(id, req.user.id, mediaType);
+    if (!item || !item.payload) {
+      res.status(404).json({ error: 'Media not found' });
+      return;
+    }
+    res.json({ id: item.id, payload: item.payload });
+  } catch (err) {
+    logError('media_get_failed', err, { userId: req.user?.id, type: req.params.type });
+    res.status(500).json({ error: 'Failed to load media' });
+  }
+});
+
+app.delete('/api/media/:type/:id', requireAuth, async (req, res) => {
+  try {
+    const mediaType = normalizeMediaType(req.params.type);
+    if (!mediaType) {
+      res.status(400).json({ error: 'Invalid media type' });
+      return;
+    }
+    const id = String(req.params.id || '').trim();
+    if (!id) {
+      res.status(400).json({ error: 'Media id is required' });
+      return;
+    }
+
+    const ok = await deleteMediaBlob(id, req.user.id, mediaType);
+    if (!ok) {
+      res.status(404).json({ error: 'Media not found' });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    logError('media_delete_failed', err, { userId: req.user?.id, type: req.params.type });
+    res.status(500).json({ error: 'Failed to delete media' });
   }
 });
 
