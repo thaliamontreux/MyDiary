@@ -8424,83 +8424,330 @@ export function createApp(mount) {
 
   // ── Voice Memos ──────────────────────────────────────────────────────────────
   const voiceRecorderState = { mediaRecorder: null, chunks: [], recording: false };
-  // In-memory cache for decrypted voice blob URLs (per-session only)
+  const MAX_VOICE_BYTES = 10 * 1024 * 1024;
+  const MAX_VOICE_MS = 10 * 60 * 1000;
   const voiceBlobCache = new Map();
+
+  function showTranscriptOverlay(text) {
+    const overlay = el('div', { class: 'overlay-backdrop' });
+    const close = () => overlay.remove();
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+    const body = el('div', { class: 'transcript-body' }, [
+      el('div', { class: 'overlay-title', text: 'Transcript' }),
+      el('div', { class: 'transcript-content' }, [
+        el('p', { text: text && text.trim() ? text : 'No transcript available.' })
+      ]),
+      el('button', { class: 'btn ghost small-btn', type: 'button', onclick: close }, [el('span', { text: 'Close' })])
+    ]);
+
+    const modal = el('div', { class: 'overlay-modal transcript-overlay' }, [body]);
+    overlay.append(modal);
+    document.body.append(overlay);
+  }
+
+  function openAudioNoteRecorderOverlay() {
+    const overlay = el('div', { class: 'overlay-backdrop' });
+    const close = () => {
+      if (voiceRecorderState.mediaRecorder && voiceRecorderState.mediaRecorder.state !== 'inactive') {
+        voiceRecorderState.mediaRecorder.stop();
+      }
+      if (currentStream) {
+        currentStream.getTracks().forEach((t) => t.stop());
+      }
+      if (audioContext) {
+        audioContext.close();
+      }
+      if (waveformAnimId) {
+        cancelAnimationFrame(waveformAnimId);
+      }
+      if (elapsedTimer) {
+        clearInterval(elapsedTimer);
+      }
+      if (recognition) {
+        recognition.onresult = null;
+        recognition.onerror = null;
+        try { recognition.stop(); } catch {}
+      }
+      voiceRecorderState.mediaRecorder = null;
+      voiceRecorderState.chunks = [];
+      voiceRecorderState.recording = false;
+      overlay.remove();
+    };
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+
+    let currentBlob = null;
+    let currentDurationMs = 0;
+    let audioUrl = null;
+    let currentStream = null;
+    let audioContext = null;
+    let analyser = null;
+    let waveformAnimId = null;
+    let elapsedTimer = null;
+    let startTs = 0;
+    const waveformSamples = [];
+
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+    let recognition = null;
+    let transcriptSupported = !!Recognition;
+    let transcriptText = '';
+
+    const header = el('div', { class: 'overlay-title', text: 'Record audio note' });
+    const statusText = el('div', { class: 'tiny', text: 'Ready to record' });
+    const timeLabel = el('div', { class: 'tiny', text: '00:00' });
+    const waveform = el('canvas', { class: 'audio-waveform', width: '400', height: '80' });
+    const ctx = waveform.getContext('2d');
+
+    const transcriptLabelText = transcriptSupported ? 'Transcription (you can edit before saving)' : 'Transcription is not supported in this browser.';
+    const transcriptLabel = el('div', { class: 'tiny', text: transcriptLabelText });
+    const transcriptArea = el('textarea', { class: 'lock-input transcript-input', placeholder: transcriptSupported ? 'Your transcript will appear here while recording…' : 'No transcript available.' });
+
+    if (!transcriptSupported) {
+      transcriptArea.disabled = true;
+    }
+
+    function redrawWaveform(samples) {
+      const width = waveform.width;
+      const height = waveform.height;
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = 'rgba(15,23,42,0.04)';
+      ctx.fillRect(0, 0, width, height);
+      if (!samples.length) return;
+      ctx.strokeStyle = 'rgba(148, 27, 147, 0.9)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      const step = width / samples.length;
+      for (let i = 0; i < samples.length; i++) {
+        const x = i * step;
+        const v = samples[i];
+        const y = height - (v * height);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    function startWaveformAnimation() {
+      if (!analyser) return;
+      const buffer = new Uint8Array(analyser.fftSize);
+      function frame() {
+        analyser.getByteTimeDomainData(buffer);
+        let sum = 0;
+        for (let i = 0; i < buffer.length; i++) {
+          const v = buffer[i] / 128 - 1;
+          sum += Math.abs(v);
+        }
+        const avg = Math.min(1, sum / buffer.length * 2);
+        waveformSamples.push(avg);
+        const condensed = waveformSamples.length > 200
+          ? waveformSamples.filter((_, idx) => idx % Math.ceil(waveformSamples.length / 200) === 0)
+          : waveformSamples.slice();
+        redrawWaveform(condensed);
+        waveformAnimId = requestAnimationFrame(frame);
+      }
+      waveformAnimId = requestAnimationFrame(frame);
+    }
+
+    function updateElapsed() {
+      const now = Date.now();
+      const ms = now - startTs;
+      currentDurationMs = ms;
+      const clamped = Math.min(ms, MAX_VOICE_MS);
+      const totalSeconds = Math.floor(clamped / 1000);
+      const m = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+      const s = String(totalSeconds % 60).padStart(2, '0');
+      timeLabel.textContent = `${m}:${s}`;
+      if (ms >= MAX_VOICE_MS && voiceRecorderState.mediaRecorder && voiceRecorderState.mediaRecorder.state !== 'inactive') {
+        statusText.textContent = 'Max recording length reached — stopping…';
+        voiceRecorderState.mediaRecorder.stop();
+      }
+    }
+
+    let isPaused = false;
+
+    async function startRecording() {
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) {
+          showToast('Audio recording is not supported in this browser.');
+          return;
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        currentStream = stream;
+        voiceRecorderState.chunks = [];
+        voiceRecorderState.recording = true;
+        statusText.textContent = 'Recording…';
+        startTs = Date.now();
+        elapsedTimer = setInterval(updateElapsed, 500);
+
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(stream);
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        startWaveformAnimation();
+
+        if (transcriptSupported) {
+          recognition = new Recognition();
+          recognition.lang = 'en-US';
+          recognition.continuous = true;
+          recognition.interimResults = true;
+          recognition.onresult = (event) => {
+            let final = '';
+            let interim = '';
+            for (let i = 0; i < event.results.length; i++) {
+              const res = event.results[i];
+              if (res.isFinal) final += res[0].transcript + ' ';
+              else interim += res[0].transcript + ' ';
+            }
+            transcriptText = (transcriptText + ' ' + final).trim();
+            transcriptArea.value = (transcriptText + ' ' + interim).trim();
+          };
+          recognition.onerror = () => {};
+          try { recognition.start(); } catch {}
+        }
+
+        const mr = new MediaRecorder(stream);
+        voiceRecorderState.mediaRecorder = mr;
+        mr.ondataavailable = (e) => { if (e.data.size > 0) voiceRecorderState.chunks.push(e.data); };
+        mr.onstop = async () => {
+          voiceRecorderState.recording = false;
+          isPaused = false;
+          if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; }
+          if (recognition) { try { recognition.stop(); } catch {} }
+          if (currentStream) { currentStream.getTracks().forEach((t) => t.stop()); currentStream = null; }
+          if (audioContext) { audioContext.close(); audioContext = null; }
+          if (waveformAnimId) { cancelAnimationFrame(waveformAnimId); waveformAnimId = null; }
+
+          try {
+            const blob = new Blob(voiceRecorderState.chunks, { type: 'audio/webm' });
+            if (blob.size === 0) { showToast('Recording failed - no audio data captured.'); statusText.textContent = 'Recording failed.'; return; }
+            if (blob.size > MAX_VOICE_BYTES) { showToast('Recording too large (max 10MB).'); statusText.textContent = 'Recording too large.'; return; }
+            currentBlob = blob;
+            statusText.textContent = 'Recording ready to save.';
+            if (audioUrl) {
+              URL.revokeObjectURL(audioUrl);
+              audioUrl = null;
+            }
+            audioUrl = URL.createObjectURL(blob);
+            audioEl.src = audioUrl;
+            audioEl.load();
+          } catch (err) {
+            console.error('Voice recording error:', err);
+            showToast('Failed to process recording: ' + (err?.message || 'Unknown error'));
+            statusText.textContent = 'Error processing recording.';
+          }
+        };
+        mr.start(500);
+      } catch (e) {
+        showToast('Microphone access denied or not available');
+        statusText.textContent = 'Microphone access denied.';
+      }
+    }
+
+    function togglePause() {
+      const mr = voiceRecorderState.mediaRecorder;
+      if (!mr || mr.state === 'inactive') return;
+      if (isPaused) {
+        mr.resume();
+        isPaused = false;
+        statusText.textContent = 'Recording…';
+      } else {
+        mr.pause();
+        isPaused = true;
+        statusText.textContent = 'Paused';
+      }
+    }
+
+    function stopRecording() {
+      const mr = voiceRecorderState.mediaRecorder;
+      if (mr && mr.state !== 'inactive') {
+        mr.stop();
+      }
+    }
+
+    const audioEl = el('audio', { class: 'voice-audio', controls: 'controls' });
+
+    const recordBtn = el('button', { class: 'btn', type: 'button', onclick: startRecording }, [el('span', { text: '● Record' })]);
+    const pauseBtn = el('button', { class: 'btn ghost small-btn', type: 'button', onclick: togglePause }, [el('span', { text: 'Pause/Resume' })]);
+    const stopBtn = el('button', { class: 'btn danger', type: 'button', onclick: stopRecording }, [el('span', { text: '⏹ Stop' })]);
+    const cancelBtn = el('button', { class: 'btn ghost small-btn', type: 'button', onclick: close }, [el('span', { text: 'Cancel' })]);
+
+    async function handleSave() {
+      if (!currentBlob) {
+        showToast('No recording to save yet.');
+        return;
+      }
+      const cur = getSelectedEntry();
+      if (!cur) {
+        showToast('No entry selected.');
+        return;
+      }
+      try {
+        statusText.textContent = 'Saving…';
+        const blobId = `vm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const dataUrl = await new Promise((res, rej) => {
+          const reader = new FileReader();
+          reader.onload = () => res(reader.result);
+          reader.onerror = rej;
+          reader.readAsDataURL(currentBlob);
+        });
+        if (!state.key) throw new Error('Vault is locked');
+        const encryptedPayload = encryptJson({ dataUrl }, state.key);
+        await uploadVoiceMedia(state.auth.token, {
+          id: blobId,
+          vaultSlot: state.activeVaultSlot,
+          entryId: cur.id,
+          payload: encryptedPayload
+        });
+        voiceBlobCache.set(blobId, dataUrl);
+        const meta = {
+          id: blobId,
+          duration: currentDurationMs || null,
+          createdAt: new Date().toISOString(),
+          transcript: transcriptSupported ? (transcriptArea.value || '').trim() : '',
+          mimeType: currentBlob.type || 'audio/webm',
+          size: currentBlob.size,
+          waveform: waveformSamples.length ? waveformSamples.slice(0, 200) : null
+        };
+        const next = [...(cur.voiceMemos || []), meta].slice(-8);
+        updateSelected({ voiceMemos: next });
+        await persistVault();
+        showToast('Audio note saved');
+        close();
+      } catch (err) {
+        console.error('Failed to save audio note:', err);
+        showToast('Failed to save audio note: ' + (err?.message || 'Unknown error'));
+        statusText.textContent = 'Save failed.';
+      }
+    }
+
+    const saveBtn = el('button', { class: 'btn primary', type: 'button', onclick: handleSave }, [el('span', { text: 'Save to entry' })]);
+
+    const controlsRow = el('div', { class: 'audio-recorder-controls' }, [recordBtn, pauseBtn, stopBtn, cancelBtn, saveBtn]);
+
+    const modal = el('div', { class: 'overlay-modal audio-note-recorder' }, [
+      header,
+      el('div', { class: 'audio-recorder-status' }, [statusText, timeLabel]),
+      waveform,
+      audioEl,
+      controlsRow,
+      transcriptLabel,
+      transcriptArea
+    ]);
+
+    overlay.append(modal);
+    document.body.append(overlay);
+  }
 
   function renderVoiceMemoUI(entry) {
     const memos = Array.isArray(entry.voiceMemos) ? entry.voiceMemos : [];
-    const statusText = el('span', { class: 'tiny', text: voiceRecorderState.recording ? 'Recording…' : '' });
+    const statusText = el('span', { class: 'tiny', text: '' });
 
     const recordBtn = el('button', {
-      class: `btn ghost small-btn ${voiceRecorderState.recording ? 'active' : ''}`,
+      class: 'btn ghost small-btn',
       type: 'button',
-      onclick: async () => {
-        if (voiceRecorderState.recording) {
-          voiceRecorderState.mediaRecorder?.stop();
-          return;
-        }
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          voiceRecorderState.chunks = [];
-          voiceRecorderState.recording = true;
-          statusText.textContent = 'Recording…';
-          const mr = new MediaRecorder(stream);
-          voiceRecorderState.mediaRecorder = mr;
-          mr.ondataavailable = (e) => { if (e.data.size > 0) voiceRecorderState.chunks.push(e.data); };
-          mr.onstop = async () => {
-            try {
-              voiceRecorderState.recording = false;
-              statusText.textContent = '';
-              stream.getTracks().forEach((t) => t.stop());
-              const blob = new Blob(voiceRecorderState.chunks, { type: 'audio/webm' });
-              if (blob.size === 0) { showToast('Recording failed - no audio data captured.'); return; }
-              if (blob.size > 10 * 1024 * 1024) { showToast('Recording too large (max 10MB).'); return; }
-
-              const blobId = `vm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-              const dataUrl = await new Promise((res, rej) => {
-                const reader = new FileReader();
-                reader.onload = () => res(reader.result);
-                reader.onerror = rej;
-                reader.readAsDataURL(blob);
-              });
-              // Encrypt and upload to the server; no persistent browser storage.
-              try {
-                if (!state.key) throw new Error('Vault is locked');
-                const encryptedPayload = encryptJson({ dataUrl }, state.key);
-                await uploadVoiceMedia(state.auth.token, {
-                  id: blobId,
-                  vaultSlot: state.activeVaultSlot,
-                  entryId: getSelectedEntry()?.id || null,
-                  payload: encryptedPayload
-                });
-                voiceBlobCache.set(blobId, dataUrl);
-              } catch (e) {
-                showToast('Failed to save voice memo to server');
-                console.error('uploadVoiceMedia error:', e);
-                return;
-              }
-
-              const cur = getSelectedEntry();
-              if (!cur) return;
-              const next = [...(cur.voiceMemos || []), {
-                id: blobId,
-                duration: null,
-                createdAt: new Date().toISOString()
-              }].slice(-8);
-              updateSelected({ voiceMemos: next });
-              await persistVault();
-              showToast('Voice memo saved');
-            } catch (err) {
-              console.error('Voice recording error:', err);
-              showToast('Failed to save voice recording: ' + (err?.message || 'Unknown error'));
-            }
-          };
-          mr.start();
-        } catch (e) {
-          showToast('Microphone access denied or not available');
-        }
-      }
-    }, [el('span', { class: 'btn-ic', text: voiceRecorderState.recording ? '⏹' : '🎙' }), el('span', { text: voiceRecorderState.recording ? 'Stop' : 'Record voice' })]);
+      onclick: () => openAudioNoteRecorderOverlay()
+    }, [el('span', { class: 'btn-ic', text: '🎙' }), el('span', { text: 'Record audio note' })]);
 
     const memoList = el('div', { class: 'voice-memo-list' });
 
@@ -8557,6 +8804,14 @@ export function createApp(mount) {
           ? el('audio', { controls: '', src: dataUrl, class: 'voice-audio', preload: 'metadata' })
           : el('span', { class: 'tiny', text: '(recording unavailable — may have been cleared from this browser)' });
 
+        const transcriptBtn = el('button', {
+          class: 'btn mini ghost',
+          type: 'button',
+          onclick: () => {
+            showTranscriptOverlay(memo.transcript || '');
+          }
+        }, [el('span', { text: 'Transcript' })]);
+
         const removeBtn = el('button', {
           class: 'btn mini ghost',
           type: 'button',
@@ -8576,6 +8831,7 @@ export function createApp(mount) {
         memoList.appendChild(el('div', { class: 'voice-memo-item' }, [
           el('span', { class: 'tiny', text: `Voice memo ${i + 1}` }),
           audio,
+          transcriptBtn,
           removeBtn
         ]));
       }
