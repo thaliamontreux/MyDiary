@@ -16,4 +16,3 @@ git push
 
 echo.
 echo === Done! ===
-pause
