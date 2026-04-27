@@ -3891,7 +3891,10 @@ export function createApp(mount) {
     root.dataset.vault = state.activeVaultSlot;
 
     // Resolve the active background theme id (per-user theme wins over base ui theme)
-    const bgTheme = state.auth.user?.theme || state.ui.themeId;
+    let bgTheme = state.auth.user?.theme || state.ui.themeId;
+    // Map generic palette ids to concrete themed folders
+    if (bgTheme === 'light') bgTheme = 'trans-pride-light';
+    if (bgTheme === 'dark') bgTheme = 'trans-pride-dark';
 
     // Dynamically load per-theme CSS overrides from /themes/<id>/theme.css
     try {
