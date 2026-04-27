@@ -8,7 +8,7 @@ cd "$SCRIPT_DIR"
 echo "[1/2] Pulling latest changes from git..."
 git pull
 
-echo "[2/2] Running install-service.sh..."
-./install-service.sh
+echo "[2/2] Running scripts/install-service.sh..."
+./scripts/install-service.sh
 
 echo "All done."
