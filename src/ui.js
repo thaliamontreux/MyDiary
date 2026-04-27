@@ -8565,6 +8565,20 @@ export function createApp(mount) {
 
     let isPaused = false;
 
+    function updateControls() {
+      const mr = voiceRecorderState.mediaRecorder;
+      const hasActiveRecorder = !!mr && mr.state !== 'inactive';
+      const canControlRecording = !!mr && (mr.state === 'recording' || mr.state === 'paused');
+
+      if (recordBtn) recordBtn.disabled = hasActiveRecorder; // prevent starting a second recorder
+      if (pauseBtn) pauseBtn.disabled = !canControlRecording;
+      if (stopBtn) stopBtn.disabled = !canControlRecording;
+
+      // Save is only allowed once we have a finished blob and the recorder is inactive
+      const canSave = !!currentBlob && !hasActiveRecorder;
+      if (saveBtn) saveBtn.disabled = !canSave;
+    }
+
     async function startRecording() {
       try {
         if (!navigator.mediaDevices?.getUserMedia) {
@@ -8573,7 +8587,17 @@ export function createApp(mount) {
         }
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         currentStream = stream;
+        // Reset previous recording state so we don't accidentally save an old blob
         voiceRecorderState.chunks = [];
+        if (currentBlob) {
+          currentBlob = null;
+          if (audioUrl) {
+            URL.revokeObjectURL(audioUrl);
+            audioUrl = null;
+          }
+          audioEl.removeAttribute('src');
+          audioEl.load();
+        }
         voiceRecorderState.recording = true;
         statusText.textContent = 'Recording…';
         startTs = Date.now();
@@ -8608,6 +8632,7 @@ export function createApp(mount) {
 
         const mr = new MediaRecorder(stream);
         voiceRecorderState.mediaRecorder = mr;
+        updateControls();
         mr.ondataavailable = (e) => { if (e.data.size > 0) voiceRecorderState.chunks.push(e.data); };
         mr.onstop = async () => {
           voiceRecorderState.recording = false;
@@ -8631,13 +8656,16 @@ export function createApp(mount) {
             audioUrl = URL.createObjectURL(blob);
             audioEl.src = audioUrl;
             audioEl.load();
+            updateControls();
           } catch (err) {
             console.error('Voice recording error:', err);
             showToast('Failed to process recording: ' + (err?.message || 'Unknown error'));
             statusText.textContent = 'Error processing recording.';
+            updateControls();
           }
         };
         mr.start(500);
+        updateControls();
       } catch (e) {
         showToast('Microphone access denied or not available');
         statusText.textContent = 'Microphone access denied.';
@@ -8656,6 +8684,7 @@ export function createApp(mount) {
         isPaused = true;
         statusText.textContent = 'Paused';
       }
+      updateControls();
     }
 
     function stopRecording() {
