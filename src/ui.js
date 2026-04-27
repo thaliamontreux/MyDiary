@@ -8589,6 +8589,7 @@ export function createApp(mount) {
 
   // ── Video Recordings ─────────────────────────────────────────────────────────
   const videoRecorderState = { mediaRecorder: null, chunks: [], recording: false, stream: null, previewStream: null };
+  const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
 
   // In-memory cache for decrypted video blob URLs (per-session only)
   const videoBlobCache = new Map();
@@ -8616,7 +8617,15 @@ export function createApp(mount) {
     // Start camera for preview only (no recording yet)
     const startCamera = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        const constraints = {
+          audio: true,
+          video: {
+            width: { ideal: 1280, max: 1280 },
+            height: { ideal: 720, max: 720 },
+            frameRate: { ideal: 30, max: 30 }
+          }
+        };
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
         videoRecorderState.stream = stream;
         // Use cloned stream for preview so original stays intact for recording
         videoRecorderState.previewStream = stream.clone();
@@ -8645,7 +8654,16 @@ export function createApp(mount) {
       });
       videoRecorderState.mediaRecorder = mr;
 
-      mr.ondataavailable = (e) => { if (e.data.size > 0) videoRecorderState.chunks.push(e.data); };
+      mr.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          videoRecorderState.chunks.push(e.data);
+          const totalSize = videoRecorderState.chunks.reduce((acc, c) => acc + c.size, 0);
+          if (totalSize >= MAX_VIDEO_BYTES && mr.state !== 'inactive') {
+            statusText.textContent = 'Max video size reached — stopping…';
+            mr.stop();
+          }
+        }
+      };
 
       mr.onstop = async () => {
         videoRecorderState.recording = false;
