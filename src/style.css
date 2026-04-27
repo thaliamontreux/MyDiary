@@ -3699,10 +3699,50 @@ body::before {
 }
 
 /* ── Voice Memos ─────────────────────────────────────────────────────────── */
-.voice-memo-controls { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.voice-memo-list { display: flex; flex-direction: column; gap: 8px; }
-.voice-memo-item { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.voice-audio { flex: 1; min-width: 180px; height: 36px; border-radius: 999px; }
+.voice-memo-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.voice-memo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.voice-memo-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--card, rgba(15, 23, 42, 0.03));
+  border: 1px solid var(--border, rgba(15, 23, 42, 0.08));
+}
+
+.voice-memo-header {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.voice-memo-header .memo-meta {
+  color: var(--muted, #6b7280);
+}
+
+.voice-audio {
+  flex: 1;
+  min-width: 200px;
+  height: 36px;
+  border-radius: 999px;
+}
+
+.voice-memo-item .btn.mini {
+  margin-top: 2px;
+}
 
 /* ── Video Recordings ────────────────────────────────────────────────────── */
 .video-preview { width: 100%; max-height: 240px; border-radius: 10px; background: #000; display: none; margin-bottom: 8px; object-fit: cover; }

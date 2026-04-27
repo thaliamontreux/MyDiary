@@ -8833,6 +8833,29 @@ export function createApp(mount) {
           ? el('audio', { controls: '', src: dataUrl, class: 'voice-audio', preload: 'metadata' })
           : el('span', { class: 'tiny', text: '(recording unavailable — may have been cleared from this browser)' });
 
+        let durationLabel = '';
+        if (typeof memo.duration === 'number' && memo.duration > 0) {
+          const totalSeconds = Math.round(memo.duration / 1000);
+          const m = Math.floor(totalSeconds / 60);
+          const s = totalSeconds % 60;
+          durationLabel = `${m}:${String(s).padStart(2, '0')}`;
+        }
+
+        let createdLabel = '';
+        if (memo.createdAt) {
+          try {
+            const d = new Date(memo.createdAt);
+            if (!Number.isNaN(d.getTime())) {
+              createdLabel = d.toLocaleString();
+            }
+          } catch {}
+        }
+
+        const metaParts = [];
+        if (durationLabel) metaParts.push(durationLabel);
+        if (createdLabel) metaParts.push(createdLabel);
+        const metaText = metaParts.length ? metaParts.join(' • ') : '';
+
         const transcriptBtn = el('button', {
           class: 'btn mini ghost',
           type: 'button',
@@ -8857,8 +8880,13 @@ export function createApp(mount) {
           }
         }, [el('span', { text: 'Remove' })]);
 
+        const headerChildren = [el('span', { class: 'tiny', text: `Voice memo ${i + 1}` })];
+        if (metaText) {
+          headerChildren.push(el('span', { class: 'tiny memo-meta', text: ` — ${metaText}` }));
+        }
+
         memoList.appendChild(el('div', { class: 'voice-memo-item' }, [
-          el('span', { class: 'tiny', text: `Voice memo ${i + 1}` }),
+          el('div', { class: 'voice-memo-header' }, headerChildren),
           audio,
           transcriptBtn,
           removeBtn
