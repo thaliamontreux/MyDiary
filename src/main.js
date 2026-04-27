@@ -9,8 +9,12 @@ async function initApp() {
     if (res.ok) {
       const data = await res.json();
       if (data.defaultLoginTheme) {
-        document.documentElement.setAttribute('data-theme', data.defaultLoginTheme);
-        const bg = `themes/${data.defaultLoginTheme}/background.webp`;
+        let themeId = data.defaultLoginTheme;
+        if (themeId === 'light') themeId = 'trans-pride-light';
+        if (themeId === 'dark') themeId = 'trans-pride-dark';
+
+        document.documentElement.setAttribute('data-theme', themeId);
+        const bg = `themes/${themeId}/background.webp`;
         document.documentElement.style.setProperty('--bg-image', `url('/${bg}')`);
       }
     }
