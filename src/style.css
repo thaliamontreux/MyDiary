@@ -4501,6 +4501,92 @@ body::before {
   background: rgba(148, 163, 184, 0.6);
 }
 
+/* 
+ * ── Video Player & Clip List ──────────────────────────────────────────────
+ */
+.video-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr);
+  gap: 12px;
+  margin-top: 6px;
+}
+
+@media (max-width: 900px) {
+  .video-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.video-player-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.video-main-player {
+  width: 100%;
+  max-height: 260px;
+  border-radius: 10px;
+  background: #000;
+}
+
+.video-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.video-clip-list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.video-clip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.video-clip-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  border-radius: 10px;
+  border: 0;
+  padding: 6px 8px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.video-clip-item:hover {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.video-clip-item.active {
+  background: rgba(37, 99, 235, 0.18);
+}
+
+.video-clip-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.video-clip-title {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.video-clip-meta {
+  font-size: 11px;
+  color: var(--muted2);
+}
+
 /* ── Voice Dictation ─────────────────────────────────────────────────────── */
 .dictate-wrap {
   display: flex;

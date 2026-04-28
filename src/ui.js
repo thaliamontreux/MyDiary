@@ -8585,6 +8585,9 @@ export function createApp(mount) {
           showToast('Audio recording is not supported in this browser.');
           return;
         }
+        // Reset transcript state for a fresh recording
+        transcriptText = '';
+        transcriptArea.value = '';
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         currentStream = stream;
         // Reset previous recording state so we don't accidentally save an old blob
@@ -8616,14 +8619,17 @@ export function createApp(mount) {
           recognition.continuous = true;
           recognition.interimResults = true;
           recognition.onresult = (event) => {
-            let final = '';
             let interim = '';
-            for (let i = 0; i < event.results.length; i++) {
+            // Only process new results starting from resultIndex to avoid
+            // re-appending old segments and causing looping/duplication.
+            for (let i = event.resultIndex; i < event.results.length; i++) {
               const res = event.results[i];
-              if (res.isFinal) final += res[0].transcript + ' ';
-              else interim += res[0].transcript + ' ';
+              if (res.isFinal) {
+                transcriptText = (transcriptText + ' ' + res[0].transcript).trim();
+              } else {
+                interim += res[0].transcript + ' ';
+              }
             }
-            transcriptText = (transcriptText + ' ' + final).trim();
             transcriptArea.value = (transcriptText + ' ' + interim).trim();
           };
           recognition.onerror = () => {};
@@ -8701,6 +8707,28 @@ export function createApp(mount) {
     const stopBtn = el('button', { class: 'btn danger', type: 'button', onclick: stopRecording }, [el('span', { text: '⏹ Stop' })]);
     const cancelBtn = el('button', { class: 'btn ghost small-btn', type: 'button', onclick: close }, [el('span', { text: 'Cancel' })]);
 
+    async function getCurrentLocation() {
+      if (!navigator.geolocation) return null;
+      return new Promise((resolve) => {
+        try {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              resolve({
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude,
+                accuracy: pos.coords.accuracy,
+                ts: new Date().toISOString()
+              });
+            },
+            () => resolve(null),
+            { enableHighAccuracy: false, timeout: 5000, maximumAge: 600000 }
+          );
+        } catch {
+          resolve(null);
+        }
+      });
+    }
+
     async function handleSave() {
       if (!currentBlob) {
         showToast('No recording to save yet.');
@@ -8713,6 +8741,7 @@ export function createApp(mount) {
       }
       try {
         statusText.textContent = 'Saving…';
+        const geo = await getCurrentLocation();
         const blobId = `vm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         const dataUrl = await new Promise((res, rej) => {
           const reader = new FileReader();
@@ -8736,7 +8765,8 @@ export function createApp(mount) {
           transcript: transcriptSupported ? (transcriptArea.value || '').trim() : '',
           mimeType: currentBlob.type || 'audio/webm',
           size: currentBlob.size,
-          waveform: waveformSamples.length ? waveformSamples.slice(0, 200) : null
+          waveform: waveformSamples.length ? waveformSamples.slice(0, 200) : null,
+          location: geo
         };
         const next = [...(cur.voiceMemos || []), meta].slice(-8);
         updateSelected({ voiceMemos: next });
@@ -8777,6 +8807,7 @@ export function createApp(mount) {
     });
 
     let selectedId = sortedMemos.length ? (sortedMemos[0].blobId || sortedMemos[0].id) : null;
+    let selectedMemoMeta = null;
     let isPlaying = false;
     let playbackRate = 1;
 
@@ -8792,6 +8823,13 @@ export function createApp(mount) {
 
     const playerTitle = el('div', { class: 'voice-player-title', text: 'No voice memo selected' });
     const metaLabel = el('div', { class: 'voice-player-meta', text: 'Select a recording to see details' });
+
+    const mapLinkBtn = el('button', {
+      class: 'btn mini ghost',
+      type: 'button',
+      style: 'display:none',
+      onclick: () => {}
+    }, [el('span', { text: 'View on map' })]);
 
     const progressLabel = el('div', { class: 'voice-player-progress-label' }, [
       el('span', { class: 'voice-time-current', text: '0:00' }),
@@ -8874,6 +8912,68 @@ export function createApp(mount) {
       }
     });
 
+    function openRenameMemoPopup(memo) {
+      const memoId = memo.blobId || memo.id;
+      const curTitle = memo.title && memo.title.trim() ? memo.title.trim() : '';
+      const overlay = el('div', { class: 'overlay-backdrop' });
+      const titleInput = el('input', {
+        class: 'lock-input',
+        type: 'text',
+        value: curTitle,
+        placeholder: 'Title for this voice memo (optional)'
+      });
+
+      const close = () => overlay.remove();
+
+      const saveBtn = el('button', {
+        class: 'btn primary small-btn', type: 'button',
+        onclick: async () => {
+          const newTitle = (titleInput.value || '').trim();
+          const cur = getSelectedEntry();
+          if (!cur) { close(); return; }
+          const next = (cur.voiceMemos || []).map((m) => {
+            const id = m.blobId || m.id;
+            return id === memoId ? { ...m, title: newTitle || undefined } : m;
+          });
+          updateSelected({ voiceMemos: next });
+          await persistVault();
+          refreshList();
+          if (selectedId === memoId) {
+            const title = newTitle || 'Voice memo';
+            playerTitle.textContent = title;
+          }
+          close();
+        }
+      }, [el('span', { text: 'Save' })]);
+
+      const cancelBtn = el('button', {
+        class: 'btn ghost small-btn', type: 'button', onclick: close
+      }, [el('span', { text: 'Cancel' })]);
+
+      const body = el('div', { class: 'overlay-modal' }, [
+        el('div', { class: 'overlay-title', text: 'Rename voice memo' }),
+        el('div', { class: 'detail-row' }, [titleInput]),
+        el('div', { class: 'overlay-actions' }, [saveBtn, cancelBtn])
+      ]);
+      overlay.append(body);
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+      document.body.append(overlay);
+      setTimeout(() => { try { titleInput.focus(); } catch {} }, 30);
+    }
+
+    const renameBtn = el('button', {
+      class: 'btn mini ghost',
+      type: 'button',
+      onclick: () => {
+        if (!selectedId) return;
+        const cur = getSelectedEntry();
+        if (!cur) return;
+        const memo = (cur.voiceMemos || []).find((m) => (m.blobId || m.id) === selectedId);
+        if (!memo) return;
+        openRenameMemoPopup(memo);
+      }
+    }, [el('span', { text: 'Rename' })]);
+
     const deleteBtn = el('button', {
       class: 'btn mini ghost danger-text',
       type: 'button',
@@ -8917,6 +9017,76 @@ export function createApp(mount) {
       }
     }, [el('span', { text: 'Show full transcript' })]);
 
+    const copyTranscriptBtn = el('button', {
+      class: 'btn mini ghost',
+      type: 'button',
+      onclick: async () => {
+        if (!selectedMemoMeta) { showToast('No voice memo selected.'); return; }
+        const text = (selectedMemoMeta.transcript || '').trim();
+        if (!text) { showToast('No transcript to copy.'); return; }
+        try {
+          if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(text);
+          } else {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); } catch {}
+            ta.remove();
+          }
+          showToast('Transcript copied to clipboard');
+        } catch (e) {
+          console.error('Clipboard copy failed', e);
+          showToast('Could not copy transcript');
+        }
+      }
+    }, [el('span', { text: 'Copy transcript' })]);
+
+    const insertTranscriptBtn = el('button', {
+      class: 'btn mini ghost',
+      type: 'button',
+      onclick: async () => {
+        if (!selectedMemoMeta) { showToast('No voice memo selected.'); return; }
+        const text = (selectedMemoMeta.transcript || '').trim();
+        if (!text) { showToast('No transcript to insert.'); return; }
+        const cur = getSelectedEntry();
+        if (!cur) { showToast('No entry selected.'); return; }
+        const body = cur.body || '';
+        const sep = body ? (body.endsWith('\n') ? '\n' : '\n\n') : '';
+        const nextBody = body + sep + text;
+        updateSelected({ body: nextBody });
+        await persistVault();
+        showToast('Transcript inserted into entry');
+      }
+    }, [el('span', { text: 'Insert into entry' })]);
+
+    const downloadAudioBtn = el('button', {
+      class: 'btn mini ghost',
+      type: 'button',
+      onclick: async () => {
+        if (!selectedMemoMeta) { showToast('No voice memo selected.'); return; }
+        const memoId = selectedMemoMeta.blobId || selectedMemoMeta.id;
+        let dataUrl = voiceBlobCache.get(memoId);
+        if (!dataUrl) {
+          const idx = sortedMemos.indexOf(selectedMemoMeta);
+          dataUrl = await loadDataUrlForMemo(selectedMemoMeta, idx === -1 ? 0 : idx);
+          if (!dataUrl) { showToast('Failed to load audio'); return; }
+        }
+        const a = document.createElement('a');
+        const baseName = (selectedMemoMeta.title && selectedMemoMeta.title.trim()) || 'voice-memo';
+        const mime = selectedMemoMeta.mimeType || 'audio/webm';
+        const ext = mime.includes('mpeg') || mime.includes('mp3') ? 'mp3' : 'webm';
+        a.href = dataUrl;
+        a.download = `${baseName}.${ext}`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => a.remove(), 0);
+      }
+    }, [el('span', { text: 'Download audio' })]);
+
     const playerControlsRow = el('div', { class: 'voice-player-controls' }, [
       playBtn,
       backBtn,
@@ -8924,19 +9094,38 @@ export function createApp(mount) {
       el('div', { class: 'voice-player-control-spacer' }),
       speedSelect,
       volumeInput,
+      renameBtn,
       deleteBtn
     ]);
 
     const mainPlayer = el('div', { class: 'voice-player-card' }, [
       playerTitle,
       metaLabel,
+      mapLinkBtn,
       el('div', { class: 'voice-player-progress-wrap' }, [progressInput, progressLabel]),
       playerControlsRow,
       transcriptPreview,
-      transcriptToggle
+      transcriptToggle,
+      el('div', { class: 'voice-transcript-actions' }, [copyTranscriptBtn, insertTranscriptBtn, downloadAudioBtn])
     ]);
 
     const listContainer = el('div', { class: 'voice-memo-list' });
+
+    const searchInput = el('input', {
+      class: 'lock-input voice-search-input',
+      type: 'text',
+      placeholder: 'Search recordings...'
+    });
+
+    const sortSelect = el('select', {
+      class: 'voice-sort-select'
+    }, [
+      el('option', { value: 'newest', text: 'Newest first' }),
+      el('option', { value: 'oldest', text: 'Oldest first' }),
+      el('option', { value: 'duration', text: 'Duration' })
+    ]);
+
+    const listHeader = el('div', { class: 'voice-list-header' }, [searchInput, sortSelect]);
 
     function formatDuration(ms, fallbackSeconds) {
       let totalSeconds;
@@ -8992,15 +9181,32 @@ export function createApp(mount) {
         listContainer.appendChild(el('span', { class: 'tiny voice-memo-empty', text: 'No voice memos yet.' }));
         return;
       }
-      const nowSorted = [...currentMemos].sort((a, b) => {
+      const query = (searchInput.value || '').trim().toLowerCase();
+      const sortMode = sortSelect.value || 'newest';
+      let nowSorted = [...currentMemos];
+      if (query) {
+        nowSorted = nowSorted.filter((memo) => {
+          const title = (memo.title || '').toLowerCase();
+          const transcript = (memo.transcript || '').toLowerCase();
+          return title.includes(query) || transcript.includes(query);
+        });
+      }
+      nowSorted.sort((a, b) => {
         const aTs = a.createdAt ? Date.parse(a.createdAt) || 0 : 0;
         const bTs = b.createdAt ? Date.parse(b.createdAt) || 0 : 0;
+        if (sortMode === 'oldest') return aTs - bTs;
+        if (sortMode === 'duration') {
+          const ad = a.duration || 0;
+          const bd = b.duration || 0;
+          return bd - ad;
+        }
         return bTs - aTs;
       });
       nowSorted.forEach((memo, index) => {
         const memoId = memo.blobId || memo.id;
         const isActive = selectedId && memoId === selectedId;
         const hasTranscript = !!(memo.transcript && memo.transcript.trim());
+        const hasLocation = !!memo.location;
         const created = memo.createdAt ? new Date(memo.createdAt) : null;
         const title = memo.title && memo.title.trim() ? memo.title.trim() : `Voice memo ${index + 1}`;
         const durationLabel = formatDuration(memo.duration || null, null);
@@ -9010,6 +9216,7 @@ export function createApp(mount) {
           metaBits.push(created.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         }
         if (durationLabel !== '0:00') metaBits.push(durationLabel);
+        if (hasLocation) metaBits.push('📍 location saved');
         const metaText = metaBits.join(' • ');
 
         const row = el('button', {
@@ -9030,6 +9237,7 @@ export function createApp(mount) {
     async function selectMemo(memo) {
       const memoId = memo.blobId || memo.id;
       selectedId = memoId;
+      selectedMemoMeta = memo;
       refreshList();
       statusText.textContent = 'Loading audio…';
       const idx = sortedMemos.indexOf(memo);
@@ -9051,10 +9259,21 @@ export function createApp(mount) {
         bits.push(created.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
       }
       if (durationLabel !== '0:00') bits.push(durationLabel);
+      if (memo.location) bits.push('📍 location saved');
       playerTitle.textContent = title;
       metaLabel.textContent = bits.join(' • ') || 'Saved voice memo';
       const previewText = memo.transcript && memo.transcript.trim() ? memo.transcript.trim() : '(No transcript saved for this memo.)';
       transcriptPreview.textContent = previewText;
+      if (memo.location && typeof memo.location.lat === 'number' && typeof memo.location.lng === 'number') {
+        mapLinkBtn.style.display = '';
+        mapLinkBtn.onclick = () => {
+          const { lat, lng } = memo.location;
+          const url = `https://www.google.com/maps?q=${encodeURIComponent(lat)},${encodeURIComponent(lng)}`;
+          window.open(url, '_blank', 'noopener,noreferrer');
+        };
+      } else {
+        mapLinkBtn.style.display = 'none';
+      }
       statusText.textContent = '';
     }
 
@@ -9086,6 +9305,7 @@ export function createApp(mount) {
     const root = el('div', { class: 'voice-memo-ui' }, [
       recordRow,
       mainPlayer,
+      listHeader,
       listContainer
     ]);
 
@@ -9110,9 +9330,62 @@ export function createApp(mount) {
   function renderVideoUI(entry) {
     // clips now only contain metadata with blobId references
     const clips = Array.isArray(entry.videoClips) ? entry.videoClips : [];
-    const preview = el('video', { class: 'video-preview', playsinline: 'playsinline' });
-    preview.muted = true; // must set as property, not attribute, to actually mute
+    const sortedClips = [...clips].sort((a, b) => {
+      const aTs = a.createdAt ? Date.parse(a.createdAt) || 0 : 0;
+      const bTs = b.createdAt ? Date.parse(b.createdAt) || 0 : 0;
+      return bTs - aTs;
+    });
+
+    let selectedId = sortedClips.length ? (sortedClips[0].blobId || sortedClips[0].id) : null;
+
+    const mainVideo = el('video', { class: 'video-main-player', playsinline: 'playsinline', controls: 'controls' });
+    mainVideo.muted = false;
     const statusText = el('span', { class: 'tiny', text: '' });
+
+    function openRenameClipPopup(clip) {
+      const clipId = clip.blobId || clip.id;
+      const curTitle = clip.title && clip.title.trim() ? clip.title.trim() : '';
+      const overlay = el('div', { class: 'overlay-backdrop' });
+      const titleInput = el('input', {
+        class: 'lock-input',
+        type: 'text',
+        value: curTitle,
+        placeholder: 'Title for this video clip (optional)'
+      });
+
+      const close = () => overlay.remove();
+
+      const saveBtn = el('button', {
+        class: 'btn primary small-btn', type: 'button',
+        onclick: async () => {
+          const newTitle = (titleInput.value || '').trim();
+          const cur = getSelectedEntry();
+          if (!cur) { close(); return; }
+          const next = (cur.videoClips || []).map((c) => {
+            const id = c.blobId || c.id;
+            return id === clipId ? { ...c, title: newTitle || undefined } : c;
+          });
+          updateSelected({ videoClips: next });
+          await persistVault();
+          refreshClipList();
+          close();
+        }
+      }, [el('span', { text: 'Save' })]);
+
+      const cancelBtn = el('button', {
+        class: 'btn ghost small-btn', type: 'button', onclick: close
+      }, [el('span', { text: 'Cancel' })]);
+
+      const body = el('div', { class: 'overlay-modal' }, [
+        el('div', { class: 'overlay-title', text: 'Rename video clip' }),
+        el('div', { class: 'detail-row' }, [titleInput]),
+        el('div', { class: 'overlay-actions' }, [saveBtn, cancelBtn])
+      ]);
+      overlay.append(body);
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+      document.body.append(overlay);
+      setTimeout(() => { try { titleInput.focus(); } catch {} }, 30);
+    }
 
     // Stop everything and clean up
     const stopCamera = () => {
@@ -9123,8 +9396,8 @@ export function createApp(mount) {
       videoRecorderState.recording = false;
       videoRecorderState.mediaRecorder = null;
       videoRecorderState.chunks = [];
-      preview.srcObject = null;
-      preview.classList.remove('active');
+      mainVideo.srcObject = null;
+      mainVideo.classList.remove('active');
     };
 
     // Start camera for preview only (no recording yet)
@@ -9142,10 +9415,10 @@ export function createApp(mount) {
         videoRecorderState.stream = stream;
         // Use cloned stream for preview so original stays intact for recording
         videoRecorderState.previewStream = stream.clone();
-        preview.srcObject = videoRecorderState.previewStream;
-        preview.muted = true;
-        preview.classList.add('active');
-        preview.play();
+        mainVideo.srcObject = videoRecorderState.previewStream;
+        mainVideo.muted = true;
+        mainVideo.classList.add('active');
+        mainVideo.play();
         statusText.textContent = 'Camera ready — position yourself, then press Record';
         updateButtons();
       } catch (err) {
@@ -9280,81 +9553,232 @@ export function createApp(mount) {
 
     const clipList = el('div', { class: 'video-clip-list' });
 
-    const loadAndRenderClips = async () => {
-      clipList.replaceChildren();
-      for (let i = 0; i < clips.length; i++) {
-        const clip = clips[i];
-        const clipId = clip.blobId || clip.id;
-
-        // Load from cache or server, decrypting with the vault key
-        let dataUrl = videoBlobCache.get(clipId);
-        if (!dataUrl) {
+    async function loadDataUrlForClip(clip, index) {
+      const clipId = clip.blobId || clip.id;
+      let dataUrl = videoBlobCache.get(clipId);
+      if (dataUrl) return dataUrl;
+      try {
+        const resp = await getVideoMedia(state.auth.token, clipId);
+        const payload = resp?.payload || null;
+        if (payload && state.key) {
           try {
-            const resp = await getVideoMedia(state.auth.token, clipId);
-            const payload = resp?.payload || null;
-            if (payload && state.key) {
+            const decrypted = decryptJson(payload, state.key);
+            dataUrl = decrypted?.dataUrl || null;
+          } catch {
+            // Legacy format: plain { dataUrl }
+            dataUrl = payload.dataUrl || null;
+            if (dataUrl) {
               try {
-                const decrypted = decryptJson(payload, state.key);
-                dataUrl = decrypted?.dataUrl || null;
-              } catch {
-                // Legacy format: plain { dataUrl }
-                dataUrl = payload.dataUrl || null;
-                if (dataUrl) {
-                  try {
-                    const encryptedPayload = encryptJson({ dataUrl }, state.key);
-                    await uploadVideoMedia(state.auth.token, {
-                      id: clipId,
-                      vaultSlot: state.activeVaultSlot,
-                      entryId: clip.id,
-                      payload: encryptedPayload
-                    });
-                  } catch (mErr) {
-                    console.error('Failed to migrate legacy video clip', clipId, mErr);
-                  }
-                }
+                const encryptedPayload = encryptJson({ dataUrl }, state.key);
+                await uploadVideoMedia(state.auth.token, {
+                  id: clipId,
+                  vaultSlot: state.activeVaultSlot,
+                  entryId: clip.id,
+                  payload: encryptedPayload
+                });
+              } catch (mErr) {
+                console.error('Failed to migrate legacy video clip', clipId, mErr);
               }
             }
-            if (dataUrl) videoBlobCache.set(clipId, dataUrl);
-          } catch (e) {
-            console.error('[VideoClip] Failed to load blob', clipId, e);
           }
         }
-
-        const videoEl = dataUrl
-          ? (() => { const v = el('video', { controls: 'controls', class: 'video-clip', playsinline: 'playsinline' }); v.src = dataUrl; return v; })()
-          : el('span', { class: 'tiny', text: '(video unavailable — may have been cleared from this browser)' });
-
-        const removeBtn = el('button', {
-          class: 'btn mini ghost',
-          type: 'button',
-          onclick: async () => {
-            const cur = getSelectedEntry();
-            if (!cur) return;
-            // Remove from server and cache
-            try { await deleteVideoMedia(state.auth.token, clipId); } catch (e) { /* ignore */ }
-            videoBlobCache.delete(clipId);
-            // Remove reference from entry
-            updateSelected({ videoClips: (cur.videoClips || []).filter((c) => c.id !== clip.id) });
-          }
-        }, [el('span', { text: 'Remove' })]);
-
-        const clipEl = el('div', { class: 'video-clip-item' }, [
-          el('span', { class: 'tiny', text: `Clip ${i + 1}` }),
-          videoEl,
-          removeBtn
-        ]);
-        clipList.append(clipEl);
+        if (dataUrl) videoBlobCache.set(clipId, dataUrl);
+        return dataUrl;
+      } catch (e) {
+        console.error('[VideoClip] Failed to load blob', clipId, e);
+        return null;
       }
-    };
+    }
 
-    loadAndRenderClips();
+    function formatVideoMeta(clip, index) {
+      const created = clip.createdAt ? new Date(clip.createdAt) : null;
+      const bits = [];
+      if (created && !isNaN(created.getTime())) {
+        bits.push(created.toLocaleDateString());
+        bits.push(created.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      }
+      return bits.join(' • ') || `Clip ${index + 1}`;
+    }
+
+    function refreshClipList() {
+      clipList.replaceChildren();
+      const cur = getSelectedEntry();
+      const currentClips = Array.isArray(cur?.videoClips) ? cur.videoClips : sortedClips;
+      if (!currentClips.length) {
+        clipList.append(el('span', { class: 'tiny', text: 'No video clips yet.' }));
+        return;
+      }
+      const query = (videoSearchInput.value || '').trim().toLowerCase();
+      const sortMode = videoSortSelect.value || 'newest';
+      let nowSorted = [...currentClips];
+      if (query) {
+        nowSorted = nowSorted.filter((clip) => {
+          const title = (clip.title || '').toLowerCase();
+          return title.includes(query);
+        });
+      }
+      nowSorted.sort((a, b) => {
+        const aTs = a.createdAt ? Date.parse(a.createdAt) || 0 : 0;
+        const bTs = b.createdAt ? Date.parse(b.createdAt) || 0 : 0;
+        if (sortMode === 'oldest') return aTs - bTs;
+        return bTs - aTs;
+      });
+      nowSorted.forEach((clip, index) => {
+        const clipId = clip.blobId || clip.id;
+        const isActive = selectedId && clipId === selectedId;
+        const row = el('button', {
+          class: 'video-clip-item' + (isActive ? ' active' : ''),
+          type: 'button',
+          onclick: () => selectClip(clip)
+        }, [
+          el('div', { class: 'video-clip-main' }, [
+            el('span', { class: 'video-clip-title', text: clip.title && clip.title.trim() ? clip.title.trim() : `Clip ${index + 1}` }),
+            el('span', { class: 'video-clip-meta', text: formatVideoMeta(clip, index) })
+          ])
+        ]);
+        clipList.append(row);
+      });
+    }
+
+    async function selectClip(clip) {
+      const clipId = clip.blobId || clip.id;
+      selectedId = clipId;
+      refreshClipList();
+      statusText.textContent = 'Loading video…';
+      const idx = sortedClips.indexOf(clip);
+      const dataUrl = await loadDataUrlForClip(clip, idx === -1 ? 0 : idx);
+      if (!dataUrl) {
+        statusText.textContent = 'Failed to load video';
+        return;
+      }
+      mainVideo.pause();
+      mainVideo.removeAttribute('srcObject');
+      mainVideo.src = dataUrl;
+      mainVideo.load();
+      statusText.textContent = '';
+    }
+
+    const headerRow = el('div', { class: 'video-header-row' }, [
+      el('span', { class: 'detail-label', text: 'Video recordings' }),
+      statusText
+    ]);
+
+    const videoSearchInput = el('input', {
+      class: 'lock-input video-search-input',
+      type: 'text',
+      placeholder: 'Search recordings...'
+    });
+
+    const videoSortSelect = el('select', {
+      class: 'video-sort-select'
+    }, [
+      el('option', { value: 'newest', text: 'Newest first' }),
+      el('option', { value: 'oldest', text: 'Oldest first' })
+    ]);
+
+    const videoListHeader = el('div', { class: 'video-clip-list-header' }, [videoSearchInput, videoSortSelect]);
+
+    function deleteSelectedClip() {
+      if (!selectedId) return;
+      const cur = getSelectedEntry();
+      if (!cur) return;
+      const clipsArr = Array.isArray(cur.videoClips) ? cur.videoClips : [];
+      const clip = clipsArr.find((c) => (c.blobId || c.id) === selectedId);
+      if (!clip) return;
+      const clipId = clip.blobId || clip.id;
+      if (!confirm('Delete this video clip from this entry?')) return;
+      (async () => {
+        try {
+          try { await deleteVideoMedia(state.auth.token, clipId); } catch (e) { /* ignore */ }
+          videoBlobCache.delete(clipId);
+          updateSelected({ videoClips: clipsArr.filter((c) => (c.blobId || c.id) !== clipId) });
+          mainVideo.pause();
+          mainVideo.removeAttribute('src');
+          mainVideo.load();
+          selectedId = null;
+          refreshClipList();
+          showToast('Video clip deleted');
+        } catch (err) {
+          console.error('Failed to delete video clip', err);
+          showToast('Failed to delete video clip: ' + (err?.message || 'Unknown error'));
+        }
+      })();
+    }
+
+    const renameSelectedBtn = el('button', {
+      class: 'btn mini ghost',
+      type: 'button',
+      onclick: () => {
+        if (!selectedId) return;
+        const cur = getSelectedEntry();
+        if (!cur) return;
+        const clip = (cur.videoClips || []).find((c) => (c.blobId || c.id) === selectedId);
+        if (!clip) return;
+        openRenameClipPopup(clip);
+      }
+    }, [el('span', { text: 'Rename' })]);
+
+    function downloadSelectedClip() {
+      if (!selectedId) return;
+      const cur = getSelectedEntry();
+      if (!cur) return;
+      const clipsArr = Array.isArray(cur.videoClips) ? cur.videoClips : [];
+      const clip = clipsArr.find((c) => (c.blobId || c.id) === selectedId);
+      if (!clip) return;
+      const clipId = clip.blobId || clip.id;
+      (async () => {
+        let dataUrl = videoBlobCache.get(clipId);
+        if (!dataUrl) {
+          const idx = sortedClips.indexOf(clip);
+          dataUrl = await loadDataUrlForClip(clip, idx === -1 ? 0 : idx);
+          if (!dataUrl) { showToast('Failed to load video'); return; }
+        }
+        const a = document.createElement('a');
+        const baseName = (clip.title && clip.title.trim()) || 'video-clip';
+        a.href = dataUrl;
+        a.download = `${baseName}.webm`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => a.remove(), 0);
+      })();
+    }
+
+    const deleteSelectedBtn = el('button', {
+      class: 'btn mini ghost danger-text',
+      type: 'button',
+      onclick: deleteSelectedClip
+    }, [el('span', { text: 'Delete' })]);
+
+    const downloadSelectedBtn = el('button', {
+      class: 'btn mini ghost',
+      type: 'button',
+      onclick: downloadSelectedClip
+    }, [el('span', { text: 'Download' })]);
+
+    const videoActionsRow = el('div', { class: 'video-actions-row' }, [renameSelectedBtn, deleteSelectedBtn, downloadSelectedBtn]);
+
+    const container = el('div', { class: 'video-layout' }, [
+      el('div', { class: 'video-player-card' }, [
+        headerRow,
+        mainVideo,
+        controlsWrap,
+        videoActionsRow
+      ]),
+      el('div', { class: 'video-clip-list-wrap' }, [
+        videoListHeader,
+        clipList
+      ])
+    ]);
+
+    refreshClipList();
+    if (sortedClips.length && selectedId) {
+      const first = sortedClips.find((c) => (c.blobId || c.id) === selectedId) || sortedClips[0];
+      selectClip(first).catch(() => {});
+    }
 
     return el('div', { class: 'detail-grid' }, [
       el('div', { class: 'detail-card detail-card-wide' }, [
-        el('span', { class: 'detail-label', text: 'Video recordings' }),
-        preview,
-        controlsWrap,
-        clipList
+        container
       ])
     ]);
   }
@@ -9363,6 +9787,9 @@ export function createApp(mount) {
   function renderAdvancedSearchOverlay() {
     const overlay = el('div', { class: 'overlay-backdrop' });
     const allMoods = ['sparkly', 'cozy', 'melancholy', 'anxious', 'grateful', 'hopeful', 'angry', 'peaceful', 'excited', 'numb'];
+
+    const rawEntries = state.vault?.entries || [];
+    const rawById = new Map(rawEntries.map((e) => [e.id, e]));
 
     const queryIn = el('input', { type: 'text', class: 'lock-input', placeholder: 'Search text…', value: state.searchQuery || '', style: 'font-size:14px' });
 
@@ -9386,6 +9813,11 @@ export function createApp(mount) {
     ]);
     tagSel.value = state.searchFilters?.tagId || '';
 
+    const hasVoiceCb = el('input', { type: 'checkbox' });
+    const hasVideoCb = el('input', { type: 'checkbox' });
+    const hasLocationCb = el('input', { type: 'checkbox' });
+    const hasTranscriptCb = el('input', { type: 'checkbox' });
+
     const resultsEl = el('div', { class: 'search-results-list' });
     const countEl   = el('div', { class: 'tiny', text: '' });
 
@@ -9396,13 +9828,41 @@ export function createApp(mount) {
       const from = fromDate.value;
       const to   = toDate.value;
       const tagId = tagSel.value;
+      const wantVoice = !!hasVoiceCb.checked;
+      const wantVideo = !!hasVideoCb.checked;
+      const wantLocation = !!hasLocationCb.checked;
+      const wantTranscript = !!hasTranscriptCb.checked;
 
-      let results = (state.vault?.entries || []).map(normalizeEntry);
-      if (q)    results = results.filter((e) => ((e.title || '') + ' ' + (e.body || '')).toLowerCase().includes(q));
+      let results = rawEntries.map(normalizeEntry);
+      if (q) {
+        results = results.filter((e) => {
+          const baseText = ((e.title || '') + ' ' + (e.body || '')).toLowerCase();
+          const raw = rawById.get(e.id) || {};
+          const voiceTranscripts = (raw.voiceMemos || []).map((m) => m.transcript || '').join(' ').toLowerCase();
+          return (baseText + ' ' + voiceTranscripts).includes(q);
+        });
+      }
       if (mood) results = results.filter((e) => e.mood === mood);
       if (type) results = results.filter((e) => e.entryType === type);
       if (from) results = results.filter((e) => e.date >= from);
       if (to)   results = results.filter((e) => e.date <= to);
+
+      if (wantVoice || wantVideo || wantLocation || wantTranscript) {
+        results = results.filter((e) => {
+          const raw = rawById.get(e.id) || {};
+          const voiceMemos = raw.voiceMemos || [];
+          const videoClips = raw.videoClips || [];
+          const hasVoice = voiceMemos.length > 0;
+          const hasVideo = videoClips.length > 0;
+          const hasLoc = voiceMemos.some((m) => !!m.location);
+          const hasTrans = voiceMemos.some((m) => (m.transcript || '').trim());
+          if (wantVoice && !hasVoice) return false;
+          if (wantVideo && !hasVideo) return false;
+          if (wantLocation && !hasLoc) return false;
+          if (wantTranscript && !hasTrans) return false;
+          return true;
+        });
+      }
 
       results = results.sort((a, b) => ((b.date || '') + (b.time || '')).localeCompare((a.date || '') + (a.time || '')));
       countEl.textContent = `${results.length} result${results.length === 1 ? '' : 's'}`;
@@ -9434,6 +9894,10 @@ export function createApp(mount) {
     fromDate.addEventListener('change', doSearch);
     toDate.addEventListener('change', doSearch);
     tagSel.addEventListener('change', doSearch);
+    hasVoiceCb.addEventListener('change', doSearch);
+    hasVideoCb.addEventListener('change', doSearch);
+    hasLocationCb.addEventListener('change', doSearch);
+    hasTranscriptCb.addEventListener('change', doSearch);
 
     const clearBtn = el('button', {
       class: 'btn ghost small-btn', type: 'button',
@@ -9450,6 +9914,13 @@ export function createApp(mount) {
           el('div', { class: 'adv-filter-group' }, [el('label', { class: 'adv-search-label', text: 'Tag' }), tagSel]),
           el('div', { class: 'adv-filter-group' }, [el('label', { class: 'adv-search-label', text: 'From' }), fromDate]),
           el('div', { class: 'adv-filter-group' }, [el('label', { class: 'adv-search-label', text: 'To' }), toDate]),
+          el('div', { class: 'adv-filter-group' }, [
+            el('label', { class: 'adv-search-label', text: 'Media' }),
+            el('label', { class: 'adv-checkbox-label' }, [hasVoiceCb, document.createTextNode(' Voice memos')]),
+            el('label', { class: 'adv-checkbox-label' }, [hasVideoCb, document.createTextNode(' Video clips')]),
+            el('label', { class: 'adv-checkbox-label' }, [hasLocationCb, document.createTextNode(' Has GPS')]),
+            el('label', { class: 'adv-checkbox-label' }, [hasTranscriptCb, document.createTextNode(' Has transcripts')])
+          ]),
           clearBtn
         ]),
         countEl
