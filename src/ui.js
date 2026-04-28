@@ -1278,7 +1278,14 @@ function normalizeEntry(entry = {}) {
     moodTriggers: Array.isArray(entry.moodTriggers) ? entry.moodTriggers.slice(0, 6) : [],
     copingActions: Array.isArray(entry.copingActions) ? entry.copingActions.slice(0, 6) : [],
     energyLevel: clampLevel(entry.energyLevel, 1, 5, 3),
-    tags: Array.isArray(entry.tags) ? entry.tags.slice(0, 8) : [],
+    // Normalize simple text metadata so it round-trips into the meta textareas
+    about: entry.about || '',
+    // Tags can be stored as an array or as a comma-separated string; normalize to a short string array
+    tags: Array.isArray(entry.tags)
+      ? entry.tags.slice(0, 8)
+      : (typeof entry.tags === 'string' && entry.tags.trim()
+          ? normalizeTags(entry.tags).slice(0, 8)
+          : []),
     accentColor: entry.accentColor || entry.colorCategory || 'rose',
     colorCategory: entry.colorCategory || entry.accentColor || 'rose',
     folder: entry.folder || '',
@@ -9765,11 +9772,11 @@ export function createApp(mount) {
         headerRow,
         mainVideo,
         controlsWrap,
-        videoActionsRow
-      ]),
-      el('div', { class: 'video-clip-list-wrap' }, [
-        videoListHeader,
-        clipList
+        videoActionsRow,
+        el('div', { class: 'video-clip-list-wrap' }, [
+          videoListHeader,
+          clipList
+        ])
       ])
     ]);
 

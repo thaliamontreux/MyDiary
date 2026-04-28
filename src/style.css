@@ -4505,16 +4505,10 @@ body::before {
  * ── Video Player & Clip List ──────────────────────────────────────────────
  */
 .video-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr);
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   margin-top: 6px;
-}
-
-@media (max-width: 900px) {
-  .video-layout {
-    grid-template-columns: 1fr;
-  }
 }
 
 .video-player-card {
