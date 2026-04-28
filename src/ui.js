@@ -8758,11 +8758,14 @@ export function createApp(mount) {
           payload: encryptedPayload
         });
         voiceBlobCache.set(blobId, dataUrl);
+        const finalTranscript = transcriptSupported
+          ? (transcriptText && transcriptText.trim() ? transcriptText.trim() : (transcriptArea.value || '').trim())
+          : '';
         const meta = {
           id: blobId,
           duration: currentDurationMs || null,
           createdAt: new Date().toISOString(),
-          transcript: transcriptSupported ? (transcriptArea.value || '').trim() : '',
+          transcript: finalTranscript,
           mimeType: currentBlob.type || 'audio/webm',
           size: currentBlob.size,
           waveform: waveformSamples.length ? waveformSamples.slice(0, 200) : null,
