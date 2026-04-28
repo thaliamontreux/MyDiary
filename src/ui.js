@@ -8771,6 +8771,8 @@ export function createApp(mount) {
   function renderVoiceMemoUI(entry) {
     const memos = Array.isArray(entry.voiceMemos) ? entry.voiceMemos : [];
     const statusText = el('span', { class: 'tiny', text: '' });
+    const detailPanel = el('div', { class: 'voice-memo-detail' });
+    let selectedIndex = memos.length > 0 ? 0 : -1;
 
     const recordBtn = el('button', {
       class: 'btn ghost small-btn',
@@ -8780,12 +8782,84 @@ export function createApp(mount) {
 
     const memoList = el('div', { class: 'voice-memo-list' });
 
+    function drawStaticWaveform(canvas, samples) {
+      if (!canvas || !Array.isArray(samples) || samples.length === 0) return;
+      const ctx = canvas.getContext('2d');
+      const width = canvas.width;
+      const height = canvas.height;
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = 'rgba(15,23,42,0.03)';
+      ctx.fillRect(0, 0, width, height);
+      ctx.strokeStyle = 'rgba(148, 27, 147, 0.9)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      const step = width / samples.length;
+      for (let i = 0; i < samples.length; i++) {
+        const v = Math.max(0, Math.min(1, samples[i]));
+        const x = i * step;
+        const y = height - (v * height);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+
+    function renderDetailCard(index, memo, dataUrl, durationLabel, createdLabel) {
+      detailPanel.innerHTML = '';
+      if (!memo || !dataUrl) return;
+
+      const headerChildren = [];
+      headerChildren.push(el('div', { class: 'voice-memo-detail-title', text: memo.title || `Voice memo ${index + 1}` }));
+
+      const subParts = [];
+      if (createdLabel) subParts.push(createdLabel);
+      if (durationLabel) subParts.push(durationLabel);
+      if (subParts.length) {
+        headerChildren.push(el('div', { class: 'voice-memo-detail-subtitle', text: subParts.join(' • ') }));
+      }
+
+      const header = el('div', { class: 'voice-memo-detail-header' }, headerChildren);
+
+      const waveformCanvas = el('canvas', { class: 'voice-memo-waveform', width: '600', height: '72' });
+      if (Array.isArray(memo.waveform) && memo.waveform.length) {
+        drawStaticWaveform(waveformCanvas, memo.waveform);
+      } else {
+        waveformCanvas.style.display = 'none';
+      }
+
+      const audio = el('audio', {
+        class: 'voice-memo-detail-audio',
+        controls: 'controls',
+        src: dataUrl,
+        preload: 'metadata'
+      });
+
+      const transcriptLabel = el('div', { class: 'voice-memo-transcript-label', text: 'Transcript' });
+      const transcriptText = (memo.transcript || '').trim();
+      const transcriptBody = transcriptText
+        ? el('div', { class: 'voice-memo-transcript-text', text: transcriptText })
+        : el('div', { class: 'voice-memo-transcript-empty', text: 'No transcript available for this memo.' });
+
+      const card = el('div', { class: 'voice-memo-detail-card' }, [
+        header,
+        waveformCanvas,
+        audio,
+        transcriptLabel,
+        transcriptBody
+      ]);
+
+      detailPanel.appendChild(card);
+    }
+
     const loadAndRenderMemos = async () => {
       memoList.innerHTML = '';
+      detailPanel.innerHTML = '';
       if (memos.length === 0) {
         memoList.appendChild(el('span', { class: 'tiny', text: 'No voice memos yet.' }));
         return;
       }
+
+      if (selectedIndex < 0 || selectedIndex >= memos.length) selectedIndex = 0;
 
       for (let i = 0; i < memos.length; i++) {
         const memo = memos[i];
@@ -8885,19 +8959,35 @@ export function createApp(mount) {
           headerChildren.push(el('span', { class: 'tiny memo-meta', text: ` — ${metaText}` }));
         }
 
-        memoList.appendChild(el('div', { class: 'voice-memo-item' }, [
+        const rowClasses = ['voice-memo-item'];
+        if (i === selectedIndex) rowClasses.push('is-selected');
+
+        const row = el('div', {
+          class: rowClasses.join(' '),
+          onclick: () => {
+            selectedIndex = i;
+            // Re-render to update selection highlight and detail card
+            setTimeout(loadAndRenderMemos, 0);
+          }
+        }, [
           el('div', { class: 'voice-memo-header' }, headerChildren),
           audio,
           transcriptBtn,
           removeBtn
-        ]));
+        ]);
+
+        memoList.appendChild(row);
+
+        if (i === selectedIndex && dataUrl && !loadError) {
+          renderDetailCard(i, memo, dataUrl, durationLabel, createdLabel);
+        }
       }
     };
 
     // Load memos asynchronously
     setTimeout(loadAndRenderMemos, 0);
 
-    return el('div', { class: 'voice-memo-ui' }, [recordBtn, statusText, memoList]);
+    return el('div', { class: 'voice-memo-ui' }, [recordBtn, statusText, detailPanel, memoList]);
   }
 
   // ── Video Recordings ─────────────────────────────────────────────────────────
