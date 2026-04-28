@@ -83,12 +83,25 @@ import {
 
 function el(tag, attrs = {}, children = []) {
   const node = document.createElement(tag);
+  const tagName = node.tagName.toLowerCase();
   for (const [k, v] of Object.entries(attrs)) {
-    if (k === 'class') node.className = v;
-    else if (k === 'text') node.textContent = v;
-    else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2), v);
-    else if (typeof v === 'boolean') { if (v) node.setAttribute(k, ''); }
-    else node.setAttribute(k, v);
+    if (k === 'class') {
+      node.className = v;
+    } else if (k === 'text') {
+      node.textContent = v;
+    } else if (k === 'value' && (tagName === 'input' || tagName === 'textarea')) {
+      // Use the property for form controls so current value is reflected in the UI
+      node.value = v;
+    } else if (k === 'checked' && tagName === 'input') {
+      node.checked = Boolean(v);
+      if (v) node.setAttribute('checked', '');
+    } else if (k.startsWith('on') && typeof v === 'function') {
+      node.addEventListener(k.slice(2), v);
+    } else if (typeof v === 'boolean') {
+      if (v) node.setAttribute(k, '');
+    } else {
+      node.setAttribute(k, v);
+    }
   }
   for (const c of children) { if (c != null && c !== false) node.append(c); }
   return node;
@@ -5756,7 +5769,8 @@ export function createApp(mount) {
   }
 
   function saveAllFormChanges() {
-    if (!getSelectedEntry()) return;
+    const currentEntry = getSelectedEntry();
+    if (!currentEntry) return;
 
     const patch = {};
 
@@ -5779,10 +5793,16 @@ export function createApp(mount) {
     if (privacySelect) patch.privacyLevel = privacySelect.value;
 
     const aboutInput = document.querySelector('[data-focus-key*="about"]');
-    if (aboutInput) patch.about = aboutInput.value;
+    // Only update "about" if the field has actually been edited; this prevents
+    // a blank textbox (from a render bug) from wiping a non-empty saved value.
+    if (aboutInput && aboutInput.dataset.dirty === '1') {
+      patch.about = aboutInput.value;
+    }
 
     const tagsInput = document.querySelector('[data-focus-key*="tags"]');
-    if (tagsInput) patch.tags = normalizeTags(tagsInput.value);
+    if (tagsInput && tagsInput.dataset.dirty === '1') {
+      patch.tags = normalizeTags(tagsInput.value);
+    }
 
     const folderSelect = document.querySelector('[data-focus-key*="folder"]');
     if (folderSelect) patch.folder = folderSelect.value;
@@ -6960,15 +6980,24 @@ export function createApp(mount) {
     const aboutInput = el('textarea', {
       class: 'meta-textarea',
       'data-focus-key': `entry:${selected.id}:about`,
-      value: selected.about || '',
       placeholder: selected.moduleType === 'recipe' ? 'What memory or occasion goes with this?' : 'Who or what is this about?'
+    }, [selected.about || '']);
+    // Ensure textarea value is set via property so it always appears in the UI
+    aboutInput.value = selected.about || '';
+    aboutInput.dataset.dirty = '0';
+    aboutInput.addEventListener('input', () => {
+      aboutInput.dataset.dirty = '1';
     });
 
     const tagsInput = el('textarea', {
       class: 'meta-textarea',
       'data-focus-key': `entry:${selected.id}:tags`,
-      value: (selected.tags || []).join(', '),
       placeholder: 'Tags, separated by commas'
+    }, [(selected.tags || []).join(', ')]);
+    tagsInput.value = (selected.tags || []).join(', ');
+    tagsInput.dataset.dirty = '0';
+    tagsInput.addEventListener('input', () => {
+      tagsInput.dataset.dirty = '1';
     });
 
     // Get folders from current vault for dropdown
