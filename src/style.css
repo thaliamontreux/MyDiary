@@ -4351,6 +4351,156 @@ body::before {
   flex-wrap: wrap;
 }
 
+/* 
+ * ── Voice Notes Player & List ──────────────────────────────────────────────
+ */
+.voice-memo-ui {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.voice-record-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.voice-player-card {
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--card, var(--card-bg, rgba(15, 23, 42, 0.95)));
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.voice-player-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.voice-player-meta {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.voice-player-progress-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.voice-player-progress {
+  width: 100%;
+}
+
+.voice-player-progress-label {
+  font-size: 11px;
+  color: var(--muted2);
+  display: flex;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.voice-player-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.voice-player-control-spacer {
+  flex: 1;
+}
+
+.voice-speed-select {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--card2);
+  color: var(--text);
+}
+
+.voice-volume {
+  width: 80px;
+}
+
+.voice-transcript-preview {
+  font-size: 11px;
+  color: var(--muted2);
+  max-height: 2.5em;
+  overflow: hidden;
+}
+
+.voice-transcript-preview.expanded {
+  max-height: 12em;
+}
+
+.voice-memo-list {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.voice-memo-empty {
+  font-size: 11px;
+  color: var(--muted2);
+}
+
+.voice-memo-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  border-radius: 10px;
+  border: 0;
+  padding: 6px 8px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.voice-memo-item:hover {
+  background: rgba(124, 58, 237, 0.06);
+}
+
+.voice-memo-item.active {
+  background: rgba(124, 58, 237, 0.14);
+}
+
+.voice-memo-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.voice-memo-title {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.voice-memo-meta {
+  font-size: 11px;
+  color: var(--muted2);
+}
+
+.voice-memo-transcript-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(52, 211, 153, 0.9);
+}
+
+.voice-memo-transcript-dot--empty {
+  background: rgba(148, 163, 184, 0.6);
+}
+
 /* ── Voice Dictation ─────────────────────────────────────────────────────── */
 .dictate-wrap {
   display: flex;

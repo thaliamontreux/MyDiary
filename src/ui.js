@@ -8770,106 +8770,334 @@ export function createApp(mount) {
 
   function renderVoiceMemoUI(entry) {
     const memos = Array.isArray(entry.voiceMemos) ? entry.voiceMemos : [];
+    const sortedMemos = [...memos].sort((a, b) => {
+      const aTs = a.createdAt ? Date.parse(a.createdAt) || 0 : 0;
+      const bTs = b.createdAt ? Date.parse(b.createdAt) || 0 : 0;
+      return bTs - aTs;
+    });
+
+    let selectedId = sortedMemos.length ? (sortedMemos[0].blobId || sortedMemos[0].id) : null;
+    let isPlaying = false;
+    let playbackRate = 1;
+
     const statusText = el('span', { class: 'tiny', text: '' });
 
     const recordBtn = el('button', {
       class: 'btn ghost small-btn',
       type: 'button',
       onclick: () => openAudioNoteRecorderOverlay()
-    }, [el('span', { class: 'btn-ic', text: '🎙' }), el('span', { text: 'Record audio note' })]);
+    }, [el('span', { class: 'btn-ic', text: '\ud83c\udf99' }), el('span', { text: 'Record audio note' })]);
 
-    const memoList = el('div', { class: 'voice-memo-list' });
+    const recordRow = el('div', { class: 'voice-record-row' }, [recordBtn, statusText]);
 
-    const loadAndRenderMemos = async () => {
-      memoList.innerHTML = '';
-      if (memos.length === 0) {
-        memoList.appendChild(el('span', { class: 'tiny', text: 'No voice memos yet.' }));
-        return;
+    const playerTitle = el('div', { class: 'voice-player-title', text: 'No voice memo selected' });
+    const metaLabel = el('div', { class: 'voice-player-meta', text: 'Select a recording to see details' });
+
+    const progressLabel = el('div', { class: 'voice-player-progress-label' }, [
+      el('span', { class: 'voice-time-current', text: '0:00' }),
+      el('span', { class: 'voice-time-separator', text: ' / ' }),
+      el('span', { class: 'voice-time-duration', text: '0:00' })
+    ]);
+
+    const progressInput = el('input', {
+      class: 'voice-player-progress',
+      type: 'range',
+      min: '0',
+      max: '100',
+      value: '0',
+      step: '0.1',
+      oninput: (e) => {
+        const audio = audioEl;
+        if (!audio || !audio.duration || !selectedId) return;
+        const pct = Number(e.target.value) / 100;
+        audio.currentTime = pct * audio.duration;
       }
+    });
 
-      for (let i = 0; i < memos.length; i++) {
-        const memo = memos[i];
+    const audioEl = el('audio', { class: 'voice-audio', preload: 'metadata' });
+
+    const playBtn = el('button', {
+      class: 'btn mini',
+      type: 'button',
+      onclick: () => {
+        if (!selectedId) return;
+        if (!audioEl.src) return;
+        if (audioEl.paused) {
+          audioEl.play().catch(() => {});
+        } else {
+          audioEl.pause();
+        }
+      }
+    }, [el('span', { text: 'Play/Pause' })]);
+
+    const backBtn = el('button', {
+      class: 'btn mini ghost',
+      type: 'button',
+      onclick: () => {
+        if (!audioEl || !audioEl.duration) return;
+        audioEl.currentTime = Math.max(0, audioEl.currentTime - 10);
+      }
+    }, [el('span', { text: '-10s' })]);
+
+    const fwdBtn = el('button', {
+      class: 'btn mini ghost',
+      type: 'button',
+      onclick: () => {
+        if (!audioEl || !audioEl.duration) return;
+        audioEl.currentTime = Math.min(audioEl.duration, audioEl.currentTime + 10);
+      }
+    }, [el('span', { text: '+10s' })]);
+
+    const speedSelect = el('select', {
+      class: 'voice-speed-select',
+      onchange: (e) => {
+        const val = Number(e.target.value) || 1;
+        playbackRate = val;
+        audioEl.playbackRate = playbackRate;
+      }
+    }, [
+      el('option', { value: '1', text: '1x' }),
+      el('option', { value: '1.5', text: '1.5x' }),
+      el('option', { value: '2', text: '2x' })
+    ]);
+
+    const volumeInput = el('input', {
+      class: 'voice-volume',
+      type: 'range',
+      min: '0',
+      max: '1',
+      step: '0.05',
+      value: '1',
+      oninput: (e) => {
+        const v = Number(e.target.value);
+        audioEl.volume = isNaN(v) ? 1 : Math.min(1, Math.max(0, v));
+      }
+    });
+
+    const deleteBtn = el('button', {
+      class: 'btn mini ghost danger-text',
+      type: 'button',
+      onclick: async () => {
+        if (!selectedId) return;
+        const cur = getSelectedEntry();
+        if (!cur) return;
+        const memo = (cur.voiceMemos || []).find((m) => (m.blobId || m.id) === selectedId);
+        if (!memo) return;
         const memoId = memo.blobId || memo.id;
+        if (!confirm('Delete this voice memo from this entry?')) return;
+        try {
+          try { await deleteVoiceMedia(state.auth.token, memoId); } catch (e) { /* ignore */ }
+          voiceBlobCache.delete(memoId);
+          updateSelected({ voiceMemos: (cur.voiceMemos || []).filter((m) => (m.blobId || m.id) !== memoId) });
+          await persistVault();
+          showToast('Voice memo deleted');
+          audioEl.pause();
+          audioEl.removeAttribute('src');
+          audioEl.load();
+          selectedId = null;
+          playerTitle.textContent = 'No voice memo selected';
+          metaLabel.textContent = 'Select a recording to see details';
+          (progressLabel.querySelector('.voice-time-current') || {}).textContent = '0:00';
+          (progressLabel.querySelector('.voice-time-duration') || {}).textContent = '0:00';
+          progressInput.value = '0';
+          refreshList();
+        } catch (err) {
+          console.error('Failed to delete voice memo', err);
+          showToast('Failed to delete voice memo: ' + (err?.message || 'Unknown error'));
+        }
+      }
+    }, [el('span', { text: 'Delete' })]);
 
-        // Load from cache or server (decrypting with the vault key)
-        let dataUrl = voiceBlobCache.get(memoId);
-        let loadError = false;
-        if (!dataUrl) {
+    const transcriptPreview = el('div', { class: 'voice-transcript-preview' });
+    const transcriptToggle = el('button', {
+      class: 'btn mini ghost',
+      type: 'button',
+      onclick: () => {
+        transcriptPreview.classList.toggle('expanded');
+      }
+    }, [el('span', { text: 'Show full transcript' })]);
+
+    const playerControlsRow = el('div', { class: 'voice-player-controls' }, [
+      playBtn,
+      backBtn,
+      fwdBtn,
+      el('div', { class: 'voice-player-control-spacer' }),
+      speedSelect,
+      volumeInput,
+      deleteBtn
+    ]);
+
+    const mainPlayer = el('div', { class: 'voice-player-card' }, [
+      playerTitle,
+      metaLabel,
+      el('div', { class: 'voice-player-progress-wrap' }, [progressInput, progressLabel]),
+      playerControlsRow,
+      transcriptPreview,
+      transcriptToggle
+    ]);
+
+    const listContainer = el('div', { class: 'voice-memo-list' });
+
+    function formatDuration(ms, fallbackSeconds) {
+      let totalSeconds;
+      if (typeof ms === 'number' && ms > 0) totalSeconds = Math.floor(ms / 1000);
+      else if (typeof fallbackSeconds === 'number' && fallbackSeconds > 0) totalSeconds = Math.floor(fallbackSeconds);
+      else return '0:00';
+      const m = String(Math.floor(totalSeconds / 60));
+      const s = String(totalSeconds % 60).padStart(2, '0');
+      return `${m}:${s}`;
+    }
+
+    async function loadDataUrlForMemo(memo, index) {
+      const memoId = memo.blobId || memo.id;
+      let dataUrl = voiceBlobCache.get(memoId);
+      if (dataUrl) return dataUrl;
+      try {
+        const resp = await getVoiceMedia(state.auth.token, memoId);
+        const payload = resp?.payload || null;
+        if (payload && state.key) {
           try {
-            const resp = await getVoiceMedia(state.auth.token, memoId);
-            const payload = resp?.payload || null;
-            if (payload && state.key) {
+            const decrypted = decryptJson(payload, state.key);
+            dataUrl = decrypted?.dataUrl || null;
+          } catch {
+            dataUrl = payload.dataUrl || null;
+            if (dataUrl) {
               try {
-                // New format: encrypted JSON wrapper
-                const decrypted = decryptJson(payload, state.key);
-                dataUrl = decrypted?.dataUrl || null;
-              } catch {
-                // Legacy format: plain { dataUrl } stored on the server
-                dataUrl = payload.dataUrl || null;
-                // Transparently migrate to encrypted payload on the server
-                if (dataUrl) {
-                  try {
-                    const encryptedPayload = encryptJson({ dataUrl }, state.key);
-                    await uploadVoiceMedia(state.auth.token, {
-                      id: memoId,
-                      vaultSlot: state.activeVaultSlot,
-                      entryId: getSelectedEntry()?.id || null,
-                      payload: encryptedPayload
-                    });
-                  } catch (mErr) {
-                    console.error('Failed to migrate legacy voice memo', memoId, mErr);
-                  }
-                }
+                const encryptedPayload = encryptJson({ dataUrl }, state.key);
+                await uploadVoiceMedia(state.auth.token, {
+                  id: memoId,
+                  vaultSlot: state.activeVaultSlot,
+                  entryId: getSelectedEntry()?.id || null,
+                  payload: encryptedPayload
+                });
+              } catch (mErr) {
+                console.error('Failed to migrate legacy voice memo', memoId, mErr);
               }
             }
-            if (dataUrl) voiceBlobCache.set(memoId, dataUrl);
-          } catch (e) {
-            console.error('Failed to load voice memo', i, ':', e);
-            loadError = true;
           }
         }
-
-        const audio = dataUrl
-          ? el('audio', { controls: '', src: dataUrl, class: 'voice-audio', preload: 'metadata' })
-          : el('span', { class: 'tiny', text: '(recording unavailable — may have been cleared from this browser)' });
-
-        const transcriptBtn = el('button', {
-          class: 'btn mini ghost',
-          type: 'button',
-          onclick: () => {
-            showTranscriptOverlay(memo.transcript || '');
-          }
-        }, [el('span', { text: 'Transcript' })]);
-
-        const removeBtn = el('button', {
-          class: 'btn mini ghost',
-          type: 'button',
-          onclick: async () => {
-            const cur = getSelectedEntry();
-            if (!cur) return;
-            // Remove from server and cache
-            try { await deleteVoiceMedia(state.auth.token, memoId); } catch (e) { /* ignore */ }
-            voiceBlobCache.delete(memoId);
-            // Remove reference from entry
-            updateSelected({ voiceMemos: (cur.voiceMemos || []).filter((m) => (m.blobId || m.id) !== memoId) });
-            await persistVault();
-            loadAndRenderMemos();
-          }
-        }, [el('span', { text: 'Remove' })]);
-
-        memoList.appendChild(el('div', { class: 'voice-memo-item' }, [
-          el('span', { class: 'tiny', text: `Voice memo ${i + 1}` }),
-          audio,
-          transcriptBtn,
-          removeBtn
-        ]));
+        if (dataUrl) voiceBlobCache.set(memoId, dataUrl);
+        return dataUrl;
+      } catch (e) {
+        console.error('Failed to load voice memo', index, ':', e);
+        return null;
       }
-    };
+    }
 
-    // Load memos asynchronously
-    setTimeout(loadAndRenderMemos, 0);
+    function refreshList() {
+      listContainer.innerHTML = '';
+      const cur = getSelectedEntry();
+      const currentMemos = Array.isArray(cur?.voiceMemos) ? cur.voiceMemos : sortedMemos;
+      if (!currentMemos.length) {
+        listContainer.appendChild(el('span', { class: 'tiny voice-memo-empty', text: 'No voice memos yet.' }));
+        return;
+      }
+      const nowSorted = [...currentMemos].sort((a, b) => {
+        const aTs = a.createdAt ? Date.parse(a.createdAt) || 0 : 0;
+        const bTs = b.createdAt ? Date.parse(b.createdAt) || 0 : 0;
+        return bTs - aTs;
+      });
+      nowSorted.forEach((memo, index) => {
+        const memoId = memo.blobId || memo.id;
+        const isActive = selectedId && memoId === selectedId;
+        const hasTranscript = !!(memo.transcript && memo.transcript.trim());
+        const created = memo.createdAt ? new Date(memo.createdAt) : null;
+        const title = memo.title && memo.title.trim() ? memo.title.trim() : `Voice memo ${index + 1}`;
+        const durationLabel = formatDuration(memo.duration || null, null);
+        const metaBits = [];
+        if (created && !isNaN(created.getTime())) {
+          metaBits.push(created.toLocaleDateString());
+          metaBits.push(created.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        }
+        if (durationLabel !== '0:00') metaBits.push(durationLabel);
+        const metaText = metaBits.join(' • ');
 
-    return el('div', { class: 'voice-memo-ui' }, [recordBtn, statusText, memoList]);
+        const row = el('button', {
+          class: 'voice-memo-item' + (isActive ? ' active' : ''),
+          type: 'button',
+          onclick: () => selectMemo(memo)
+        }, [
+          el('div', { class: 'voice-memo-main', }, [
+            el('span', { class: 'voice-memo-title', text: title }),
+            el('span', { class: 'voice-memo-meta', text: metaText || 'Saved voice memo' })
+          ]),
+          hasTranscript ? el('span', { class: 'voice-memo-transcript-dot', title: 'Transcript available' }) : el('span', { class: 'voice-memo-transcript-dot voice-memo-transcript-dot--empty' })
+        ]);
+        listContainer.appendChild(row);
+      });
+    }
+
+    async function selectMemo(memo) {
+      const memoId = memo.blobId || memo.id;
+      selectedId = memoId;
+      refreshList();
+      statusText.textContent = 'Loading audio…';
+      const idx = sortedMemos.indexOf(memo);
+      const dataUrl = await loadDataUrlForMemo(memo, idx === -1 ? 0 : idx);
+      if (!dataUrl) {
+        statusText.textContent = 'Failed to load audio';
+        return;
+      }
+      audioEl.pause();
+      audioEl.src = dataUrl;
+      audioEl.load();
+      audioEl.playbackRate = playbackRate;
+      const created = memo.createdAt ? new Date(memo.createdAt) : null;
+      const durationLabel = formatDuration(memo.duration || null, null);
+      const title = memo.title && memo.title.trim() ? memo.title.trim() : 'Voice memo';
+      const bits = [];
+      if (created && !isNaN(created.getTime())) {
+        bits.push(created.toLocaleDateString());
+        bits.push(created.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      }
+      if (durationLabel !== '0:00') bits.push(durationLabel);
+      playerTitle.textContent = title;
+      metaLabel.textContent = bits.join(' • ') || 'Saved voice memo';
+      const previewText = memo.transcript && memo.transcript.trim() ? memo.transcript.trim() : '(No transcript saved for this memo.)';
+      transcriptPreview.textContent = previewText;
+      statusText.textContent = '';
+    }
+
+    audioEl.addEventListener('timeupdate', () => {
+      if (!audioEl.duration || !audioEl.currentTime) {
+        progressInput.value = '0';
+        (progressLabel.querySelector('.voice-time-current') || {}).textContent = '0:00';
+        (progressLabel.querySelector('.voice-time-duration') || {}).textContent = formatDuration(null, audioEl.duration || 0);
+        return;
+      }
+      const pct = (audioEl.currentTime / audioEl.duration) * 100;
+      progressInput.value = String(pct);
+      (progressLabel.querySelector('.voice-time-current') || {}).textContent = formatDuration(null, audioEl.currentTime);
+      (progressLabel.querySelector('.voice-time-duration') || {}).textContent = formatDuration(null, audioEl.duration);
+    });
+
+    audioEl.addEventListener('play', () => {
+      isPlaying = true;
+    });
+
+    audioEl.addEventListener('pause', () => {
+      isPlaying = false;
+    });
+
+    audioEl.addEventListener('ended', () => {
+      isPlaying = false;
+    });
+
+    const root = el('div', { class: 'voice-memo-ui' }, [
+      recordRow,
+      mainPlayer,
+      listContainer
+    ]);
+
+    // Initial list render and default selection (newest first, but do not autoplay)
+    refreshList();
+    if (sortedMemos.length && selectedId) {
+      const first = sortedMemos.find((m) => (m.blobId || m.id) === selectedId) || sortedMemos[0];
+      // Fire and forget; user will click play manually
+      selectMemo(first).catch(() => {});
+    }
+
+    return root;
   }
 
   // ── Video Recordings ─────────────────────────────────────────────────────────
