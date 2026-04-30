@@ -7512,7 +7512,12 @@ export function createApp(mount) {
         .then((res) => (res.ok ? res.text() : ''))
         .then((text) => {
           if (!text) return;
-          const lines = text.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+          const lines = text
+            .split(/\r?\n/)
+            .map((s) => s.trim())
+            // Keep only simple tag identifiers (no angle brackets or spaces),
+            // so we never accidentally treat HTML or other markup as tags.
+            .filter((s) => s && /^[A-Za-z0-9+]+$/.test(s));
           if (!lines.length) return;
           predefinedMetaTags = lines;
           refreshTagSuggestions(lastTagFilter || '');
