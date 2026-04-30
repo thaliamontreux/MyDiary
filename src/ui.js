@@ -7337,6 +7337,11 @@ export function createApp(mount) {
       .slice(0, 16)
       .map(([label]) => label);
 
+    // Predefined meta tags loaded from the static prompts list (one tag per line).
+    // This will be populated asynchronously from /Images/emoji/prompts.txt and used
+    // for the suggestion chips, while still allowing arbitrary user-entered tags.
+    let predefinedMetaTags = [];
+
     const aboutChipsRow = el('div', { class: 'dietary-chips-row meta-about-chips-row' });
     commonAbouts.forEach((name) => {
       const chip = el('button', {
@@ -7373,6 +7378,7 @@ export function createApp(mount) {
 
     const tagChipsRow = el('div', { class: 'dietary-chips-row meta-tag-chips-row' });
     const tagSuggestRow = el('div', { class: 'dietary-chips-row meta-tag-suggestions-row' });
+    let lastTagFilter = '';
 
     const refreshTagChips = () => {
       tagChipsRow.replaceChildren();
@@ -7395,7 +7401,7 @@ export function createApp(mount) {
 
         const iconImg = el('img', {
           class: 'meta-tag-icon',
-          src: `Images/emoji/${key}.svg`,
+          src: `/Images/emoji/${key}.svg`,
           alt: labelText
         });
         iconImg.width = 18;
@@ -7415,7 +7421,10 @@ export function createApp(mount) {
     const refreshTagSuggestions = (filterText) => {
       tagSuggestRow.replaceChildren();
       const existing = new Set(normalizeTags(tagsInput.value || ''));
-      const baseSuggestions = commonTags.filter((t) => !existing.has(t));
+      const allPool = (predefinedMetaTags && predefinedMetaTags.length)
+        ? predefinedMetaTags
+        : commonTags;
+      const baseSuggestions = allPool.filter((t) => !existing.has(t));
       const normFilter = (filterText || '').trim().toLowerCase();
       const suggestions = normFilter
         ? baseSuggestions.filter((t) => t.toLowerCase().startsWith(normFilter))
@@ -7442,7 +7451,7 @@ export function createApp(mount) {
 
         const iconImg = el('img', {
           class: 'meta-tag-icon',
-          src: `Images/emoji/${key}.svg`,
+          src: `/Images/emoji/${key}.svg`,
           alt: labelText
         });
         iconImg.width = 18;
@@ -7463,6 +7472,7 @@ export function createApp(mount) {
       const raw = tagsInput.value || '';
       const segments = raw.split(',');
       const last = segments.length ? segments[segments.length - 1].trim() : '';
+      lastTagFilter = last;
       refreshTagChips();
       refreshTagSuggestions(last);
     });
@@ -7473,6 +7483,7 @@ export function createApp(mount) {
       onclick: () => {
         tagsInput.value = '';
         tagsInput.dataset.dirty = '1';
+        lastTagFilter = '';
         refreshTagChips();
         refreshTagSuggestions('');
       }
@@ -7486,12 +7497,32 @@ export function createApp(mount) {
     ];
     if (commonTags.length) {
       tagsExtrasChildren.push(
-        el('span', { class: 'detail-label', text: 'Recent tags' }),
+        el('span', { class: 'detail-label', text: 'Suggested tags' }),
         tagSuggestRow
       );
     }
     tagsExtrasChildren.push(clearTagsBtn);
     const tagsExtrasRow = el('div', { class: 'meta-tags-extra' }, tagsExtrasChildren);
+
+    // Load predefined meta tags from the static prompts list so users get
+    // a consistent set of icon-backed suggestions, while still being able
+    // to type any arbitrary tags. If this fails, we fall back to commonTags.
+    try {
+      fetch('/Images/emoji/prompts.txt')
+        .then((res) => (res.ok ? res.text() : ''))
+        .then((text) => {
+          if (!text) return;
+          const lines = text.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+          if (!lines.length) return;
+          predefinedMetaTags = lines;
+          refreshTagSuggestions(lastTagFilter || '');
+        })
+        .catch(() => {
+          // ignore, suggestions will continue to use commonTags
+        });
+    } catch (e) {
+      // ignore environments without fetch; suggestions will use commonTags
+    }
 
     refreshTagChips();
     refreshTagSuggestions('');
