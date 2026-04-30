@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Pride month calendar with rainbow header">
+  <!-- Transparent background, calendar page with rainbow banner -->
+  <g transform="translate(14 14)">
+    <rect x="0" y="4" width="36" height="32" rx="5" ry="5" fill="#0f172a" fill-opacity="0.85"/>
+    <!-- rainbow header -->
+    <rect x="0" y="4" width="36" height="6" fill="#E40303"/>
+    <rect x="0" y="10" width="36" height="3" fill="#FF8C00"/>
+    <rect x="0" y="13" width="36" height="3" fill="#FFED00"/>
+    <rect x="0" y="16" width="36" height="3" fill="#008026"/>
+    <rect x="0" y="19" width="36" height="3" fill="#004DFF"/>
+    <rect x="0" y="22" width="36" height="3" fill="#750787"/>
+    <!-- simplified grid -->
+    <rect x="6" y="18" width="4" height="4" rx="1" fill="#e5e7eb"/>
+    <rect x="14" y="18" width="4" height="4" rx="1" fill="#e5e7eb"/>
+    <rect x="22" y="18" width="4" height="4" rx="1" fill="#e5e7eb"/>
+    <rect x="6" y="25" width="4" height="4" rx="1" fill="#e5e7eb"/>
+    <rect x="14" y="25" width="4" height="4" rx="1" fill="#e5e7eb"/>
+    <rect x="22" y="25" width="4" height="4" rx="1" fill="#e5e7eb"/>
+  </g>
+</svg>

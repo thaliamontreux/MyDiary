@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Global queer issues globe with rainbow band">
+  <!-- Transparent background, globe with rainbow band -->
+  <g transform="translate(32 32)">
+    <circle cx="0" cy="0" r="9" fill="#0f172a"/>
+    <circle cx="0" cy="0" r="8" fill="#22c55e"/>
+    <!-- latitude/longitude hints -->
+    <path d="M-6 0 H6" fill="none" stroke="#0f172a" stroke-width="1"/>
+    <path d="M0 -6 V6" fill="none" stroke="#0f172a" stroke-width="1"/>
+    <!-- rainbow band -->
+    <path d="M-8 -1 C-4 -3 4 -3 8 -1" fill="none" stroke="#E40303" stroke-width="2" stroke-linecap="round"/>
+    <path d="M-8 1 C-4 -1 4 -1 8 1" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round"/>
+  </g>
+</svg>

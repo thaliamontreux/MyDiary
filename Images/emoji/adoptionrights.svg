@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Adoption rights family within heart">
+  <!-- Transparent background, family silhouettes inside a heart -->
+  <g transform="translate(32 34)">
+    <!-- heart outline -->
+    <path d="M0 16  -8 8c-4-4-6-9-3-13 2-3 6-4 9-1 1 1 2 2 3 3 1-1 2-2 3-3 3-3 7-2 9 1 3 4 1 9-3 13z" fill="#0f172a"/>
+    <!-- parents -->
+    <circle cx="-3" cy="4" r="2" fill="#e5e7eb"/>
+    <circle cx="3" cy="4" r="2" fill="#e5e7eb"/>
+    <rect x="-4" y="6" width="2" height="4" fill="#e5e7eb"/>
+    <rect x="2" y="6" width="2" height="4" fill="#e5e7eb"/>
+    <!-- child -->
+    <circle cx="0" cy="2" r="1.7" fill="#e5e7eb"/>
+    <rect x="-0.8" y="3.5" width="1.6" height="3" fill="#e5e7eb"/>
+  </g>
+</svg>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Loneliness solitary figure">
+  <!-- Transparent background, small figure alone -->
+  <g transform="translate(32 36)">
+    <circle cx="0" cy="-6" r="2.3" fill="#e5e7eb"/>
+    <rect x="-1.8" y="-4" width="3.6" height="6" fill="#111827"/>
+  </g>
+  <g transform="translate(32 44)">
+    <ellipse cx="0" cy="0" rx="6" ry="2" fill="#020617" fill-opacity="0.5"/>
+  </g>
+</svg>

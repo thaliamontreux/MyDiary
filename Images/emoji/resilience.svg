@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Resilience springing plant">
+  <!-- Transparent background, bent plant springing back up -->
+  <g transform="translate(32 38)">
+    <path d="M-6 4 C-4 1 -2 -1 0 -1 C2 -1 4 1 6 4" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+    <rect x="-1" y="-4" width="2" height="6" fill="#16a34a"/>
+  </g>
+</svg>

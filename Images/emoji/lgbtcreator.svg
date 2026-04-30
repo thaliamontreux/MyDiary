@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="LGBT creator pencil and rainbow bar">
+  <!-- Transparent background, pencil over rainbow bar -->
+  <g transform="translate(18 34)">
+    <!-- rainbow bar -->
+    <rect x="0" y="2" width="28" height="4" rx="2" fill="#E40303"/>
+    <rect x="0" y="6" width="28" height="4" rx="2" fill="#22c55e"/>
+  </g>
+  <g transform="translate(34 24) rotate(-20)">
+    <!-- pencil body -->
+    <rect x="-10" y="-2" width="20" height="4" rx="2" ry="2" fill="#f97316"/>
+    <!-- tip -->
+    <polygon points="10,-2 14,0 10,2" fill="#facc15"/>
+  </g>
+</svg>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Depression awareness cloud and ribbon">
+  <!-- Transparent background, dark cloud with awareness ribbon -->
+  <g transform="translate(30 30)">
+    <path d="M-8 2 C-10 2 -12 0 -12 -2 C-12 -4 -10 -6 -8 -6 C-7 -9 -4 -10 -1 -10 C2 -10 5 -9 6 -6 C8 -6 10 -4 10 -2 C10 0 8 2 6 2 Z" fill="#111827"/>
+  </g>
+  <g transform="translate(40 38)">
+    <!-- ribbon -->
+    <path d="M-2 -8 C-4 -5 -4 -2 -2 0 C0 2 1 4 2 6 C3 4 4 2 4 0 C4 -2 3 -5 2 -8" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round"/>
+  </g>
+</svg>

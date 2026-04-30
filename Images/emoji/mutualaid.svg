@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Mutual aid two arrows in circle">
+  <!-- Transparent background, circular arrows -->
+  <g transform="translate(32 34)">
+    <path d="M-6 0 A6 6 0 0 1 0 -6" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+    <polygon points="0,-6 2,-3 -1,-3" fill="#22c55e"/>
+    <path d="M6 0 A6 6 0 0 1 0 6" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+    <polygon points="0,6 -2,3 1,3" fill="#22c55e"/>
+  </g>
+</svg>

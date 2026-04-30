@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="LGBTQ support hands holding heart">
+  <!-- Transparent background, two hands cupping a heart -->
+  <g transform="translate(32 36)">
+    <!-- heart -->
+    <path d="M0 4c-2-3-6-3-8 0-2 3-1 6 1 8l7 6 7-6c2-2 3-5 1-8-2-3-6-3-8 0z" fill="#f97316"/>
+    <!-- hands -->
+    <path d="M-10 4 C-8 8 -4 10 0 10" fill="none" stroke="#e5e7eb" stroke-width="2.4" stroke-linecap="round"/>
+    <path d="M10 4 C8 8 4 10 0 10" fill="none" stroke="#e5e7eb" stroke-width="2.4" stroke-linecap="round"/>
+  </g>
+</svg>

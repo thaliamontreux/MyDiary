@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Protect queer kids shield and child with heart">
+  <!-- Transparent background, shield with child and heart -->
+  <g transform="translate(30 32)">
+    <path d="M0 -14 L9 -9 L9 -1 C9 4 5 8 0 10 C-5 8 -9 4 -9 -1 L-9 -9 Z" fill="#0f172a"/>
+  </g>
+  <g transform="translate(42 36)">
+    <circle cx="0" cy="-6" r="2.4" fill="#e5e7eb"/>
+    <rect x="-1.8" y="-4" width="3.6" height="6" fill="#111827"/>
+    <path d="M0 4  -2 2c-1-1-1.5-2.5-0.5-3.5 0.9-1 2.3-1 3.1 0 0.8-1 2.2-1 3.1 0 1 1 0.5 2.5-0.5 3.5z" fill="#f97316"/>
+  </g>
+</svg>

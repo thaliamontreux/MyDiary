@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Agender pride flag icon">
+  <!-- Transparent background, agender pride flag card -->
+  <g transform="translate(10 14)">
+    <rect x="0" y="0" width="44" height="32" rx="6" ry="6" fill="#020617"/>
+    <rect x="2" y="2" width="40" height="4" fill="#000000"/>
+    <rect x="2" y="6" width="40" height="4" fill="#A3A3A3"/>
+    <rect x="2" y="10" width="40" height="4" fill="#ffffff"/>
+    <rect x="2" y="14" width="40" height="4" fill="#B9F484"/>
+    <rect x="2" y="18" width="40" height="4" fill="#ffffff"/>
+    <rect x="2" y="22" width="40" height="4" fill="#A3A3A3"/>
+    <rect x="2" y="26" width="40" height="4" fill="#000000"/>
+  </g>
+</svg>

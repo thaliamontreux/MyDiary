@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Legislation scroll and quill">
+  <!-- Transparent background, scroll and feather quill -->
+  <g transform="translate(28 32)">
+    <path d="M-6 -8 H2 C4 -8 6 -6 6 -4 V6 C6 8 4 10 2 10 H-6 Z" fill="#020617"/>
+    <path d="M-6 -8 V10" fill="none" stroke="#111827" stroke-width="1"/>
+    <circle cx="-4" cy="8" r="1.4" fill="#111827"/>
+  </g>
+  <g transform="translate(42 30)">
+    <path d="M-4 4 C-2 1 0 -1 2 -2 C4 -3 6 -3 8 -2 C6 0 4 2 2 4 Z" fill="#f97316"/>
+  </g>
+</svg>

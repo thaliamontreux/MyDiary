@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Inclusive circle of people">
+  <!-- Transparent background, ring of small people around a heart -->
+  <g transform="translate(32 34)">
+    <!-- heart center -->
+    <path d="M0 6  -3 3c-2-2-3-5-1-7 1-2 4-2 6 0 2-2 5-2 6 0 2 2 1 5-1 7z" fill="#f97316"/>
+    <!-- small heads around -->
+    <circle cx="0" cy="-14" r="1.8" fill="#e5e7eb"/>
+    <circle cx="10" cy="-10" r="1.8" fill="#e5e7eb"/>
+    <circle cx="14" cy="0" r="1.8" fill="#e5e7eb"/>
+    <circle cx="10" cy="10" r="1.8" fill="#e5e7eb"/>
+    <circle cx="0" cy="14" r="1.8" fill="#e5e7eb"/>
+    <circle cx="-10" cy="10" r="1.8" fill="#e5e7eb"/>
+    <circle cx="-14" cy="0" r="1.8" fill="#e5e7eb"/>
+    <circle cx="-10" cy="-10" r="1.8" fill="#e5e7eb"/>
+  </g>
+</svg>

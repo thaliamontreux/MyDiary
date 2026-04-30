@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Deadnaming name tag with X">
+  <!-- Transparent background, name tag with X -->
+  <g transform="translate(32 32)">
+    <rect x="-12" y="-6" width="24" height="12" rx="3" ry="3" fill="#020617"/>
+    <rect x="-10" y="-4" width="20" height="3" fill="#111827"/>
+    <line x1="-6" y1="2" x2="6" y2="2" stroke="#e5e7eb" stroke-width="1.2"/>
+    <!-- X over tag -->
+    <path d="M-8,-4 L8,4" fill="none" stroke="#ef4444" stroke-width="1.8" stroke-linecap="round"/>
+    <path d="M8,-4 L-8,4" fill="none" stroke="#ef4444" stroke-width="1.8" stroke-linecap="round"/>
+  </g>
+</svg>

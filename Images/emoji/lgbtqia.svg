@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="LGBTQIA inclusive flag icon">
+  <!-- Transparent background, progress-style pride chevron + rainbow stripes -->
+  <g transform="translate(8 10)">
+    <!-- rainbow block -->
+    <rect x="14" y="4" width="40" height="36" rx="6" ry="6" fill="#020617"/>
+    <rect x="16" y="6" width="36" height="5" fill="#E40303"/>
+    <rect x="16" y="11" width="36" height="5" fill="#FF8C00"/>
+    <rect x="16" y="16" width="36" height="5" fill="#FFED00"/>
+    <rect x="16" y="21" width="36" height="5" fill="#008026"/>
+    <rect x="16" y="26" width="36" height="5" fill="#004DFF"/>
+    <rect x="16" y="31" width="36" height="5" fill="#750787"/>
+
+    <!-- left chevron for trans / intersex / PoC -->
+    <polygon points="14,4 8,4 8,40 14,40" fill="#000000"/>
+    <polygon points="14,4 8,4 8,40 14,40" fill="#000000" fill-opacity="0.9"/>
+    <polygon points="14,4 8,4 8,40" fill="#784f17" fill-opacity="0.9"/>
+    <polygon points="14,4 8,12 8,32 14,40" fill="#ffffff" fill-opacity="0.95"/>
+    <polygon points="14,4 8,12 8,20 14,12" fill="#5BCEFA"/>
+    <polygon points="14,12 8,20 8,28 14,20" fill="#F5A9B8"/>
+    <polygon points="14,20 8,28 8,36 14,28" fill="#5BCEFA"/>
+  </g>
+</svg>

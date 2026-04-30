@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Queer erasure fading rainbow heart">
+  <!-- Transparent background, fading rainbow heart -->
+  <g transform="translate(32 34)">
+    <defs>
+      <linearGradient id="qe-heart" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#E40303" stop-opacity="1"/>
+        <stop offset="100%" stop-color="#E40303" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <path d="M0 16  -8 8c-4-4-6-9-3-13 2-3 7-4 9-1 1 1 2 2 3 3 1-1 2-2 3-3 2-3 7-2 9 1 3 4 1 9-3 13z" fill="url(#qe-heart)"/>
+  </g>
+</svg>

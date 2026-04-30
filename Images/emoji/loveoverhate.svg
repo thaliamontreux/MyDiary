@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Love over hate heart over crossed X">
+  <!-- Transparent background, heart above a crossed X -->
+  <g transform="translate(32 28)">
+    <path d="M0 8  -3 5c-2-2-3-4-1-6 1-2 4-2 6 0 2-2 5-2 6 0 2 2 1 4-1 6z" fill="#f97316"/>
+  </g>
+  <g transform="translate(32 38)">
+    <line x1="-6" y1="2" x2="6" y2="-2" stroke="#ef4444" stroke-width="2" stroke-linecap="round"/>
+    <line x1="-6" y1="-2" x2="6" y2="2" stroke="#ef4444" stroke-width="2" stroke-linecap="round"/>
+  </g>
+</svg>

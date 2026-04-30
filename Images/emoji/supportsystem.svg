@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Support system nodes connected">
+  <!-- Transparent background, connected nodes -->
+  <g transform="translate(32 34)">
+    <circle cx="-6" cy="-4" r="2" fill="#22c55e"/>
+    <circle cx="6" cy="-4" r="2" fill="#3b82f6"/>
+    <circle cx="0" cy="6" r="2" fill="#f97316"/>
+    <line x1="-6" y1="-4" x2="6" y2="-4" stroke="#e5e7eb" stroke-width="1.6"/>
+    <line x1="-6" y1="-4" x2="0" y2="6" stroke="#e5e7eb" stroke-width="1.6"/>
+    <line x1="6" y1="-4" x2="0" y2="6" stroke="#e5e7eb" stroke-width="1.6"/>
+  </g>
+</svg>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Sexuality intertwined symbols">
+  <!-- Transparent background, intertwined Venus and Mars with gradient -->
+  <defs>
+    <linearGradient id="sexuality-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ec4899"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(32 32)">
+    <!-- left circle -->
+    <circle cx="-6" cy="0" r="7" fill="none" stroke="url(#sexuality-grad)" stroke-width="3"/>
+    <!-- right circle -->
+    <circle cx="6" cy="0" r="7" fill="none" stroke="url(#sexuality-grad)" stroke-width="3"/>
+    <!-- venus cross -->
+    <line x1="-6" y1="7" x2="-6" y2="14" stroke="#ec4899" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="-10" y1="11" x2="-2" y2="11" stroke="#ec4899" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- mars arrow -->
+    <line x1="9" y1="-7" x2="14" y2="-12" stroke="#8b5cf6" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="12" y1="-13" x2="16" y2="-9" stroke="#8b5cf6" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+</svg>

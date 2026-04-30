@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Anxiety jittery face">
+  <!-- Transparent background, jittery face icon -->
+  <g transform="translate(32 34)">
+    <circle cx="0" cy="0" r="7" fill="#e5e7eb"/>
+    <circle cx="-2.5" cy="-1" r="1" fill="#111827"/>
+    <circle cx="2.5" cy="-1" r="1" fill="#111827"/>
+    <path d="M-3 3 C-1 2 1 4 3 3" fill="none" stroke="#111827" stroke-width="1.2" stroke-linecap="round"/>
+  </g>
+</svg>

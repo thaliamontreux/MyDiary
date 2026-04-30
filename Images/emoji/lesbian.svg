@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Lesbian pride flag icon">
+  <!-- Transparent background, 7-stripe lesbian pride flag card -->
+  <g transform="translate(10 12)">
+    <rect x="0" y="0" width="44" height="36" rx="6" ry="6" fill="#020617"/>
+    <rect x="2" y="2" width="40" height="4" fill="#D62800"/>
+    <rect x="2" y="6" width="40" height="4" fill="#FF9B56"/>
+    <rect x="2" y="10" width="40" height="4" fill="#FFB87A"/>
+    <rect x="2" y="14" width="40" height="4" fill="#ffffff"/>
+    <rect x="2" y="18" width="40" height="4" fill="#D462A6"/>
+    <rect x="2" y="22" width="40" height="4" fill="#A40062"/>
+    <rect x="2" y="26" width="40" height="4" fill="#680039"/>
+  </g>
+</svg>

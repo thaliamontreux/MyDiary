@@ -1269,6 +1269,28 @@ body::before {
   font-weight: 600;
 }
 
+.meta-about-extra,
+.meta-tags-extra {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.meta-about-chips-row,
+.meta-tag-chips-row,
+.meta-tag-suggestions-row {
+  flex-wrap: wrap;
+}
+
+.meta-tag-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  margin-right: 4px;
+  object-fit: cover;
+}
+
 /* ── Resolution builder ──────────────────────────────────────────────────── */
 .res-card {
   display: flex;

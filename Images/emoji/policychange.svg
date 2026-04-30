@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Policy change document and rotating arrows">
+  <!-- Transparent background, document with circular arrows -->
+  <g transform="translate(26 30)">
+    <rect x="-7" y="-8" width="14" height="16" rx="2" ry="2" fill="#020617"/>
+    <line x1="-4" y1="-4" x2="4" y2="-4" stroke="#e5e7eb" stroke-width="1.2"/>
+    <line x1="-4" y1="-1" x2="2" y2="-1" stroke="#e5e7eb" stroke-width="1.2"/>
+  </g>
+  <g transform="translate(40 36)">
+    <path d="M-4 0 A4 4 0 0 1 0 -4" fill="none" stroke="#22c55e" stroke-width="1.6" stroke-linecap="round"/>
+    <polygon points="0,-4 2,-2 -1,-2" fill="#22c55e"/>
+    <path d="M4 0 A4 4 0 0 1 0 4" fill="none" stroke="#22c55e" stroke-width="1.6" stroke-linecap="round"/>
+    <polygon points="0,4 -2,2 1,2" fill="#22c55e"/>
+  </g>
+</svg>

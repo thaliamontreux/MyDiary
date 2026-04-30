@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Safe schools shield and schoolhouse">
+  <!-- Transparent background, small schoolhouse in a shield -->
+  <g transform="translate(32 32)">
+    <path d="M0 -16 L12 -10 L12 0 C12 6 7 11 0 14 C-7 11 -12 6 -12 0 L-12 -10 Z" fill="#0f172a"/>
+    <polygon points="0,-8 6,-3 -6,-3" fill="#111827"/>
+    <rect x="-5" y="-3" width="10" height="7" rx="1.5" ry="1.5" fill="#020617"/>
+    <rect x="-1" y="-1" width="2" height="4" fill="#1f2937"/>
+  </g>
+</svg>

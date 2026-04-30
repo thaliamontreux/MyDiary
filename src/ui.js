@@ -1033,6 +1033,320 @@ function normalizeTags(input) {
     .slice(0, 8);
 }
 
+function normalizeTagKey(tag) {
+  if (!tag) return '';
+  let s = String(tag).trim();
+  if (s.startsWith('#')) s = s.slice(1);
+  return s.toLowerCase();
+}
+
+const TAG_EMOJI = {
+  // Identity / pride core
+  lgbt: '🏳️‍🌈',
+  lgbtq: '🏳️‍🌈',
+  'lgbtqia+': '🏳️‍🌈',
+  lgbtqia: '🏳️‍🌈',
+  queer: '🌈',
+  pride: '🏳️‍🌈',
+  gay: '🌈',
+  lesbian: '👭',
+  bisexual: '💜',
+  pansexual: '💖',
+  asexual: '🖤',
+  aromantic: '💚',
+  demisexual: '🤍',
+  transgender: '⚧️',
+  trans: '⚧️',
+  nonbinary: '💛',
+  enby: '💛',
+  genderfluid: '🎨',
+  genderqueer: '💜',
+  agender: '⚪',
+  intersex: '🟡',
+  twospirit: '🪶',
+  queercommunity: '🤝',
+  pridemonth: '📅',
+  loveislove: '❤️',
+  bornthisway: '✨',
+  comingout: '🚪',
+  transrights: '⚖️',
+  gaypride: '🏳️‍🌈',
+  lesbianpride: '👭',
+  bi: '💜',
+  pan: '💖',
+  ace: '🖤',
+  aro: '💚',
+  transman: '👨',
+  transwoman: '👩',
+  mtf: '👩',
+  ftm: '👨',
+  nonbinarypride: '💛',
+  genderidentity: '🧬',
+  sexuality: '💘',
+  queerjoy: '🎉',
+  queerlove: '💞',
+  rainbow: '🌈',
+  rainbowflag: '🏳️‍🌈',
+  prideflag: '🏳️‍🌈',
+  ally: '🤝',
+  lgbtally: '🤝',
+  safespace: '🛟',
+  visibilitymatters: '👀',
+  transvisibility: '👁️',
+  bisexualvisibility: '💜',
+  lesbianvisibility: '👭',
+  gayvisibility: '👬',
+  queervisibility: '👁️',
+  transisbeautiful: '🌸',
+  protecttranskids: '🛡️',
+  lovehasnolabels: '🏷️',
+  beproud: '🌟',
+  outandproud: '🚪',
+  pride2026: '📆',
+  queerartist: '🎨',
+  lgbtcreator: '🛠️',
+  lgbtartist: '🎨',
+  queerwriter: '✍️',
+  gaymer: '🎮',
+  wlw: '👭',
+  mlm: '👬',
+  sapphic: '🌹',
+  achillean: '🏹',
+  androgynous: '⚧️',
+  drag: '💄',
+  dragqueen: '👑',
+  dragking: '👑',
+  ballroomculture: '💃',
+  voguing: '🕺',
+  queerfashion: '👗',
+  genderexpression: '🎭',
+  pridevibes: '🔮',
+  queerhistory: '📚',
+  stonewall: '🧱',
+  chosenfamily: '👨‍👩‍👧‍👦',
+  lgbtyouth: '🧒',
+  queeryouth: '🧒',
+  transyouth: '🧒',
+  lgbtparents: '👨‍👩‍👧',
+  queerparents: '👨‍👩‍👧',
+  gaylove: '💙',
+  lesbianlove: '💖',
+  translove: '💗',
+  queerandproud: '🌈',
+  lgbtqsupport: '🤗',
+  humanrights: '🕊️',
+  equality: '⚖️',
+  nohate: '🚫',
+  stopdiscrimination: '✋',
+  inclusive: '🤝',
+  diversity: '🧬',
+  representationmatters: '🎭',
+  prideallyear: '🗓️',
+
+  // Issues / advocacy (sample)
+  lgbtqrights: '⚖️',
+  equalrights: '⚖️',
+  transrightsarehumanrights: '⚖️',
+  queerrights: '⚖️',
+  fightforlove: '✊',
+  endiscrimination: '🚫',
+  stophomophobia: '🚫',
+  stoptransphobia: '🚫',
+  biphobia: '🚫',
+  homophobia: '🚫',
+  transphobia: '🚫',
+  queerphobia: '🚫',
+  hatecrime: '⛔',
+  antihate: '🕊️',
+  bullying: '🚫',
+  cyberbullying: '💻',
+  schoolbullying: '🎒',
+  familyrejection: '💔',
+  comingoutstruggles: '💧',
+  closeted: '🚪',
+  forcedouting: '⚠️',
+  religioustrauma: '⛪',
+  conversiontherapy: '⚠️',
+  banconversiontherapy: '🚫',
+  mentalhealthmatters: '🧠',
+  lgbtqmentalhealth: '🧠',
+  depressionawareness: '🌧️',
+  anxietyawareness: '💭',
+  suicideprevention: '🛟',
+  youthhomelessness: '🏚️',
+  lgbthomeless: '🏚️',
+  healthcareinequality: '🏥',
+  transhealthcare: '🏥',
+  genderaffirmingcare: '💊',
+  insuranceissues: '📑',
+  workplacediscrimination: '💼',
+  housingdiscrimination: '🏠',
+  legalrights: '📜',
+  marriageequality: '💍',
+  adoptionrights: '👶',
+  militaryban: '🎖️',
+  policychange: '📜',
+  activism: '📣',
+  grassroots: '🌱',
+  protest: '✊',
+  standup: '✊',
+  advocacy: '📣',
+  queeradvocacy: '📣',
+  transadvocacy: '📣',
+  lobbying: '🏛️',
+  representationgap: '📉',
+  mediarepresentation: '📺',
+  visibilitygap: '👀',
+  intersectionality: '🔗',
+  racialjustice: '✊🏿',
+  blackqueerlivesmatter: '✊🏿',
+  queerpeopleofcolor: '🌍',
+  immigrationissues: '🛂',
+  asylumseekers: '🛂',
+  globalqueerissues: '🌍',
+  safeschools: '🏫',
+  inclusiveeducation: '📚',
+  genderneutral: '🚻',
+  pronouns: '🔠',
+  respectpronouns: '🗣️',
+  misgendering: '⚠️',
+  deadnaming: '⚠️',
+  identityerasure: '🧨',
+  biinvisibility: '👻',
+  aceerasure: '👻',
+  transerasure: '👻',
+  queererasure: '👻',
+  censorship: '🚫',
+  bookbans: '📚',
+  dragbans: '💄',
+  bathroombills: '🚻',
+  legislation: '📜',
+  protectlgbtq: '🛡️',
+  allyship: '🤝',
+  beanally: '🤝',
+  speakup: '🗣️',
+  silenceisviolence: '🤐',
+  supporttransyouth: '🧒',
+  protectqueerkids: '🛡️',
+  lgbtqsafety: '🛡️',
+  safehousing: '🏠',
+  safehealthcare: '🏥',
+  communitysupport: '🤝',
+  mutualaid: '🤝',
+  nonprofitsupport: '🏛️',
+  donate: '💸',
+  volunteer: '🙋',
+  grassrootsmovement: '🌱',
+  changeisneeded: '⚠️',
+  endstigma: '🧠',
+  fightstigma: '🛡️',
+  visibilitysaveslives: '💡',
+  loveoverhate: '❤️',
+  justiceforall: '⚖️',
+  equalfuture: '🌅',
+
+  // Emotions / inner life (sample)
+  selflove: '💖',
+  selfacceptance: '🤗',
+  loveyourself: '💗',
+  healingjourney: '🩹',
+  innerpeace: '🧘',
+  prideinside: '🔥',
+  findingmyself: '🧭',
+  authenticself: '🪞',
+  beingme: '🌟',
+  identityjourney: '🛤️',
+  growth: '🌱',
+  healing: '💊',
+  freedom: '🕊️',
+  liberation: '🕊️',
+  confidence: '💪',
+  courage: '🦁',
+  bravery: '🦁',
+  strength: '💪',
+  resilience: '🌈',
+  hope: '✨',
+  belonging: '🏡',
+  acceptance: '🤝',
+  validation: '✅',
+  seen: '👀',
+  heard: '👂',
+  understood: '🧠',
+  connection: '🔗',
+  communitylove: '💞',
+  supportsystem: '🛟',
+  chosenfamilylove: '👨‍👩‍👧‍👦',
+  warmth: '🔥',
+  joyful: '😄',
+  celebration: '🎉',
+  happiness: '😊',
+  euphoria: '🌈',
+  gendereuphoria: '🌈',
+  relief: '😌',
+  peaceful: '🕊️',
+  safe: '🛟',
+  comfort: '🛏️',
+  heartsopen: '💓',
+  lovewins: '🏳️‍🌈',
+  togetherness: '🤝',
+  kindness: '💗',
+  compassion: '🤲',
+  empathy: '💞',
+  uplifting: '🎈',
+  encouragement: '📣',
+  motivation: '🚀',
+  inspiration: '💡',
+  proudmoment: '🏅',
+  livingmytruth: '🌈',
+  outandfree: '🕊️',
+  fear: '😨',
+  anxiety: '😰',
+  stress: '😖',
+  loneliness: '😔',
+  isolation: '🚪',
+  rejection: '💔',
+  heartbreak: '💔',
+  confusion: '❓',
+  dysphoria: '🌧️',
+  genderdysphoria: '🌧️',
+  overwhelmed: '🌊',
+  sadness: '😢',
+  pain: '💥',
+  struggle: '🧗',
+  hurt: '💔',
+  anger: '😡',
+  frustration: '😤',
+  exhausted: '😴',
+  burnout: '🔥',
+  trauma: '🩹',
+  healingfromtrauma: '🩹',
+  survivor: '🏅',
+  stillstanding: '🏆',
+  keepgoing: '➡️',
+  nevergiveup: '🏁',
+  youarenotalone: '🤝',
+  wegotthis: '🤝',
+  holdon: '👐',
+  hopeful: '✨',
+  lightahead: '🔆',
+  newbeginnings: '🌅',
+  selfdiscovery: '🔍',
+  growthmindset: '🧠',
+  transform: '🐛',
+  rebirth: '🦋',
+  becoming: '🌱',
+  softness: '☁️',
+  vulnerability: '💧',
+  realfeelings: '💬',
+  honesty: '🪞',
+  truth: '✨',
+  expression: '🎭',
+  feelingseen: '👀',
+  innerstrength: '💪',
+  riseabove: '⬆️',
+  ownyourstory: '📖'
+};
+
 function summarizeBody(text = '') {
   const compact = text.replace(/\s+/g, ' ').trim();
   if (!compact) return 'Blank page waiting for your words';
@@ -6982,7 +7296,6 @@ export function createApp(mount) {
       'data-focus-key': `entry:${selected.id}:about`,
       placeholder: selected.moduleType === 'recipe' ? 'What memory or occasion goes with this?' : 'Who or what is this about?'
     }, [selected.about || '']);
-    // Ensure textarea value is set via property so it always appears in the UI
     aboutInput.value = selected.about || '';
     aboutInput.dataset.dirty = '0';
     aboutInput.addEventListener('input', () => {
@@ -6996,9 +7309,192 @@ export function createApp(mount) {
     }, [(selected.tags || []).join(', ')]);
     tagsInput.value = (selected.tags || []).join(', ');
     tagsInput.dataset.dirty = '0';
+
+    const entriesForMeta = (state.vault && Array.isArray(state.vault.entries)) ? state.vault.entries : [];
+    const metaTagCounts = {};
+    const metaAboutCounts = {};
+    for (const rawEntry of entriesForMeta) {
+      const e = normalizeEntry(rawEntry);
+      const about = (e.about || '').trim();
+      if (about) {
+        metaAboutCounts[about] = (metaAboutCounts[about] || 0) + 1;
+      }
+      const tList = Array.isArray(e.tags) ? e.tags : [];
+      for (const tRaw of tList) {
+        const t = String(tRaw || '').trim();
+        if (!t) continue;
+        metaTagCounts[t] = (metaTagCounts[t] || 0) + 1;
+      }
+    }
+
+    const commonAbouts = Object.entries(metaAboutCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([label]) => label);
+
+    const commonTags = Object.entries(metaTagCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 16)
+      .map(([label]) => label);
+
+    const aboutChipsRow = el('div', { class: 'dietary-chips-row meta-about-chips-row' });
+    commonAbouts.forEach((name) => {
+      const chip = el('button', {
+        class: 'dietary-chip meta-about-chip',
+        type: 'button',
+        onclick: () => {
+          aboutInput.value = name;
+          aboutInput.dataset.dirty = '1';
+        }
+      }, [el('span', { text: name })]);
+      aboutChipsRow.append(chip);
+    });
+
+    const clearAboutBtn = el('button', {
+      class: 'btn ghost small-btn',
+      type: 'button',
+      onclick: () => {
+        aboutInput.value = '';
+        aboutInput.dataset.dirty = '1';
+      }
+    }, [
+      el('span', { text: 'Clear about' })
+    ]);
+
+    const aboutExtrasChildren = [];
+    if (commonAbouts.length) {
+      aboutExtrasChildren.push(
+        el('span', { class: 'detail-label', text: 'People you mention often' }),
+        aboutChipsRow
+      );
+    }
+    aboutExtrasChildren.push(clearAboutBtn);
+    const aboutExtrasRow = el('div', { class: 'meta-about-extra' }, aboutExtrasChildren);
+
+    const tagChipsRow = el('div', { class: 'dietary-chips-row meta-tag-chips-row' });
+    const tagSuggestRow = el('div', { class: 'dietary-chips-row meta-tag-suggestions-row' });
+
+    const refreshTagChips = () => {
+      tagChipsRow.replaceChildren();
+      const currentTags = normalizeTags(tagsInput.value || '');
+      currentTags.forEach((tag) => {
+        const key = normalizeTagKey(tag);
+        const emoji = TAG_EMOJI[key] || '';
+        const labelText = tag;
+        const chip = el('button', {
+          class: 'dietary-chip meta-tag-chip active',
+          type: 'button',
+          onclick: () => {
+            const next = currentTags.filter((t) => t !== tag);
+            tagsInput.value = next.join(', ');
+            tagsInput.dataset.dirty = '1';
+            refreshTagChips();
+            refreshTagSuggestions('');
+          }
+        }, []);
+
+        const iconImg = el('img', {
+          class: 'meta-tag-icon',
+          src: `Images/emoji/${key}.svg`,
+          alt: labelText
+        });
+        iconImg.width = 18;
+        iconImg.height = 18;
+        iconImg.onerror = () => {
+          iconImg.style.display = 'none';
+        };
+
+        const textSpan = el('span', { text: emoji ? `${emoji} ${labelText}` : labelText });
+        const closeSpan = el('span', { text: ' ×' });
+
+        chip.append(iconImg, textSpan, closeSpan);
+        tagChipsRow.append(chip);
+      });
+    };
+
+    const refreshTagSuggestions = (filterText) => {
+      tagSuggestRow.replaceChildren();
+      const existing = new Set(normalizeTags(tagsInput.value || ''));
+      const baseSuggestions = commonTags.filter((t) => !existing.has(t));
+      const normFilter = (filterText || '').trim().toLowerCase();
+      const suggestions = normFilter
+        ? baseSuggestions.filter((t) => t.toLowerCase().startsWith(normFilter))
+        : baseSuggestions;
+      suggestions.slice(0, 12).forEach((tag) => {
+        const key = normalizeTagKey(tag);
+        const emoji = TAG_EMOJI[key] || '';
+        const labelText = tag;
+        const chip = el('button', {
+          class: 'dietary-chip meta-tag-suggest-chip',
+          type: 'button',
+          onclick: () => {
+            const raw = tagsInput.value || '';
+            let segments = raw.split(',');
+            if (!segments.length) segments = [''];
+            segments[segments.length - 1] = tag;
+            const cleaned = segments.map((s) => s.trim()).filter(Boolean);
+            tagsInput.value = cleaned.join(', ');
+            tagsInput.dataset.dirty = '1';
+            refreshTagChips();
+            refreshTagSuggestions('');
+          }
+        }, []);
+
+        const iconImg = el('img', {
+          class: 'meta-tag-icon',
+          src: `Images/emoji/${key}.svg`,
+          alt: labelText
+        });
+        iconImg.width = 18;
+        iconImg.height = 18;
+        iconImg.onerror = () => {
+          iconImg.style.display = 'none';
+        };
+
+        const textSpan = el('span', { text: emoji ? `${emoji} ${labelText}` : labelText });
+
+        chip.append(iconImg, textSpan);
+        tagSuggestRow.append(chip);
+      });
+    };
+
     tagsInput.addEventListener('input', () => {
       tagsInput.dataset.dirty = '1';
+      const raw = tagsInput.value || '';
+      const segments = raw.split(',');
+      const last = segments.length ? segments[segments.length - 1].trim() : '';
+      refreshTagChips();
+      refreshTagSuggestions(last);
     });
+
+    const clearTagsBtn = el('button', {
+      class: 'btn ghost small-btn',
+      type: 'button',
+      onclick: () => {
+        tagsInput.value = '';
+        tagsInput.dataset.dirty = '1';
+        refreshTagChips();
+        refreshTagSuggestions('');
+      }
+    }, [
+      el('span', { text: 'Clear tags' })
+    ]);
+
+    const tagsExtrasChildren = [
+      el('span', { class: 'detail-label', text: 'Current tags' }),
+      tagChipsRow
+    ];
+    if (commonTags.length) {
+      tagsExtrasChildren.push(
+        el('span', { class: 'detail-label', text: 'Recent tags' }),
+        tagSuggestRow
+      );
+    }
+    tagsExtrasChildren.push(clearTagsBtn);
+    const tagsExtrasRow = el('div', { class: 'meta-tags-extra' }, tagsExtrasChildren);
+
+    refreshTagChips();
+    refreshTagSuggestions('');
 
     // Get folders from current vault for dropdown
     const currentFolders = state.folders.filter((f) => f.vaultSlot === state.activeVaultSlot);
@@ -7579,11 +8075,13 @@ export function createApp(mount) {
       detailCards.push(
         el('label', { class: 'detail-card' }, [
           el('span', { class: 'detail-label', text: 'Who it is about' }),
-          aboutInput
+          aboutInput,
+          aboutExtrasRow
         ]),
         el('label', { class: 'detail-card' }, [
           el('span', { class: 'detail-label', text: 'Tags' }),
-          tagsInput
+          tagsInput,
+          tagsExtrasRow
         ])
       );
     }
@@ -7601,11 +8099,13 @@ export function createApp(mount) {
         ]),
         el('label', { class: 'detail-card' }, [
           el('span', { class: 'detail-label', text: 'What this note is about' }),
-          aboutInput
+          aboutInput,
+          aboutExtrasRow
         ]),
         el('label', { class: 'detail-card' }, [
           el('span', { class: 'detail-label', text: 'Tags' }),
-          tagsInput
+          tagsInput,
+          tagsExtrasRow
         ])
       );
     }
@@ -7623,11 +8123,13 @@ export function createApp(mount) {
         ]),
         el('label', { class: 'detail-card' }, [
           el('span', { class: 'detail-label', text: 'Who or what this letter is about' }),
-          aboutInput
+          aboutInput,
+          aboutExtrasRow
         ]),
         el('label', { class: 'detail-card' }, [
           el('span', { class: 'detail-label', text: 'Tags' }),
-          tagsInput
+          tagsInput,
+          tagsExtrasRow
         ]),
         selected.letterKind === 'sent'
           ? el('label', { class: 'detail-card' }, [
@@ -7681,7 +8183,7 @@ export function createApp(mount) {
           ])
         ]),
 
-        // \u2500\u2500 Ingredients \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+        // \u2500\u2500 Ingredients \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
         el('div', { class: 'detail-card detail-card-wide recipe-section-card' }, [
           el('div', { class: 'recipe-section-header' }, [
             el('span', { class: 'recipe-section-icon', text: '\ud83e\uded9' }),

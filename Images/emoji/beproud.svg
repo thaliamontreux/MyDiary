@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Be proud ribbon with star">
+  <!-- Transparent background, ribbon badge with small star -->
+  <g transform="translate(32 30)">
+    <!-- circular badge -->
+    <circle cx="0" cy="0" r="10" fill="#0f172a"/>
+    <circle cx="0" cy="0" r="8" fill="#f97316"/>
+    <!-- star -->
+    <polygon points="0,-5 1.5,-1.5 5,0 1.5,1.5 0,5 -1.5,1.5 -5,0 -1.5,-1.5" fill="#fefce8"/>
+  </g>
+  <!-- ribbon tails -->
+  <g transform="translate(32 40)">
+    <polygon points="-4,0 -10,10 -4,8" fill="#ea580c"/>
+    <polygon points="4,0 10,10 4,8" fill="#ea580c"/>
+  </g>
+</svg>

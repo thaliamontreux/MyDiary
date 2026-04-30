@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Ally shield with rainbow">
+  <!-- Transparent background, shield with rainbow chevron -->
+  <g transform="translate(32 32)">
+    <!-- shield base -->
+    <path d="M0 -18 L12 -12 L12 2 C12 8 7 13 0 16 C-7 13 -12 8 -12 2 L-12 -12 Z" fill="#0f172a"/>
+    <!-- rainbow chevron inside -->
+    <path d="M0 -14 L8 -10 L8 0 C8 4 5 7 0 9 C-5 7 -8 4 -8 0 L-8 -10 Z" fill="#111827"/>
+    <path d="M0 -12 L6 -9 L6 -4 L0 -7 L-6 -4 L-6 -9 Z" fill="#E40303"/>
+    <path d="M0 -8 L5 -5 L5 -1 L0 -4 L-5 -1 L-5 -5 Z" fill="#FFED00"/>
+    <path d="M0 -4 L4 -1 L4 3 L0 0 L-4 3 L-4 -1 Z" fill="#22c55e"/>
+  </g>
+</svg>

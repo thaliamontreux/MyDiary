@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Heard ear and lines">
+  <!-- Transparent background, ear with sound lines -->
+  <g transform="translate(30 34)">
+    <path d="M-2 -6 C-4 -6 -5.5 -4.5 -5.5 -2 C-5.5 1 -4 3 -3 4.5 C-2 6 0 6 1 5" fill="none" stroke="#e5e7eb" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(40 32)">
+    <path d="M0 -2 L4 -3" fill="none" stroke="#e5e7eb" stroke-width="1.6" stroke-linecap="round"/>
+    <path d="M0 1 L4 2" fill="none" stroke="#e5e7eb" stroke-width="1.6" stroke-linecap="round"/>
+  </g>
+</svg>

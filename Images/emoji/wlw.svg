@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="WLW interlocking venus symbols">
+  <!-- Transparent background, two interlocking Venus symbols -->
+  <g transform="translate(32 32)">
+    <circle cx="-5" cy="-2" r="5" fill="none" stroke="#ec4899" stroke-width="2.4"/>
+    <circle cx="5" cy="-2" r="5" fill="none" stroke="#f97316" stroke-width="2.4"/>
+    <!-- left cross -->
+    <line x1="-5" y1="3" x2="-5" y2="9" stroke="#ec4899" stroke-width="2.4" stroke-linecap="round"/>
+    <line x1="-8" y1="6" x2="-2" y2="6" stroke="#ec4899" stroke-width="2.4" stroke-linecap="round"/>
+    <!-- right cross -->
+    <line x1="5" y1="3" x2="5" y2="9" stroke="#f97316" stroke-width="2.4" stroke-linecap="round"/>
+    <line x1="2" y1="6" x2="8" y2="6" stroke="#f97316" stroke-width="2.4" stroke-linecap="round"/>
+  </g>
+</svg>

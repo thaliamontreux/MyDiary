@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Gay pride flag with sparkle">
+  <!-- Transparent background, MLM flag card with sparkle -->
+  <g transform="translate(10 18)">
+    <rect x="0" y="0" width="32" height="24" rx="5" ry="5" fill="#020617"/>
+    <rect x="2" y="2" width="28" height="4" fill="#078D70"/>
+    <rect x="2" y="6" width="28" height="4" fill="#26CEAA"/>
+    <rect x="2" y="10" width="28" height="4" fill="#ffffff"/>
+    <rect x="2" y="14" width="28" height="4" fill="#7BADE2"/>
+    <rect x="2" y="18" width="28" height="4" fill="#5049CC"/>
+  </g>
+  <!-- sparkle -->
+  <g transform="translate(42 18)">
+    <path d="M0,-4 L1,0 0,4 -1,0 Z" fill="#facc15"/>
+    <circle cx="0" cy="0" r="1.5" fill="#fefce8"/>
+  </g>
+</svg>

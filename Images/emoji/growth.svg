@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Growth plant with upward arrow">
+  <!-- Transparent background, plant with upward arrow -->
+  <g transform="translate(30 38)">
+    <rect x="-1" y="-4" width="2" height="8" fill="#16a34a"/>
+    <path d="M-1 -4 C-3 -6 -4 -8 -3 -9 C-2 -10 0 -9 1 -7" fill="#16a34a"/>
+    <path d="M1 -4 C3 -6 4 -8 3 -9 C2 -10 0 -9 -1 -7" fill="#22c55e"/>
+  </g>
+  <g transform="translate(42 28)">
+    <path d="M-4 4 L0 -2 L4 4" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+    <line x1="0" y1="-2" x2="0" y2="4" stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+  </g>
+</svg>

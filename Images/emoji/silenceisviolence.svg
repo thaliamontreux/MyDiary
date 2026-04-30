@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Silence is violence muted mouth and exclamation">
+  <!-- Transparent background, muted mouth with exclamation -->
+  <g transform="translate(28 34)">
+    <!-- mouth -->
+    <rect x="-8" y="-2" width="16" height="6" rx="3" ry="3" fill="#111827"/>
+    <line x1="-6" y1="1" x2="6" y2="1" stroke="#ef4444" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(44 26)">
+    <rect x="-2" y="-6" width="4" height="8" rx="2" ry="2" fill="#f97316"/>
+    <circle cx="0" cy="4" r="2" fill="#f97316"/>
+  </g>
+</svg>

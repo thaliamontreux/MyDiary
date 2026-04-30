@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Euphoria sparkles and heart">
+  <!-- Transparent background, sparkly heart -->
+  <g transform="translate(32 34)">
+    <path d="M0 14  -6 7c-3-3-4-7-2-10 2-3 6-3 8 0 2-3 6-3 8 0 2 3 1 7-2 10z" fill="#f97316"/>
+  </g>
+  <g transform="translate(24 26)">
+    <path d="M0,-3 L1,0 0,3 -1,0 Z" fill="#fef9c3"/>
+  </g>
+  <g transform="translate(40 24)">
+    <path d="M0,-3 L1,0 0,3 -1,0 Z" fill="#fde68a"/>
+  </g>
+</svg>

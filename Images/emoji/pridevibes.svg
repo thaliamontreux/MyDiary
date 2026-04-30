@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Pride vibes music note with rainbow">
+  <!-- Transparent background, music note with rainbow trail -->
+  <g transform="translate(26 28)">
+    <!-- note stem and head -->
+    <line x1="4" y1="-8" x2="4" y2="6" stroke="#0f172a" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="0" cy="6" r="3" fill="#0f172a"/>
+    <circle cx="8" cy="4" r="3" fill="#0f172a"/>
+  </g>
+  <g transform="translate(36 34)">
+    <!-- rainbow vibrations -->
+    <path d="M-10 -2 C-4 -6 4 -6 10 -2" fill="none" stroke="#E40303" stroke-width="2" stroke-linecap="round"/>
+    <path d="M-9 1 C-3 -3 3 -3 9 1" fill="none" stroke="#FFED00" stroke-width="2" stroke-linecap="round"/>
+    <path d="M-8 4 C-2 0 2 0 8 4" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+  </g>
+</svg>

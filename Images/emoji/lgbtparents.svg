@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="LGBT parents two adults and child">
+  <!-- Transparent background, two adults and a child silhouette -->
+  <g transform="translate(32 34)">
+    <!-- adult heads -->
+    <circle cx="-6" cy="-10" r="3" fill="#e5e7eb"/>
+    <circle cx="6" cy="-10" r="3" fill="#e5e7eb"/>
+    <!-- child head -->
+    <circle cx="0" cy="-6" r="2.4" fill="#e5e7eb"/>
+    <!-- bodies -->
+    <path d="M-10 -2 C-8 -8 -4 -8 -2 -2 L-2 8 L-10 8 Z" fill="#111827"/>
+    <path d="M10 -2 C8 -8 4 -8 2 -2 L2 8 L10 8 Z" fill="#111827"/>
+    <path d="M-3 0 C-2 -4 2 -4 3 0 L3 8 L-3 8 Z" fill="#1f2937"/>
+  </g>
+</svg>

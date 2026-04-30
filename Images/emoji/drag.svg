@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Drag fan with sparkles">
+  <!-- Transparent background, folding fan with sparkles -->
+  <g transform="translate(32 36)">
+    <!-- fan -->
+    <path d="M-14 4 L0 -10 L14 4 Z" fill="#111827"/>
+    <path d="M-12 4 L0 -8 L12 4 Z" fill="#ec4899"/>
+    <path d="M-8 4 L0 -4 L8 4 Z" fill="#f97316"/>
+  </g>
+  <!-- sparkles -->
+  <g transform="translate(18 20)">
+    <path d="M0,-3 L1,0 0,3 -1,0 Z" fill="#facc15"/>
+  </g>
+  <g transform="translate(46 20)">
+    <path d="M0,-3 L1,0 0,3 -1,0 Z" fill="#facc15"/>
+  </g>
+</svg>

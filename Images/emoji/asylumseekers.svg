@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Asylum seekers boat and shore">
+  <!-- Transparent background, small boat approaching shore -->
+  <g transform="translate(26 34)">
+    <!-- boat -->
+    <path d="M-8 2 L0 -2 L8 2 L6 4 H-6 Z" fill="#111827"/>
+  </g>
+  <g transform="translate(42 34)">
+    <!-- shore line -->
+    <rect x="-4" y="2" width="10" height="2" fill="#facc15"/>
+  </g>
+</svg>

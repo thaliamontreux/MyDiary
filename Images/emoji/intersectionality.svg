@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Intersectionality overlapping circles">
+  <!-- Transparent background, overlapping circles of different colors -->
+  <g transform="translate(32 34)">
+    <circle cx="-4" cy="0" r="5" fill="#22c55e" fill-opacity="0.9"/>
+    <circle cx="4" cy="0" r="5" fill="#3b82f6" fill-opacity="0.9"/>
+    <circle cx="0" cy="-5" r="5" fill="#f97316" fill-opacity="0.9"/>
+  </g>
+</svg>

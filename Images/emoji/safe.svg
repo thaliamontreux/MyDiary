@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Safe simple shield">
+  <!-- Transparent background, simple shield -->
+  <g transform="translate(32 32)">
+    <path d="M0 -12 L9 -6 L9 0 C9 4 5 7 0 9 C-5 7 -9 4 -9 0 L-9 -6 Z" fill="#0f172a"/>
+  </g>
+</svg>

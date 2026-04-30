@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Representation gap unequal silhouettes on screen">
+  <!-- Transparent background, screen with tall and short silhouettes -->
+  <g transform="translate(32 30)">
+    <rect x="-12" y="-8" width="24" height="16" rx="2" ry="2" fill="#020617"/>
+    <!-- tall silhouette -->
+    <circle cx="-4" cy="-3" r="2.2" fill="#e5e7eb"/>
+    <rect x="-5" y="-1" width="2.6" height="6" rx="1.3" fill="#e5e7eb"/>
+    <!-- short silhouette -->
+    <circle cx="4" cy="-1" r="1.8" fill="#6b7280"/>
+    <rect x="3.2" y="0.5" width="2" height="4" rx="1" fill="#6b7280"/>
+  </g>
+</svg>

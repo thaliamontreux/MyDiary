@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Trans love heart in trans colors">
+  <!-- Transparent background, heart in trans colors -->
+  <g transform="translate(32 34)">
+    <path d="M0 18  -8 10c-4-4-5-10-2-14 2-3 6-4 9-2 1 1 2 2 3 3 1-1 2-2 3-3 3-2 7-1 9 2 3 4 2 10-2 14z" fill="#5BCEFA"/>
+    <path d="M0 14  -6 8c-3-3-4-7-2-10 2-3 5-3 8 0 1 2 3 2 4 0 3-3 6-3 8 0 2 3 1 7-2 10z" fill="#F5A9B8" fill-opacity="0.9"/>
+  </g>
+</svg>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Military ban crossed helmet">
+  <!-- Transparent background, military-style helmet with ban slash -->
+  <g transform="translate(30 32)">
+    <path d="M-8 0 C-8 -6 -3 -10 2 -10 C7 -10 10 -7 10 -2 V2 H-8 Z" fill="#111827"/>
+  </g>
+  <g transform="translate(34 34)">
+    <circle cx="0" cy="0" r="8" fill="none" stroke="#ef4444" stroke-width="2"/>
+    <line x1="-5.5" y1="5.5" x2="5.5" y2="-5.5" stroke="#ef4444" stroke-width="2" stroke-linecap="round"/>
+  </g>
+</svg>

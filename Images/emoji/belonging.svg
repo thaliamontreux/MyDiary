@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Belonging circle of people">
+  <!-- Transparent background, circle of people icons -->
+  <g transform="translate(32 34)">
+    <circle cx="0" cy="-10" r="2.2" fill="#e5e7eb"/>
+    <circle cx="8" cy="-6" r="2.2" fill="#e5e7eb"/>
+    <circle cx="10" cy="2" r="2.2" fill="#e5e7eb"/>
+    <circle cx="0" cy="8" r="2.2" fill="#e5e7eb"/>
+    <circle cx="-10" cy="2" r="2.2" fill="#e5e7eb"/>
+    <circle cx="-8" cy="-6" r="2.2" fill="#e5e7eb"/>
+  </g>
+</svg>

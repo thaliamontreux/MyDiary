@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Diversity colorful circles cluster">
+  <!-- Transparent background, cluster of multi-colored circles -->
+  <g transform="translate(32 34)">
+    <circle cx="-6" cy="-6" r="4" fill="#f97316"/>
+    <circle cx="6" cy="-6" r="4" fill="#22c55e"/>
+    <circle cx="0" cy="0" r="4" fill="#3b82f6"/>
+    <circle cx="-6" cy="6" r="4" fill="#e11d48"/>
+    <circle cx="6" cy="6" r="4" fill="#a855f7"/>
+  </g>
+</svg>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Representation matters screen with silhouettes">
+  <!-- Transparent background, screen with three different silhouettes -->
+  <g transform="translate(32 30)">
+    <rect x="-12" y="-8" width="24" height="16" rx="2" ry="2" fill="#020617"/>
+    <!-- silhouettes -->
+    <circle cx="-6" cy="-3" r="2" fill="#f97316"/>
+    <circle cx="0" cy="-3" r="2" fill="#22c55e"/>
+    <circle cx="6" cy="-3" r="2" fill="#3b82f6"/>
+    <rect x="-7" y="0" width="2.8" height="4" rx="1.3" fill="#f97316"/>
+    <rect x="-1.4" y="0" width="2.8" height="4" rx="1.3" fill="#22c55e"/>
+    <rect x="4" y="0" width="2.8" height="4" rx="1.3" fill="#3b82f6"/>
+  </g>
+</svg>

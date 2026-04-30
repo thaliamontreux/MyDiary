@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Ban conversion therapy banned sign">
+  <!-- Transparent background, prohibition sign over arrows -->
+  <g transform="translate(32 32)">
+    <circle cx="0" cy="0" r="10" fill="none" stroke="#ef4444" stroke-width="2.4"/>
+    <!-- inner arrows similar to conversiontherapy -->
+    <line x1="-7" y1="-4" x2="-2" y2="-1" stroke="#e5e7eb" stroke-width="1.8" stroke-linecap="round"/>
+    <polygon points="-2,-1 -5,0 -4,-3" fill="#e5e7eb"/>
+    <line x1="7" y1="-4" x2="2" y2="-1" stroke="#e5e7eb" stroke-width="1.8" stroke-linecap="round"/>
+    <polygon points="2,-1 5,0 4,-3" fill="#e5e7eb"/>
+    <!-- slash -->
+    <line x1="-7" y1="7" x2="7" y2="-7" stroke="#ef4444" stroke-width="2.4" stroke-linecap="round"/>
+  </g>
+</svg>

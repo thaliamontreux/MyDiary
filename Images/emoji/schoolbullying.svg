@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="School bullying locker and sad face">
+  <!-- Transparent background, locker door and small sad face -->
+  <g transform="translate(28 32)">
+    <rect x="-6" y="-10" width="12" height="20" rx="1.5" ry="1.5" fill="#111827"/>
+    <rect x="-5" y="-8" width="10" height="1.4" fill="#1f2937"/>
+    <rect x="-5" y="-5" width="10" height="1.4" fill="#1f2937"/>
+    <rect x="-5" y="-2" width="10" height="1.4" fill="#1f2937"/>
+    <rect x="3" y="-1" width="1.4" height="4" fill="#e5e7eb"/>
+  </g>
+  <g transform="translate(44 36)">
+    <circle cx="0" cy="0" r="4" fill="#111827"/>
+    <circle cx="-1" cy="-1" r="0.9" fill="#e5e7eb"/>
+    <circle cx="1" cy="-1" r="0.9" fill="#e5e7eb"/>
+    <path d="M-2 1 C0 -1 2 -1 2 1" fill="none" stroke="#e5e7eb" stroke-width="1.2" stroke-linecap="round"/>
+  </g>
+</svg>

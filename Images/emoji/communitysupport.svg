@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Community support circle of hands around heart">
+  <!-- Transparent background, hands circle around heart -->
+  <g transform="translate(32 36)">
+    <!-- heart center -->
+    <path d="M0 6  -3 3c-2-2-3-5-1-7 1-2 4-2 6 0 2-2 5-2 6 0 2 2 1 5-1 7z" fill="#f97316"/>
+    <!-- hands -->
+    <path d="M-10 0 C-8 -2 -6 -3 -4 -3" fill="none" stroke="#e5e7eb" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M10 0 C8 -2 6 -3 4 -3" fill="none" stroke="#e5e7eb" stroke-width="2.2" stroke-linecap="round"/>
+  </g>
+</svg>

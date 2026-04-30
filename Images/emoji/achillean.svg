@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Achillean shield and spear tip">
+  <!-- Transparent background, round shield with small spear tip -->
+  <g transform="translate(30 32)">
+    <circle cx="0" cy="0" r="9" fill="#0f172a"/>
+    <circle cx="0" cy="0" r="6.5" fill="#22c55e"/>
+    <circle cx="0" cy="0" r="3" fill="#e5e7eb"/>
+  </g>
+  <g transform="translate(40 24) rotate(-35)">
+    <polygon points="0,-2 6,0 0,2" fill="#22c55e"/>
+  </g>
+</svg>

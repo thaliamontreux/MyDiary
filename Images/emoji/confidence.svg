@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Confidence star badge">
+  <!-- Transparent background, star badge -->
+  <g transform="translate(32 32)">
+    <circle cx="0" cy="0" r="9" fill="#0f172a"/>
+    <circle cx="0" cy="0" r="7" fill="#f97316"/>
+    <polygon points="0,-4 1,-1 4,-1 2,1 3,4 0,2 -3,4 -2,1 -4,-1 -1,-1" fill="#fefce8"/>
+  </g>
+</svg>

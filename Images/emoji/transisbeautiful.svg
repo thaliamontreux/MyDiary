@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Trans is beautiful butterfly with trans colors">
+  <!-- Transparent background, butterfly wings in trans colors -->
+  <g transform="translate(32 34)">
+    <!-- left wing -->
+    <path d="M-2 -8 C-10 -10 -16 -4 -16 3 C-16 10 -10 14 -4 12 C-4 8 -2 2 -2 -2 Z" fill="#5BCEFA"/>
+    <path d="M-2 -4 C-9 -6 -12 -2 -12 2 C-12 6 -8 8 -4 7 C-4 5 -3 2 -2 0 Z" fill="#F5A9B8"/>
+    <!-- right wing -->
+    <path d="M2 -8 C10 -10 16 -4 16 3 C16 10 10 14 4 12 C4 8 2 2 2 -2 Z" fill="#5BCEFA"/>
+    <path d="M2 -4 C9 -6 12 -2 12 2 C12 6 8 8 4 7 C4 5 3 2 2 0 Z" fill="#F5A9B8"/>
+    <!-- body -->
+    <rect x="-1" y="-6" width="2" height="12" rx="1" fill="#0f172a"/>
+    <circle cx="0" cy="-7" r="1.5" fill="#0f172a"/>
+  </g>
+</svg>

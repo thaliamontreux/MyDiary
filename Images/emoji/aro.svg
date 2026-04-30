@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Aro shorthand aromantic flag icon">
+  <!-- Transparent background, small aro flag card -->
+  <g transform="translate(16 20)">
+    <rect x="0" y="0" width="32" height="22" rx="5" ry="5" fill="#020617"/>
+    <rect x="2" y="2" width="28" height="5" fill="#3DA542"/>
+    <rect x="2" y="7" width="28" height="5" fill="#A7D379"/>
+    <rect x="2" y="12" width="28" height="5" fill="#ffffff"/>
+    <rect x="2" y="17" width="28" height="5" fill="#A9A9A9"/>
+  </g>
+</svg>

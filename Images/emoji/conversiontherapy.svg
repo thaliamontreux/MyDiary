@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Conversion therapy crossed arrows">
+  <!-- Transparent background, two arrows pointing inward with a cross mark -->
+  <g transform="translate(32 32)">
+    <line x1="-10" y1="-6" x2="-2" y2="0" stroke="#e5e7eb" stroke-width="2" stroke-linecap="round"/>
+    <polygon points="-2,0 -6,1 -5,-3" fill="#e5e7eb"/>
+    <line x1="10" y1="-6" x2="2" y2="0" stroke="#e5e7eb" stroke-width="2" stroke-linecap="round"/>
+    <polygon points="2,0 6,1 5,-3" fill="#e5e7eb"/>
+    <!-- red X over -->
+    <line x1="-6" y1="6" x2="6" y2="-6" stroke="#ef4444" stroke-width="2.2" stroke-linecap="round"/>
+    <line x1="-6" y1="-6" x2="6" y2="6" stroke="#ef4444" stroke-width="2.2" stroke-linecap="round"/>
+  </g>
+</svg>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Be an ally heart and badge">
+  <!-- Transparent background, heart with small ally badge -->
+  <g transform="translate(30 34)">
+    <path d="M0 14  -6 7c-3-3-4-7-2-10 2-3 6-3 8 0 2-3 6-3 8 0 2 3 1 7-2 10z" fill="#f97316"/>
+  </g>
+  <g transform="translate(42 26)">
+    <circle cx="0" cy="0" r="4" fill="#0f172a"/>
+    <path d="M-1 1 L0 -2 L1 1 Z" fill="#f9fafb"/>
+  </g>
+</svg>

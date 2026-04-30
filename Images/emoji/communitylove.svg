@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Community love heart above people">
+  <!-- Transparent background, heart above three people -->
+  <g transform="translate(32 28)">
+    <path d="M0 6  -3 3c-2-2-3-4-1-6 1-2 4-2 6 0 2-2 5-2 6 0 2 2 1 4-1 6z" fill="#f97316"/>
+  </g>
+  <g transform="translate(32 38)">
+    <circle cx="-6" cy="0" r="2.2" fill="#e5e7eb"/>
+    <circle cx="0" cy="-2" r="2.4" fill="#e5e7eb"/>
+    <circle cx="6" cy="0" r="2.2" fill="#e5e7eb"/>
+  </g>
+</svg>

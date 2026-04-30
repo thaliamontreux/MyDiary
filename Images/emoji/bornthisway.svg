@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Born this way star and rainbow">
+  <!-- Transparent background, star with small rainbow underneath -->
+  <g transform="translate(32 20)">
+    <polygon points="0,-10 3,-2 11,-2 5,2 7,10 0,5 -7,10 -5,2 -11,-2 -3,-2" fill="#facc15"/>
+  </g>
+  <g transform="translate(32 38)">
+    <path d="M-14 4 A14 10 0 0 1 14 4" fill="none" stroke="#E40303" stroke-width="3" stroke-linecap="round"/>
+    <path d="M-12 7 A12 8 0 0 1 12 7" fill="none" stroke="#FF8C00" stroke-width="3" stroke-linecap="round"/>
+    <path d="M-10 10 A10 6 0 0 1 10 10" fill="none" stroke="#22c55e" stroke-width="3" stroke-linecap="round"/>
+  </g>
+</svg>

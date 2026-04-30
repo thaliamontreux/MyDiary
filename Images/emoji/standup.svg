@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Stand up microphoned stand and raised hand">
+  <!-- Transparent background, microphone stand and raised hand -->
+  <g transform="translate(28 34)">
+    <!-- stand -->
+    <line x1="0" y1="-6" x2="0" y2="6" stroke="#111827" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="0" cy="-8" r="2" fill="#111827"/>
+  </g>
+  <g transform="translate(40 34)">
+    <!-- raised hand -->
+    <path d="M-2 6 L-2 -2 C-2 -4 0 -6 2 -6 C4 -6 6 -4 6 -2 L6 6 Z" fill="#f97316"/>
+  </g>
+</svg>

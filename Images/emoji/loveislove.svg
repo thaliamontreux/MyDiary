@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Love is love interlocking rainbow hearts">
+  <!-- Transparent background, two interlocking hearts with rainbow fill -->
+  <g transform="translate(32 34)">
+    <!-- left heart -->
+    <path d="M-6 -8c-3-4-9-4-12 0-3 4-2 9 1 12l11 10 5-4" fill="#f97316" fill-opacity="0.9"/>
+    <!-- right heart -->
+    <path d="M6 -8c3-4 9-4 12 0 3 4 2 9-1 12l-11 10-5-4" fill="#3b82f6" fill-opacity="0.9"/>
+    <!-- central overlap glow -->
+    <path d="M-2 -6c2-3 6-3 8 0 2 3 1 6-1 8l-3 3-3-3c-2-2-3-5-1-8z" fill="#f9fafb" fill-opacity="0.9"/>
+  </g>
+</svg>

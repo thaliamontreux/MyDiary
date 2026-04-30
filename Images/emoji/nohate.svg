@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="No hate heart crossed out">
+  <!-- Transparent background, heart with prohibition slash -->
+  <g transform="translate(32 34)">
+    <path d="M0 14  -7 7c-4-4-5-10-2-14 2-3 7-4 9-1 1 1 2 2 3 3 1-1 2-2 3-3 2-3 7-2 9 1 3 4 2 10-2 14z" fill="#ef4444"/>
+    <circle cx="0" cy="4" r="11" fill="none" stroke="#111827" stroke-width="2"/>
+    <line x1="-7" y1="-1" x2="7" y2="9" stroke="#111827" stroke-width="2.4" stroke-linecap="round"/>
+  </g>
+</svg>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Volunteer hand and heart">
+  <!-- Transparent background, raised hand with small heart -->
+  <g transform="translate(30 36)">
+    <path d="M-2 8 L-2 -4 C-2 -6 0 -8 2 -8 C4 -8 6 -6 6 -4 L6 8 Z" fill="#e5e7eb"/>
+    <rect x="-3" y="8" width="10" height="4" rx="2" ry="2" fill="#d1d5db"/>
+  </g>
+  <g transform="translate(42 26)">
+    <path d="M0 6  -2 4c-1-1-1.5-2.5-0.5-3.5 0.9-1 2.3-1 3.1 0 0.8-1 2.2-1 3.1 0 1 1 0.5 2.5-0.5 3.5z" fill="#f97316"/>
+  </g>
+</svg>

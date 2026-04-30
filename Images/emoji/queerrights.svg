@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Queer rights protest sign with rainbow">
+  <!-- Transparent background, protest sign with rainbow bar -->
+  <g transform="translate(32 36)">
+    <!-- pole -->
+    <rect x="-1.5" y="-6" width="3" height="16" fill="#0f172a"/>
+  </g>
+  <g transform="translate(32 22)">
+    <!-- sign board -->
+    <rect x="-10" y="-6" width="20" height="12" rx="2" ry="2" fill="#020617"/>
+    <rect x="-8" y="-4" width="16" height="2" fill="#E40303"/>
+    <rect x="-8" y="-2" width="16" height="2" fill="#FFED00"/>
+    <rect x="-8" y="0" width="16" height="2" fill="#22c55e"/>
+  </g>
+</svg>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Mental health matters brain and heart">
+  <!-- Transparent background, brain outline with small heart -->
+  <g transform="translate(30 32)">
+    <!-- brain-like cloud -->
+    <path d="M-6 -4 C-8 -4 -10 -2 -10 0 C-10 2 -8 4 -6 4 C-6 7 -3 8 0 8 C3 8 6 7 6 4 C8 4 10 2 10 0 C10 -2 8 -4 6 -4 C6 -7 3 -8 0 -8 C-3 -8 -6 -7 -6 -4 Z" fill="#e5e7eb"/>
+  </g>
+  <g transform="translate(40 38)">
+    <path d="M0 6  -3 3c-2-2-3-4-1-6 1-2 4-2 6 0 2-2 5-2 6 0 2 2 1 4-1 6z" fill="#f97316"/>
+  </g>
+</svg>

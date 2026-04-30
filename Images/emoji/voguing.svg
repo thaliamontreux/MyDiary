@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Voguing pose silhouette">
+  <!-- Transparent background, stylized vogue pose silhouette -->
+  <g transform="translate(32 36)">
+    <!-- body -->
+    <path d="M-2 8 L0 -8 L2 8 Z" fill="#111827"/>
+    <!-- arms in pose -->
+    <line x1="0" y1="-4" x2="-8" y2="-10" stroke="#f97316" stroke-width="2" stroke-linecap="round"/>
+    <line x1="0" y1="-4" x2="8" y2="-6" stroke="#f97316" stroke-width="2" stroke-linecap="round"/>
+    <!-- head -->
+    <circle cx="0" cy="-10" r="3" fill="#f97316"/>
+  </g>
+</svg>

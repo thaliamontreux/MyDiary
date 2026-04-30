@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Gaymer gamepad with rainbow buttons">
+  <!-- Transparent background, game controller with rainbow buttons -->
+  <g transform="translate(32 34)">
+    <path d="M-14 -4 C-8 -10 8 -10 14 -4 C16 -2 16 2 14 4 C12 6 8 6 6 4 L2 0 H-2 L-6 4 C-8 6 -12 6 -14 4 C-16 2 -16 -2 -14 -4 Z" fill="#020617"/>
+    <!-- left controls -->
+    <circle cx="-6" cy="0" r="3" fill="#111827"/>
+    <rect x="-7.5" y="-0.7" width="3" height="1.4" fill="#e5e7eb"/>
+    <rect x="-6.7" y="-1.5" width="1.4" height="3" fill="#e5e7eb"/>
+    <!-- right rainbow buttons -->
+    <circle cx="6" cy="-1.5" r="1.4" fill="#E40303"/>
+    <circle cx="9" cy="1" r="1.4" fill="#FFED00"/>
+    <circle cx="3" cy="1" r="1.4" fill="#22c55e"/>
+    <circle cx="6" cy="3.5" r="1.4" fill="#3b82f6"/>
+  </g>
+</svg>

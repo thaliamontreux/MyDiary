@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Bravery torch">
+  <!-- Transparent background, torch with flame -->
+  <g transform="translate(32 36)">
+    <rect x="-1" y="0" width="2" height="8" fill="#92400e"/>
+    <path d="M-3 0 H3" fill="none" stroke="#92400e" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(32 28)">
+    <path d="M0 -4 C-2 -4 -3.5 -2.5 -3.5 -1 C-3.5 0.5 -2.5 2 0 3 C2.5 2 3.5 0.5 3.5 -1 C3.5 -2.5 2 -4 0 -4 Z" fill="#f97316"/>
+  </g>
+</svg>

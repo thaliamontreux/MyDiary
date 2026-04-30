@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Marriage equality rings and equal sign">
+  <!-- Transparent background, two rings with equal sign -->
+  <g transform="translate(28 34)">
+    <circle cx="-4" cy="0" r="4" fill="none" stroke="#facc15" stroke-width="2"/>
+    <circle cx="4" cy="0" r="4" fill="none" stroke="#facc15" stroke-width="2"/>
+  </g>
+  <g transform="translate(40 30)">
+    <rect x="-4" y="-2" width="8" height="1.8" rx="0.9" ry="0.9" fill="#e5e7eb"/>
+    <rect x="-4" y="1" width="8" height="1.8" rx="0.9" ry="0.9" fill="#e5e7eb"/>
+  </g>
+</svg>

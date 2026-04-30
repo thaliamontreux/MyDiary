@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Liberation broken chain and bird">
+  <!-- Transparent background, broken chain link with small bird -->
+  <g transform="translate(26 36)">
+    <path d="M-8 -2 C-11 -2 -13 0 -13 3 C-13 6 -11 8 -8 8 C-5 8 -3 6 -3 3" fill="none" stroke="#e5e7eb" stroke-width="2" stroke-linecap="round"/>
+    <line x1="-3" y1="-1" x2="0" y2="-4" stroke="#f97316" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(42 28)">
+    <path d="M-6 2 C-2 0 0 -2 4 -2 C6 -2 7 -1 8 0 C6 0 4 1 2 2 C0 3 -2 4 -6 4" fill="#e5e7eb"/>
+  </g>
+</svg>

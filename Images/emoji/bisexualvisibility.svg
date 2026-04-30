@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Bisexual visibility eye with bi colors">
+  <!-- Transparent background, eye with bi-colored iris -->
+  <g transform="translate(32 34)">
+    <path d="M-18 0 C-12 -10 -4 -14 0 -14 C4 -14 12 -10 18 0 C12 10 4 14 0 14 C-4 14 -12 10 -18 0 Z" fill="#0f172a"/>
+    <path d="M-14 0 C-9 -7 -3 -10 0 -10 C3 -10 9 -7 14 0 C9 7 3 10 0 10 C-3 10 -9 7 -14 0 Z" fill="#020617"/>
+    <circle cx="0" cy="0" r="6" fill="#111827"/>
+    <circle cx="0" cy="0" r="5" fill="#D60270"/>
+    <path d="M0 5 A5 5 0 0 1 0 -5" fill="none" stroke="#0038A8" stroke-width="3"/>
+    <circle cx="0" cy="0" r="2.3" fill="#0f172a"/>
+    <circle cx="-1" cy="-1.5" r="0.9" fill="#f9fafb"/>
+  </g>
+</svg>

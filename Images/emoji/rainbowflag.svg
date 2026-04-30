@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Rainbow flag on pole">
+  <!-- Transparent background, waving rainbow flag on pole -->
+  <g transform="translate(18 16)">
+    <rect x="0" y="0" width="3" height="32" rx="1.5" fill="#0f172a"/>
+    <path d="M3 4 C10 2 16 6 23 4 C30 2 36 6 41 4 L41 26 C34 28 28 24 21 26 C14 28 8 24 3 26 Z" fill="#E40303"/>
+    <path d="M3 8 C10 6 16 10 23 8 C30 6 36 10 41 8 L41 12 C34 14 28 10 21 12 C14 14 8 10 3 12 Z" fill="#FF8C00"/>
+    <path d="M3 12 C10 10 16 14 23 12 C30 10 36 14 41 12 L41 16 C34 18 28 14 21 16 C14 18 8 14 3 16 Z" fill="#FFED00"/>
+    <path d="M3 16 C10 14 16 18 23 16 C30 14 36 18 41 16 L41 20 C34 22 28 18 21 20 C14 22 8 18 3 20 Z" fill="#008026"/>
+    <path d="M3 20 C10 18 16 22 23 20 C30 18 36 22 41 20 L41 24 C34 26 28 22 21 24 C14 26 8 22 3 24 Z" fill="#004DFF"/>
+    <path d="M3 24 C10 22 16 26 23 24 C30 22 36 26 41 24 L41 28 C34 30 28 26 21 28 C14 30 8 26 3 28 Z" fill="#750787"/>
+  </g>
+</svg>

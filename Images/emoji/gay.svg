@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Gay pride flag icon">
+  <!-- Transparent background, MLM pride flag card -->
+  <g transform="translate(10 14)">
+    <rect x="0" y="0" width="44" height="32" rx="6" ry="6" fill="#020617"/>
+    <rect x="2" y="2" width="40" height="5" fill="#078D70"/>
+    <rect x="2" y="7" width="40" height="5" fill="#26CEAA"/>
+    <rect x="2" y="12" width="40" height="5" fill="#ffffff"/>
+    <rect x="2" y="17" width="40" height="5" fill="#7BADE2"/>
+    <rect x="2" y="22" width="40" height="5" fill="#5049CC"/>
+  </g>
+</svg>

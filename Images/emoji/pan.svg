@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Pan shorthand pansexual flag icon">
+  <!-- Transparent background, small pan flag card -->
+  <g transform="translate(16 20)">
+    <rect x="0" y="0" width="32" height="22" rx="5" ry="5" fill="#020617"/>
+    <rect x="2" y="2" width="28" height="7" fill="#FF218C"/>
+    <rect x="2" y="9" width="28" height="6" fill="#FFD800"/>
+    <rect x="2" y="15" width="28" height="5" fill="#21B1FF"/>
+  </g>
+</svg>

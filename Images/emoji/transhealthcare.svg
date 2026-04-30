@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Trans healthcare medical cross in trans colors">
+  <!-- Transparent background, medical cross in trans flag colors -->
+  <g transform="translate(32 32)">
+    <rect x="-4" y="-12" width="8" height="24" rx="2" ry="2" fill="#5BCEFA"/>
+    <rect x="-12" y="-4" width="24" height="8" rx="2" ry="2" fill="#F5A9B8"/>
+  </g>
+</svg>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Motivation target with arrow">
+  <!-- Transparent background, target and arrow -->
+  <g transform="translate(30 32)">
+    <circle cx="0" cy="0" r="6" fill="#0f172a"/>
+    <circle cx="0" cy="0" r="4" fill="#f97316"/>
+    <circle cx="0" cy="0" r="2" fill="#fefce8"/>
+  </g>
+  <g transform="translate(42 28)">
+    <line x1="-4" y1="4" x2="4" y2="-2" stroke="#f97316" stroke-width="2" stroke-linecap="round"/>
+    <polygon points="4,-2 2,-1 3,1" fill="#f97316"/>
+  </g>
+</svg>

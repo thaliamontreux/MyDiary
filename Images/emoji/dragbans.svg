@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Drag bans heel with forbidden sign">
+  <!-- Transparent background, high heel with ban circle -->
+  <g transform="translate(26 36)">
+    <path d="M-6 4 L-4 -2 L4 -2 L6 2 L4 4 Z" fill="#ec4899"/>
+    <rect x="4" y="2" width="3" height="4" fill="#111827"/>
+  </g>
+  <g transform="translate(42 30)">
+    <circle cx="0" cy="0" r="5" fill="none" stroke="#ef4444" stroke-width="2"/>
+    <line x1="-3.5" y1="3.5" x2="3.5" y2="-3.5" stroke="#ef4444" stroke-width="2" stroke-linecap="round"/>
+  </g>
+</svg>

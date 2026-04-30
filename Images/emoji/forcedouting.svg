@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Forced outing broken closet door">
+  <!-- Transparent background, door with crack and arrow -->
+  <g transform="translate(28 34)">
+    <rect x="-8" y="-12" width="16" height="22" rx="2" ry="2" fill="#111827"/>
+    <rect x="-7" y="-11" width="14" height="20" fill="#020617"/>
+    <!-- crack -->
+    <path d="M-3 -10 L-1 -6 L-3 -2 L-1 2 L-3 6" fill="none" stroke="#f97316" stroke-width="1.4"/>
+  </g>
+  <!-- outward arrow -->
+  <g transform="translate(42 32)">
+    <line x1="-4" y1="0" x2="4" y2="0" stroke="#f97316" stroke-width="2" stroke-linecap="round"/>
+    <polygon points="4,0 0,-3 0,3" fill="#f97316"/>
+  </g>
+</svg>

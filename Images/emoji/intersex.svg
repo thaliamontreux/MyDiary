@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Intersex pride flag icon">
+  <!-- Transparent background, intersex pride flag card -->
+  <g transform="translate(10 14)">
+    <rect x="0" y="0" width="44" height="32" rx="6" ry="6" fill="#FFD800"/>
+    <circle cx="22" cy="16" r="9" fill="none" stroke="#7902AA" stroke-width="3"/>
+  </g>
+</svg>

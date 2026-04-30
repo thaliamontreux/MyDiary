@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Nonprofit support heart and building">
+  <!-- Transparent background, building with heart badge -->
+  <g transform="translate(28 32)">
+    <rect x="-6" y="-8" width="12" height="16" rx="2" ry="2" fill="#111827"/>
+    <rect x="-3" y="-10" width="6" height="3" rx="1.5" ry="1.5" fill="#111827"/>
+  </g>
+  <g transform="translate(42 30)">
+    <circle cx="0" cy="0" r="4" fill="#f97316"/>
+    <path d="M0 3  -1.5 1c-1-1-1.4-2.3-0.5-3.2 0.7-0.9 2-0.9 2.7 0 0.7-0.9 2-0.9 2.7 0 0.9 0.9 0.5 2.2-0.5 3.2z" fill="#fefce8"/>
+  </g>
+</svg>

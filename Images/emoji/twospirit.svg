@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Two-Spirit symbol with feathers">
+  <!-- Transparent background, circular badge with two feathers -->
+  <g transform="translate(32 32)">
+    <circle cx="0" cy="0" r="18" fill="#0f172a" fill-opacity="0.88"/>
+    <circle cx="0" cy="0" r="14" fill="#1e293b"/>
+    <!-- rainbow ring hint -->
+    <circle cx="0" cy="0" r="15" fill="none" stroke="#f97316" stroke-width="2" stroke-opacity="0.8"/>
+    <!-- crossing feathers -->
+    <path d="M-1 -10 C-7 -4 -9 4 -6 12 L-3 10 C-4 6 -2 0 1 -5 Z" fill="#e5e7eb"/>
+    <path d="M1 -10 C7 -4 9 4 6 12 L3 10 C4 6 2 0 -1 -5 Z" fill="#c4b5fd"/>
+  </g>
+</svg>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="LGBT ally shield with A">
+  <!-- Transparent background, shield with rainbow A -->
+  <g transform="translate(32 32)">
+    <path d="M0 -18 L12 -12 L12 2 C12 8 7 13 0 16 C-7 13 -12 8 -12 2 L-12 -12 Z" fill="#020617"/>
+    <!-- A shape -->
+    <path d="M0 -12 L6 8 H2 L0 0 L-2 8 H-6 Z" fill="#f9fafb"/>
+    <!-- rainbow bar across A -->
+    <rect x="-5" y="-2" width="10" height="2" fill="#E40303"/>
+    <rect x="-5" y="0" width="10" height="2" fill="#FFED00"/>
+    <rect x="-5" y="2" width="10" height="2" fill="#22c55e"/>
+  </g>
+</svg>

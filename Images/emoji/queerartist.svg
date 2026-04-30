@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Queer artist palette with rainbow paints">
+  <!-- Transparent background, painter palette with rainbow blobs -->
+  <g transform="translate(32 34)">
+    <path d="M-10 -10 C4 -14 16 -6 16 4 C16 12 10 16 4 16 C2 16 0 14 1 12 C2 10 2 8 0 7 C-2 6 -4 7 -6 8 C-10 9 -16 6 -16 0 C-16 -6 -14 -9 -10 -10 Z" fill="#0f172a"/>
+    <!-- paint blobs -->
+    <circle cx="-4" cy="-6" r="2" fill="#E40303"/>
+    <circle cx="2" cy="-7" r="2" fill="#FFED00"/>
+    <circle cx="7" cy="-3" r="2" fill="#22c55e"/>
+    <circle cx="-1" cy="0" r="2" fill="#3b82f6"/>
+    <circle cx="5" cy="5" r="2" fill="#a855f7"/>
+    <!-- thumb hole -->
+    <circle cx="-6" cy="2" r="2.3" fill="#020617"/>
+  </g>
+</svg>

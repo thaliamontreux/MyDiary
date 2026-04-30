@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Pansexual pride flag icon">
+  <!-- Transparent background, pan pride flag card -->
+  <g transform="translate(10 14)">
+    <rect x="0" y="0" width="44" height="32" rx="6" ry="6" fill="#020617"/>
+    <rect x="2" y="2" width="40" height="9" fill="#FF218C"/>
+    <rect x="2" y="11" width="40" height="10" fill="#FFD800"/>
+    <rect x="2" y="21" width="40" height="9" fill="#21B1FF"/>
+  </g>
+</svg>

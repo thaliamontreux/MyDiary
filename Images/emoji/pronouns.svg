@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Pronouns text bubbles">
+  <!-- Transparent background, overlapping text bubbles -->
+  <g transform="translate(30 30)">
+    <rect x="-10" y="-6" width="14" height="10" rx="3" ry="3" fill="#020617"/>
+    <path d="M-6 4 L-4 6 L-4 4 Z" fill="#020617"/>
+    <line x1="-8" y1="-2" x2="-1" y2="-2" stroke="#e5e7eb" stroke-width="1.2" stroke-linecap="round"/>
+    <line x1="-8" y1="1" x2="-3" y2="1" stroke="#e5e7eb" stroke-width="1.2" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(42 34)">
+    <rect x="-6" y="-6" width="12" height="9" rx="3" ry="3" fill="#111827"/>
+    <path d="M-2 3 L0 5 L0 3 Z" fill="#111827"/>
+    <line x1="-4" y1="-2" x2="3" y2="-2" stroke="#e5e7eb" stroke-width="1.2" stroke-linecap="round"/>
+  </g>
+</svg>

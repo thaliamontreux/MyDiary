@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Pride all year calendar with heart">
+  <!-- Transparent background, small calendar with rainbow header and heart -->
+  <g transform="translate(32 32)">
+    <rect x="-12" y="-8" width="24" height="18" rx="3" ry="3" fill="#020617"/>
+    <!-- rainbow header -->
+    <rect x="-12" y="-8" width="24" height="3" fill="#E40303"/>
+    <rect x="-12" y="-5" width="24" height="2" fill="#FFED00"/>
+    <rect x="-12" y="-3" width="24" height="2" fill="#22c55e"/>
+    <!-- heart inside -->
+    <path d="M0 6  -3 3c-2-2-3-5-1-7 1-2 4-2 6 0 2-2 5-2 6 0 2 2 1 5-1 7z" fill="#f97316"/>
+  </g>
+</svg>

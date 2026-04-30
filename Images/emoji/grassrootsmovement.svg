@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Grassroots movement plant and crowd">
+  <!-- Transparent background, plant in front of small crowd -->
+  <g transform="translate(42 32)">
+    <circle cx="-6" cy="2" r="2.2" fill="#e5e7eb"/>
+    <circle cx="0" cy="0" r="2.4" fill="#e5e7eb"/>
+    <circle cx="6" cy="2" r="2.2" fill="#e5e7eb"/>
+  </g>
+  <g transform="translate(24 36)">
+    <rect x="-1" y="-2" width="2" height="6" fill="#16a34a"/>
+    <path d="M-1 -2 C-3 -4 -4 -6 -3 -7 C-2 -8 0 -7 1 -5" fill="#16a34a"/>
+    <path d="M1 -2 C3 -4 4 -6 3 -7 C2 -8 0 -7 -1 -5" fill="#22c55e"/>
+  </g>
+</svg>

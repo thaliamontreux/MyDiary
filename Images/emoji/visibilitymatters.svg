@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Visibility matters eye with rainbow iris">
+  <!-- Transparent background, eye with rainbow iris -->
+  <g transform="translate(32 34)">
+    <!-- eye outline -->
+    <path d="M-18 0 C-12 -10 -4 -14 0 -14 C4 -14 12 -10 18 0 C12 10 4 14 0 14 C-4 14 -12 10 -18 0 Z" fill="#0f172a"/>
+    <path d="M-14 0 C-9 -7 -3 -10 0 -10 C3 -10 9 -7 14 0 C9 7 3 10 0 10 C-3 10 -9 7 -14 0 Z" fill="#020617"/>
+    <!-- iris -->
+    <circle cx="0" cy="0" r="5.5" fill="#111827"/>
+    <circle cx="0" cy="0" r="5" fill="#E40303"/>
+    <path d="M0 -5 A5 5 0 0 1 4.33 -2.5 L0 0 Z" fill="#FF8C00"/>
+    <path d="M4.33 -2.5 A5 5 0 0 1 4.33 2.5 L0 0 Z" fill="#FFED00"/>
+    <path d="M4.33 2.5 A5 5 0 0 1 0 5 L0 0 Z" fill="#22c55e"/>
+    <path d="M0 5 A5 5 0 0 1 -4.33 2.5 L0 0 Z" fill="#3b82f6"/>
+    <path d="M-4.33 2.5 A5 5 0 0 1 -4.33 -2.5 L0 0 Z" fill="#6366f1"/>
+    <path d="M-4.33 -2.5 A5 5 0 0 1 0 -5 L0 0 Z" fill="#a855f7"/>
+    <!-- highlight -->
+    <circle cx="-1.5" cy="-2" r="1.3" fill="#f9fafb"/>
+  </g>
+</svg>

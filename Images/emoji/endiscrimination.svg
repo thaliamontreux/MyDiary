@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="End discrimination broken chain">
+  <!-- Transparent background, broken chain links -->
+  <g transform="translate(32 32)">
+    <!-- left link -->
+    <path d="M-10 -2 C-13 -2 -15 0 -15 3 C-15 6 -13 8 -10 8 C-7 8 -5 6 -5 3" fill="none" stroke="#e5e7eb" stroke-width="2.4" stroke-linecap="round"/>
+    <!-- right link -->
+    <path d="M10 -2 C13 -2 15 0 15 3 C15 6 13 8 10 8 C7 8 5 6 5 3" fill="none" stroke="#e5e7eb" stroke-width="2.4" stroke-linecap="round"/>
+    <!-- broken center -->
+    <line x1="-4" y1="-1" x2="0" y2="-5" stroke="#ef4444" stroke-width="2.4" stroke-linecap="round"/>
+    <line x1="0" y1="-5" x2="4" y2="-1" stroke="#ef4444" stroke-width="2.4" stroke-linecap="round"/>
+  </g>
+</svg>

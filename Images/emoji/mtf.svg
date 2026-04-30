@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="MTF arrows with trans gradient">
+  <!-- Transparent background, stylized MTF arrows in trans colors -->
+  <defs>
+    <linearGradient id="mtf-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#5BCEFA"/>
+      <stop offset="50%" stop-color="#F5A9B8"/>
+      <stop offset="100%" stop-color="#5BCEFA"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(32 32)">
+    <path d="M-12 6 L-4 -10 L4 6 Z" fill="url(#mtf-grad)"/>
+    <path d="M0 -4 L6 -14 L12 -4 Z" fill="#0f172a" fill-opacity="0.9"/>
+  </g>
+</svg>

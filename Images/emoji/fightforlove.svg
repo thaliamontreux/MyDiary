@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Fight for love fist with heart">
+  <!-- Transparent background, raised fist holding small heart -->
+  <g transform="translate(32 38)">
+    <!-- fist -->
+    <path d="M-4 4 L-4 -4 C-4 -6 -2 -8 0 -8 C2 -8 4 -6 4 -4 L4 4 Z" fill="#f97316"/>
+    <rect x="-6" y="4" width="12" height="8" rx="2" ry="2" fill="#ea580c"/>
+    <!-- heart above -->
+    <path d="M0 -10  -2 -12c-1-2-4-2-5 0-1 2-1 4 1 6l6 5 6-5c2-2 2-4 1-6-1-2-4-2-5 0z" fill="#ef4444"/>
+  </g>
+</svg>

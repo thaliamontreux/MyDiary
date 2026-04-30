@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Stop homophobia stop hand and rainbow">
+  <!-- Transparent background, raised hand with rainbow arc -->
+  <g transform="translate(26 36)">
+    <!-- hand -->
+    <path d="M-3 8 L-3 -4 C-3 -6 -1 -8 1 -8 C3 -8 5 -6 5 -4 L5 8 Z" fill="#e5e7eb"/>
+    <rect x="-5" y="4" width="10" height="6" rx="2" ry="2" fill="#d1d5db"/>
+  </g>
+  <g transform="translate(38 26)">
+    <path d="M-8 4 A8 8 0 0 1 8 4" fill="none" stroke="#E40303" stroke-width="2" stroke-linecap="round"/>
+    <path d="M-7 6 A7 7 0 0 1 7 6" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+  </g>
+</svg>

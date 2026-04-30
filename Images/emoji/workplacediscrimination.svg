@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Workplace discrimination briefcase and unequal figures">
+  <!-- Transparent background, briefcase with two uneven figures -->
+  <g transform="translate(28 30)">
+    <rect x="-8" y="-6" width="16" height="12" rx="2" ry="2" fill="#111827"/>
+    <rect x="-4" y="-8" width="8" height="3" rx="1.5" ry="1.5" fill="#111827"/>
+  </g>
+  <g transform="translate(42 36)">
+    <!-- taller figure -->
+    <circle cx="-3" cy="-6" r="2.3" fill="#e5e7eb"/>
+    <rect x="-4.5" y="-4" width="3" height="9" rx="1.3" fill="#111827"/>
+    <!-- shorter figure -->
+    <circle cx="4" cy="-5" r="1.9" fill="#e5e7eb"/>
+    <rect x="3" y="-3" width="2.4" height="6" rx="1.2" fill="#374151"/>
+  </g>
+</svg>

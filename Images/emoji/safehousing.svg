@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Safe housing house and shield">
+  <!-- Transparent background, house with small shield -->
+  <g transform="translate(26 32)">
+    <polygon points="0,-8 8,-2 -8,-2" fill="#111827"/>
+    <rect x="-7" y="-2" width="14" height="9" rx="2" ry="2" fill="#020617"/>
+  </g>
+  <g transform="translate(44 34)">
+    <path d="M0 -6 L4 -3 L4 1 C4 3 3 4 0 5 C-3 4 -4 3 -4 1 L-4 -3 Z" fill="#0f172a"/>
+  </g>
+</svg>

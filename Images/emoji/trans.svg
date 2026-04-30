@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Trans pride flag icon">
+  <!-- Transparent background, trans pride flag card -->
+  <g transform="translate(10 14)">
+    <rect x="0" y="0" width="44" height="32" rx="6" ry="6" fill="#ffffff"/>
+    <rect x="2" y="2" width="40" height="6" fill="#5BCEFA"/>
+    <rect x="2" y="8" width="40" height="6" fill="#F5A9B8"/>
+    <rect x="2" y="14" width="40" height="6" fill="#ffffff"/>
+    <rect x="2" y="20" width="40" height="6" fill="#F5A9B8"/>
+    <rect x="2" y="26" width="40" height="6" fill="#5BCEFA"/>
+  </g>
+</svg>

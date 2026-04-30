@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Compassion heart and hands">
+  <!-- Transparent background, heart cradled by hands -->
+  <g transform="translate(32 30)">
+    <path d="M0 6  -3 3c-2-2-3-4-1-6 1-2 4-2 6 0 2-2 5-2 6 0 2 2 1 4-1 6z" fill="#f97316"/>
+  </g>
+  <g transform="translate(32 38)">
+    <path d="M-8 0 C-6 2 -4 3 -2 3 C0 3 1 2 2 1" fill="none" stroke="#e5e7eb" stroke-width="2.2" stroke-linecap="round"/>
+    <path d="M8 0 C6 2 4 3 2 3 C0 3 -1 2 -2 1" fill="none" stroke="#e5e7eb" stroke-width="2.2" stroke-linecap="round"/>
+  </g>
+</svg>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Stonewall brick wall with pride flag">
+  <!-- Transparent background, brick wall with small pride flag -->
+  <g transform="translate(20 30)">
+    <!-- bricks -->
+    <rect x="0" y="0" width="24" height="4" fill="#4b5563"/>
+    <rect x="0" y="5" width="24" height="4" fill="#374151"/>
+    <rect x="0" y="10" width="24" height="4" fill="#4b5563"/>
+    <!-- mortar lines -->
+    <rect x="7" y="0" width="2" height="14" fill="#1f2937" opacity="0.5"/>
+    <rect x="15" y="0" width="2" height="14" fill="#1f2937" opacity="0.5"/>
+  </g>
+  <!-- pride flag on side -->
+  <g transform="translate(40 22)">
+    <rect x="0" y="0" width="10" height="8" rx="1.5" ry="1.5" fill="#020617"/>
+    <rect x="1" y="1" width="8" height="1.2" fill="#E40303"/>
+    <rect x="1" y="2.2" width="8" height="1.2" fill="#FF8C00"/>
+    <rect x="1" y="3.4" width="8" height="1.2" fill="#FFED00"/>
+    <rect x="1" y="4.6" width="8" height="1.2" fill="#008026"/>
+    <rect x="1" y="5.8" width="8" height="1.2" fill="#004DFF"/>
+  </g>
+</svg>

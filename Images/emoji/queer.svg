@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Queer rainbow heart icon">
+  <!-- Transparent background, rainbow arc and heart -->
+  <g transform="translate(12 14)">
+    <rect x="0" y="10" width="40" height="4" rx="2" fill="#E40303"/>
+    <rect x="2" y="14" width="36" height="4" rx="2" fill="#FF8C00"/>
+    <rect x="4" y="18" width="32" height="4" rx="2" fill="#FFED00"/>
+    <rect x="6" y="22" width="28" height="4" rx="2" fill="#008026"/>
+    <rect x="8" y="26" width="24" height="4" rx="2" fill="#004DFF"/>
+    <rect x="10" y="30" width="20" height="4" rx="2" fill="#750787"/>
+    <!-- central heart -->
+    <path d="M20 16c-3-4-9-4-12 0-3 4-2 10 2 13l10 8 10-8c4-3 5-9 2-13-3-4-9-4-12 0z" fill="#f9fafb"/>
+  </g>
+</svg>

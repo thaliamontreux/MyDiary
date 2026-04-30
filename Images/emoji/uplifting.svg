@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Uplifting arrows upward">
+  <!-- Transparent background, three arrows pointing up -->
+  <g transform="translate(32 36)">
+    <path d="M-8 4 L-4 -2 L0 4" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round"/>
+    <path d="M0 4 L4 -2 L8 4" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round"/>
+  </g>
+</svg>

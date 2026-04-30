@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Bisexual pride flag icon">
+  <!-- Transparent background, bi pride flag card -->
+  <g transform="translate(10 14)">
+    <rect x="0" y="0" width="44" height="32" rx="6" ry="6" fill="#020617"/>
+    <!-- top 40% magenta -->
+    <rect x="2" y="2" width="40" height="12" fill="#D60270"/>
+    <!-- middle 20% purple -->
+    <rect x="2" y="14" width="40" height="6" fill="#9B4F96"/>
+    <!-- bottom 40% blue -->
+    <rect x="2" y="20" width="40" height="12" fill="#0038A8"/>
+  </g>
+</svg>

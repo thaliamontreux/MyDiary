@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Biphobia broken bi flag">
+  <!-- Transparent background, cracked bi flag card -->
+  <g transform="translate(32 34)">
+    <rect x="-12" y="-8" width="24" height="16" rx="3" ry="3" fill="#020617"/>
+    <!-- bi stripes -->
+    <rect x="-10" y="-7" width="20" height="6" fill="#D60270"/>
+    <rect x="-10" y="-1" width="20" height="4" fill="#9B4F96"/>
+    <rect x="-10" y="3" width="20" height="6" fill="#0038A8"/>
+    <!-- crack -->
+    <path d="M-6 -8 L-2 -2 L-4 2 L0 6 L4 2 L2 -2 L6 -8" fill="none" stroke="#020617" stroke-width="1.6"/>
+  </g>
+</svg>

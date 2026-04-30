@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Justice for all scales and people">
+  <!-- Transparent background, scales with three small figures underneath -->
+  <g transform="translate(32 28)">
+    <line x1="0" y1="-8" x2="0" y2="4" stroke="#111827" stroke-width="2.4" stroke-linecap="round"/>
+    <line x1="-10" y1="-4" x2="10" y2="-4" stroke="#111827" stroke-width="2.2" stroke-linecap="round"/>
+    <circle cx="-8" cy="0" r="3" fill="none" stroke="#111827" stroke-width="1.8"/>
+    <circle cx="8" cy="0" r="3" fill="none" stroke="#111827" stroke-width="1.8"/>
+  </g>
+  <g transform="translate(32 38)">
+    <circle cx="-6" cy="0" r="2" fill="#e5e7eb"/>
+    <circle cx="0" cy="0" r="2" fill="#e5e7eb"/>
+    <circle cx="6" cy="0" r="2" fill="#e5e7eb"/>
+  </g>
+</svg>

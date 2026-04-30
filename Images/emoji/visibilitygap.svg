@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Visibility gap one filled eye one dim eye">
+  <!-- Transparent background, one bright eye and one dim eye -->
+  <g transform="translate(24 34)">
+    <path d="M-10 0 C-6 -6 -2 -8 0 -8 C2 -8 6 -6 10 0 C6 6 2 8 0 8 C-2 8 -6 6 -10 0 Z" fill="#0f172a"/>
+    <circle cx="0" cy="0" r="3" fill="#e5e7eb"/>
+  </g>
+  <g transform="translate(44 34)">
+    <path d="M-10 0 C-6 -6 -2 -8 0 -8 C2 -8 6 -6 10 0 C6 6 2 8 0 8 C-2 8 -6 6 -10 0 Z" fill="#020617"/>
+    <circle cx="0" cy="0" r="2" fill="#4b5563"/>
+  </g>
+</svg>

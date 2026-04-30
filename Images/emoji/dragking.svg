@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" role="img" aria-label="Drag king crown and moustache">
+  <!-- Transparent background, small crown and moustache -->
+  <g transform="translate(32 24)">
+    <!-- crown -->
+    <path d="M-8 4 L-4 -2 L0 4 L4 -2 L8 4 Z" fill="#facc15"/>
+    <circle cx="-4" cy="-2" r="1.2" fill="#f97316"/>
+    <circle cx="0" cy="0" r="1.4" fill="#f97316"/>
+    <circle cx="4" cy="-2" r="1.2" fill="#f97316"/>
+  </g>
+  <!-- moustache -->
+  <g transform="translate(32 38)">
+    <path d="M-8 0 C-6 -2 -4 -2 -2 0 C-4 -1 -6 1 -8 0 Z" fill="#0f172a"/>
+    <path d="M8 0 C6 -2 4 -2 2 0 C4 -1 6 1 8 0 Z" fill="#0f172a"/>
+  </g>
+</svg>
